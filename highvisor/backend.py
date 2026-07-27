@@ -78,6 +78,33 @@ class BackendError(Exception):
     """Raised for addressable, client-facing failures (bad target, etc.)."""
 
 
+# Named half/quadrant zones of the primary display, resolved against its physical
+# size. This is the vocabulary the Ersatz layout uses ("Godot top-right over the
+# slurped program bottom-right"). OS-neutral on purpose — the engine computes the
+# rect from the backend's screen_size() and hands the backend plain pixels.
+ZONES = ("full", "left", "right", "top", "bottom",
+         "top-left", "top-right", "bottom-left", "bottom-right")
+
+
+def zone_rect(zone: str, screen_w: int, screen_h: int):
+    """Return (x, y, w, h) in physical pixels for a named ZONES entry."""
+    hw, hh = screen_w // 2, screen_h // 2
+    table = {
+        "full":         (0, 0, screen_w, screen_h),
+        "left":         (0, 0, hw, screen_h),
+        "right":        (hw, 0, hw, screen_h),
+        "top":          (0, 0, screen_w, hh),
+        "bottom":       (0, hh, screen_w, hh),
+        "top-left":     (0, 0, hw, hh),
+        "top-right":    (hw, 0, hw, hh),
+        "bottom-left":  (0, hh, hw, hh),
+        "bottom-right": (hw, hh, hw, hh),
+    }
+    if zone not in table:
+        raise BackendError("unknown zone %r (known: %s)" % (zone, ", ".join(ZONES)))
+    return table[zone]
+
+
 class PlatformBackend:
     """Abstract per-OS backend. Subclasses implement all methods. Every method
     runs on the engine's single worker thread (see engine.py), so implementations
@@ -110,4 +137,14 @@ class PlatformBackend:
         raise NotImplementedError
 
     def inspect(self, target: str, depth: int = 3) -> Element:
+        raise NotImplementedError
+
+    def screen_size(self):
+        """Return (width, height) of the primary display in physical pixels."""
+        raise NotImplementedError
+
+    def move(self, target: str, x: int, y: int, w: int, h: int,
+             topmost: bool = False) -> ActionResult:
+        """Position + size ``target`` to a physical-pixel rect. ``topmost`` keeps
+        it above non-topmost windows (used to pin an Ersatz overlay)."""
         raise NotImplementedError

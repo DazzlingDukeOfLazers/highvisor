@@ -105,6 +105,22 @@ class Engine:
             tree = b.inspect(req["target"], int(req.get("depth", 3)))
             return {"ok": True, "tree": tree.to_dict()}
 
+        if op == P.OP_SCREEN:
+            w, h = b.screen_size()
+            return {"ok": True, "w": w, "h": h}
+
+        if op == P.OP_MOVE:
+            topmost = bool(req.get("topmost", False))
+            zone = req.get("zone")
+            if zone:  # resolve the named zone against the physical display size
+                from .backend import zone_rect
+                sw, sh = b.screen_size()
+                x, y, w, h = zone_rect(zone, sw, sh)
+            else:
+                x, y, w, h = (int(req["x"]), int(req["y"]),
+                              int(req["w"]), int(req["h"]))
+            return b.move(req["target"], x, y, w, h, topmost).to_dict()
+
         return {"ok": False, "error": "unknown op: %r" % op}
 
     def stop(self):
