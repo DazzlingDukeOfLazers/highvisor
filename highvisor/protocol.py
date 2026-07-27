@@ -23,6 +23,8 @@ OP_ACTIVATE = "activate"    # target -> ActionResult
 OP_TEXT = "text"            # target, text -> ActionResult
 OP_KEY = "key"              # target, keys -> ActionResult
 OP_INSPECT = "inspect"      # target, depth -> {ok, tree}
+OP_MOVE = "move"            # target, (zone | x,y,w,h), [topmost] -> ActionResult
+OP_SCREEN = "screen_size"   # -> {ok, w, h}  (physical pixels of primary display)
 
 MAX_FRAME = 64 * 1024 * 1024  # 64 MiB guard (a 4k screenshot fits easily)
 

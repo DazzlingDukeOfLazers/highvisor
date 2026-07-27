@@ -29,6 +29,13 @@ WM_KEYDOWN, WM_KEYUP, WM_CHAR = 0x0100, 0x0101, 0x0102
 PW_RENDERFULLCONTENT = 0x00000002
 SW_RESTORE = 9
 
+# BitBlt raster op + SetWindowPos flags / special HWNDs (window-ops).
+SRCCOPY = 0x00CC0020
+SWP_NOSIZE, SWP_NOMOVE, SWP_NOZORDER = 0x0001, 0x0002, 0x0004
+SWP_NOACTIVATE, SWP_SHOWWINDOW = 0x0010, 0x0040
+HWND_TOP, HWND_TOPMOST, HWND_NOTOPMOST = 0, -1, -2
+SPI_SETFOREGROUNDLOCKTIMEOUT = 0x2001
+
 VK = {
     "RETURN": 0x0D, "ENTER": 0x0D, "TAB": 0x09, "ESC": 0x1B, "ESCAPE": 0x1B,
     "SPACE": 0x20, "BACKSPACE": 0x08, "BACK": 0x08, "DELETE": 0x2E, "DEL": 0x2E,
@@ -77,6 +84,23 @@ def _configure_win32():
         (gdi32.GetDIBits, ctypes.c_int,
          [ctypes.c_void_p, ctypes.c_void_p, wintypes.UINT, wintypes.UINT,
           ctypes.c_void_p, ctypes.c_void_p, wintypes.UINT]),
+        # window-ops: screen capture (BitBlt), screen size, move, robust activate
+        (user32.GetDC, ctypes.c_void_p, [wintypes.HWND]),
+        (user32.GetSystemMetrics, ctypes.c_int, [ctypes.c_int]),
+        (user32.SetWindowPos, ctypes.c_int,
+         [wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int,
+          ctypes.c_int, ctypes.c_int, wintypes.UINT]),
+        (user32.GetWindowThreadProcessId, wintypes.DWORD,
+         [wintypes.HWND, ctypes.c_void_p]),
+        (user32.AttachThreadInput, ctypes.c_int,
+         [wintypes.DWORD, wintypes.DWORD, ctypes.c_int]),
+        (user32.BringWindowToTop, ctypes.c_int, [wintypes.HWND]),
+        (user32.SystemParametersInfoW, ctypes.c_int,
+         [wintypes.UINT, wintypes.UINT, ctypes.c_void_p, wintypes.UINT]),
+        (gdi32.BitBlt, ctypes.c_int,
+         [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+          ctypes.c_int, ctypes.c_void_p, ctypes.c_int, ctypes.c_int,
+          wintypes.DWORD]),
     ]
     for fn, res, args in sig:
         fn.restype, fn.argtypes = res, args
@@ -182,7 +206,21 @@ class WindowsBackend(PlatformBackend):
         from PIL import Image
         hwnd = self._resolve(target)
         if hwnd is None:
-            hwnd = user32.GetDesktopWindow()
+            # Full-screen: PrintWindow on the desktop returns black, so BitBlt
+            # from the screen DC instead. Physical pixels (we're DPI-aware).
+            w, h = self.screen_size()
+            src = user32.GetDC(None)
+            mem = gdi32.CreateCompatibleDC(src)
+            bmp = gdi32.CreateCompatibleBitmap(src, w, h)
+            gdi32.SelectObject(mem, bmp)
+            gdi32.BitBlt(mem, 0, 0, w, h, src, 0, 0, SRCCOPY)
+            buf = self._dib_bytes(mem, bmp, w, h)
+            gdi32.DeleteObject(bmp)
+            gdi32.DeleteDC(mem)
+            user32.ReleaseDC(None, src)
+            out = BytesIO()
+            Image.frombuffer("RGB", (w, h), buf, "raw", "BGRX", 0, 1).save(out, "PNG")
+            return out.getvalue()
         rect = wintypes.RECT()
         user32.GetWindowRect(hwnd, ctypes.byref(rect))
         w, h = rect.right - rect.left, rect.bottom - rect.top
@@ -193,6 +231,16 @@ class WindowsBackend(PlatformBackend):
         bmp = gdi32.CreateCompatibleBitmap(hdc, w, h)
         gdi32.SelectObject(mem, bmp)
         user32.PrintWindow(hwnd, mem, PW_RENDERFULLCONTENT)
+        buf = self._dib_bytes(mem, bmp, w, h)
+        gdi32.DeleteObject(bmp)
+        gdi32.DeleteDC(mem)
+        user32.ReleaseDC(hwnd, hdc)
+        out = BytesIO()
+        Image.frombuffer("RGB", (w, h), buf, "raw", "BGRX", 0, 1).save(out, "PNG")
+        return out.getvalue()
+
+    def _dib_bytes(self, mem, bmp, w, h):
+        """Pull top-down 32-bit BGRX pixels out of a bitmap via GetDIBits."""
         bmi = BITMAPINFO()
         bmi.bmiHeader.biSize = ctypes.sizeof(BITMAPINFOHEADER)
         bmi.bmiHeader.biWidth, bmi.bmiHeader.biHeight = w, -h
@@ -200,12 +248,24 @@ class WindowsBackend(PlatformBackend):
         bmi.bmiHeader.biCompression = 0
         buf = ctypes.create_string_buffer(w * h * 4)
         gdi32.GetDIBits(mem, bmp, 0, h, buf, ctypes.byref(bmi), 0)
-        gdi32.DeleteObject(bmp)
-        gdi32.DeleteDC(mem)
-        user32.ReleaseDC(hwnd, hdc)
-        out = BytesIO()
-        Image.frombuffer("RGB", (w, h), buf, "raw", "BGRX", 0, 1).save(out, "PNG")
-        return out.getvalue()
+        return buf
+
+    def screen_size(self):
+        return (user32.GetSystemMetrics(0), user32.GetSystemMetrics(1))
+
+    def move(self, target: str, x: int, y: int, w: int, h: int,
+             topmost: bool = False) -> ActionResult:
+        hwnd = self._resolve(target)
+        if hwnd is None:
+            return ActionResult.fail("move needs a window target")
+        if user32.IsIconic(hwnd):
+            user32.ShowWindow(hwnd, SW_RESTORE)
+        insert_after = HWND_TOPMOST if topmost else HWND_TOP
+        flags = SWP_NOACTIVATE | SWP_SHOWWINDOW
+        ok = user32.SetWindowPos(hwnd, insert_after, x, y, w, h, flags)
+        return ActionResult(ok=bool(ok), tier=4,
+                            detail="SetWindowPos %d,%d %dx%d topmost=%s"
+                                   % (x, y, w, h, topmost))
 
     def inspect(self, target: str, depth: int = 3) -> Element:
         hwnd = self._resolve(target)
@@ -242,9 +302,27 @@ class WindowsBackend(PlatformBackend):
             return ActionResult.fail("activate needs a window target")
         if user32.IsIconic(hwnd):
             user32.ShowWindow(hwnd, SW_RESTORE)
-        ok = user32.SetForegroundWindow(hwnd)
+        # A bare SetForegroundWindow from a background process is refused by the
+        # foreground lock (returns 0). Defeat it: zero the lock timeout, then
+        # attach our input queue to the current foreground thread's so Windows
+        # treats the call as coming from the active app.
+        user32.SystemParametersInfoW(SPI_SETFOREGROUNDLOCKTIMEOUT, 0,
+                                     ctypes.c_void_p(0), 0)
+        fg = user32.GetForegroundWindow()
+        tgt_t = user32.GetWindowThreadProcessId(hwnd, None)
+        fg_t = user32.GetWindowThreadProcessId(fg, None) if fg else 0
+        attached = bool(fg_t) and fg_t != tgt_t
+        if attached:
+            user32.AttachThreadInput(fg_t, tgt_t, True)
+        try:
+            user32.BringWindowToTop(hwnd)
+            ok = user32.SetForegroundWindow(hwnd)
+        finally:
+            if attached:
+                user32.AttachThreadInput(fg_t, tgt_t, False)
         return ActionResult(ok=bool(ok), tier=4,
-                            detail="SetForegroundWindow=%s" % ok)
+                            detail="SetForegroundWindow=%s (attach=%s)"
+                                   % (ok, attached))
 
     def _wm_get_text(self, hwnd):
         n = user32.SendMessageW(hwnd, WM_GETTEXTLENGTH, 0, 0)
