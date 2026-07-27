@@ -254,13 +254,17 @@ class WindowsBackend(PlatformBackend):
         return (user32.GetSystemMetrics(0), user32.GetSystemMetrics(1))
 
     def move(self, target: str, x: int, y: int, w: int, h: int,
-             topmost: bool = False) -> ActionResult:
+             topmost: Optional[bool] = None) -> ActionResult:
         hwnd = self._resolve(target)
         if hwnd is None:
             return ActionResult.fail("move needs a window target")
         if user32.IsIconic(hwnd):
             user32.ShowWindow(hwnd, SW_RESTORE)
-        insert_after = HWND_TOPMOST if topmost else HWND_TOP
+        # Tri-state z-order: True pins topmost, False explicitly clears the
+        # topmost bit, None just raises (HWND_TOP leaves an existing topmost
+        # window topmost — there's no way to clear it without HWND_NOTOPMOST).
+        insert_after = (HWND_TOPMOST if topmost is True else
+                        HWND_NOTOPMOST if topmost is False else HWND_TOP)
         flags = SWP_NOACTIVATE | SWP_SHOWWINDOW
         ok = user32.SetWindowPos(hwnd, insert_after, x, y, w, h, flags)
         return ActionResult(ok=bool(ok), tier=4,

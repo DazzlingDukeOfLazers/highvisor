@@ -11,10 +11,11 @@ other language could reimplement this in a few lines (that's the point).
     hv key <target> <keys>
     hv activate <target>
     hv inspect <target> [depth]
-    hv move <target> <zone | x y w h> [--topmost]
+    hv move <target> <zone | x y w h> [--topmost | --no-topmost]
     hv screen
     hv diff <a.png> <b.png> [--out heat.png]
     hv zones <img.png> [--top N]
+    hv responsive <golem> <source> [--threshold P] [--out-dir DIR]
     hv raw '{"op":"ping"}'
 
 <target> is a window ref: "hwnd:0x1a2b", "pid:1234", or a title substring.
@@ -116,6 +117,15 @@ def _cmd_zones(a):
     _print_json({"count": len(z), "zones": z})
 
 
+def _cmd_responsive(a):
+    # Orchestrates the daemon (screen/move/shot) + local diff; see responsive.py.
+    from . import responsive
+    report = responsive.run(_call, a.golem, a.source,
+                            threshold=a.threshold, out_dir=a.out_dir)
+    _print_json(report)
+    return 0 if report["verdict"] == "PASS" else 1
+
+
 def _cmd_raw(a):
     _print_json(_call(json.loads(a.json)), strip=("png_b64",))
 
@@ -157,8 +167,11 @@ def build_parser():
     s.add_argument("target")
     s.add_argument("rect", nargs="+",
                    help="zone name (e.g. top-right) or four ints: x y w h")
-    s.add_argument("--topmost", action="store_true",
-                   help="keep the window above non-topmost windows")
+    g = s.add_mutually_exclusive_group()
+    g.add_argument("--topmost", dest="topmost", action="store_true", default=None,
+                   help="pin the window above non-topmost windows")
+    g.add_argument("--no-topmost", dest="topmost", action="store_false",
+                   help="clear the window's topmost bit")
     s.set_defaults(fn=_cmd_move)
 
     sub.add_parser("screen").set_defaults(fn=_cmd_screen)
@@ -175,6 +188,16 @@ def build_parser():
     s.add_argument("img")
     s.add_argument("--top", type=int, default=0, help="px of OS chrome to skip")
     s.set_defaults(fn=_cmd_zones)
+
+    s = sub.add_parser("responsive",
+                       help="deterministic responsive-parity test: golem vs source")
+    s.add_argument("golem", help="window ref for the generated/candidate window")
+    s.add_argument("source", help="window ref for the reference window")
+    s.add_argument("--threshold", type=float, default=99.0,
+                   help="min content-match %% to pass a frame (default 99.0)")
+    s.add_argument("--out-dir", default=None, dest="out_dir",
+                   help="where to write per-frame captures + heatmaps")
+    s.set_defaults(fn=_cmd_responsive)
 
     s = sub.add_parser("raw")
     s.add_argument("json")
