@@ -13,6 +13,8 @@ other language could reimplement this in a few lines (that's the point).
     hv inspect <target> [depth]
     hv move <target> <zone | x y w h> [--topmost]
     hv screen
+    hv diff <a.png> <b.png> [--out heat.png]
+    hv zones <img.png> [--top N]
     hv raw '{"op":"ping"}'
 
 <target> is a window ref: "hwnd:0x1a2b", "pid:1234", or a title substring.
@@ -102,6 +104,18 @@ def _cmd_screen(a):
     _print_json(_call({"op": P.OP_SCREEN}))
 
 
+def _cmd_diff(a):
+    # Local image analysis — no daemon round-trip.
+    from . import imageops
+    _print_json(imageops.diff(a.a, a.b, crop_top=a.crop_top, out=a.out))
+
+
+def _cmd_zones(a):
+    from . import imageops
+    z = imageops.detect_zones(a.img, top=a.top)
+    _print_json({"count": len(z), "zones": z})
+
+
 def _cmd_raw(a):
     _print_json(_call(json.loads(a.json)), strip=("png_b64",))
 
@@ -148,6 +162,19 @@ def build_parser():
     s.set_defaults(fn=_cmd_move)
 
     sub.add_parser("screen").set_defaults(fn=_cmd_screen)
+
+    s = sub.add_parser("diff", help="score two captures + write a heatmap")
+    s.add_argument("a")
+    s.add_argument("b")
+    s.add_argument("--out", default=None, help="write amplified diff heatmap here")
+    s.add_argument("--crop-top", type=int, default=58, dest="crop_top",
+                   help="px of OS chrome to skip for the content score")
+    s.set_defaults(fn=_cmd_diff)
+
+    s = sub.add_parser("zones", help="detect saturated colour rectangles")
+    s.add_argument("img")
+    s.add_argument("--top", type=int, default=0, help="px of OS chrome to skip")
+    s.set_defaults(fn=_cmd_zones)
 
     s = sub.add_parser("raw")
     s.add_argument("json")
