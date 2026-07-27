@@ -11,6 +11,8 @@ other language could reimplement this in a few lines (that's the point).
     hv key <target> <keys>
     hv activate <target>
     hv inspect <target> [depth]
+    hv move <target> <zone | x y w h> [--topmost]
+    hv screen
     hv raw '{"op":"ping"}'
 
 <target> is a window ref: "hwnd:0x1a2b", "pid:1234", or a title substring.
@@ -85,6 +87,21 @@ def _cmd_inspect(a):
     _print_json(_call({"op": P.OP_INSPECT, "target": a.target, "depth": a.depth}))
 
 
+def _cmd_move(a):
+    req = {"op": P.OP_MOVE, "target": a.target, "topmost": a.topmost}
+    if len(a.rect) == 1:
+        req["zone"] = a.rect[0]
+    elif len(a.rect) == 4:
+        req["x"], req["y"], req["w"], req["h"] = (int(v) for v in a.rect)
+    else:
+        raise SystemExit("move needs either a zone name or x y w h")
+    _print_json(_call(req))
+
+
+def _cmd_screen(a):
+    _print_json(_call({"op": P.OP_SCREEN}))
+
+
 def _cmd_raw(a):
     _print_json(_call(json.loads(a.json)), strip=("png_b64",))
 
@@ -121,6 +138,16 @@ def build_parser():
     s.add_argument("target")
     s.add_argument("depth", nargs="?", type=int, default=3)
     s.set_defaults(fn=_cmd_inspect)
+
+    s = sub.add_parser("move", help="reposition a window to a zone or x y w h")
+    s.add_argument("target")
+    s.add_argument("rect", nargs="+",
+                   help="zone name (e.g. top-right) or four ints: x y w h")
+    s.add_argument("--topmost", action="store_true",
+                   help="keep the window above non-topmost windows")
+    s.set_defaults(fn=_cmd_move)
+
+    sub.add_parser("screen").set_defaults(fn=_cmd_screen)
 
     s = sub.add_parser("raw")
     s.add_argument("json")
