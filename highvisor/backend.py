@@ -144,7 +144,9 @@ class PlatformBackend:
         raise NotImplementedError
 
     def move(self, target: str, x: int, y: int, w: int, h: int,
-             topmost: bool = False) -> ActionResult:
-        """Position + size ``target`` to a physical-pixel rect. ``topmost`` keeps
-        it above non-topmost windows (used to pin an Ersatz overlay)."""
+             topmost: Optional[bool] = None) -> ActionResult:
+        """Position + size ``target`` to a physical-pixel rect. ``topmost`` is
+        tri-state: ``True`` pins it above non-topmost windows (used to pin an
+        Ersatz overlay), ``False`` explicitly clears the topmost bit, ``None``
+        (default) just raises without touching the topmost state."""
         raise NotImplementedError

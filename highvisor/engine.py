@@ -110,7 +110,7 @@ class Engine:
             return {"ok": True, "w": w, "h": h}
 
         if op == P.OP_MOVE:
-            topmost = bool(req.get("topmost", False))
+            topmost = req.get("topmost")  # tri-state: True/False/None
             zone = req.get("zone")
             if zone:  # resolve the named zone against the physical display size
                 from .backend import zone_rect
