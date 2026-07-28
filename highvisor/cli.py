@@ -303,6 +303,78 @@ def _cmd_parity(a):
     _print_json(res)
 
 
+def _run_steps(window, steps):
+    import time
+    for st in steps or []:
+        if "move" in st:
+            x, y, w, h = st["move"]
+            _call({"op": P.OP_MOVE, "target": window, "x": int(x), "y": int(y),
+                   "w": int(w), "h": int(h), "topmost": False})
+        elif "click" in st:
+            x, y = st["click"]
+            req = {"op": P.OP_CLICK, "target": window, "x": int(x), "y": int(y),
+                   "button": st.get("button", "left"), "double": bool(st.get("double", False))}
+            if st.get("hover"):
+                req["hover"] = True
+            _call(req)
+        elif "key" in st:
+            _call({"op": P.OP_KEY, "target": window, "keys": st["key"], "focus": st.get("focus", True)})
+        elif "wait" in st:
+            time.sleep(float(st["wait"]))
+
+
+def _cmd_scene(a):
+    """Drive a window to a named UI state and regression-diff the capture vs its golden.
+    `--bless` writes the capture AS the golden instead. Scenes should run from a known
+    start (e.g. a freshly launched app); use per-scene "reset" steps to normalize."""
+    import os
+    import time
+    import shutil
+    from . import imageops
+    from . import scenes as scenes_mod
+    scenes = scenes_mod.load(a.config)
+    names = ([k for k, v in scenes.items() if isinstance(v, dict)] if a.all
+             else ([a.name] if a.name else []))
+    if not names:
+        raise SystemExit("give a scene name or --all")
+    out_dir = a.out or os.path.join(os.path.dirname(os.path.abspath(a.config)), "_regress")
+    os.makedirs(out_dir, exist_ok=True)
+    results = []
+    for nm in names:
+        sc = scenes.get(nm)
+        if sc is None:
+            results.append({"scene": nm, "error": "not in config"})
+            continue
+        win = sc["window"]
+        if sc.get("size"):
+            sw, sh = (int(v) for v in str(sc["size"]).lower().split("x"))
+            _resize_local(win, sw, sh)
+        _run_steps(win, sc.get("reset"))
+        _run_steps(win, sc.get("steps"))
+        time.sleep(a.settle)
+        cur = os.path.join(out_dir, nm + ".png")
+        _capture(win, None, cur)
+        golden = scenes_mod.rel(a.config, sc.get("golden", "golden/" + nm + ".png"))
+        if a.bless:
+            os.makedirs(os.path.dirname(golden), exist_ok=True)
+            shutil.copy(cur, golden)
+            results.append({"scene": nm, "blessed": golden})
+            continue
+        if not os.path.exists(golden):
+            results.append({"scene": nm, "error": "no golden — run with --bless first", "current": cur})
+            continue
+        ct = int(sc.get("crop_top", 58))
+        d = imageops.diff(golden, cur, crop_top=ct)
+        ann = os.path.join(out_dir, nm + "_diff.png")
+        reg = imageops.regions(golden, cur, crop_top=ct, out=ann)
+        thr = float(sc.get("threshold", 98.0))
+        results.append({"scene": nm, "content_match": d["content_match"],
+                        "pass": d["content_match"] >= thr, "threshold": thr,
+                        "worst": reg["worst"][:5], "current": cur, "golden": golden, "diff": ann})
+    scored = [r for r in results if "pass" in r]
+    _print_json({"passed": sum(1 for r in scored if r["pass"]), "of": len(scored), "results": results})
+
+
 def _parse_sizes(spec):
     out = []
     for tok in spec.split(","):
@@ -467,6 +539,15 @@ def build_parser():
     s.add_argument("--window", help="window title substring (if not using --app)")
     s.add_argument("--port", type=int, default=None, help="state-indicating localhost port")
     s.set_defaults(fn=_cmd_probe)
+
+    s = sub.add_parser("scene", help="drive to a named UI state + regression-diff vs its golden")
+    s.add_argument("name", nargs="?", help="scene name (omit when using --all)")
+    s.add_argument("--all", action="store_true", help="run every scene in the config")
+    s.add_argument("--config", default="scenes.json", help="scenes JSON (default ./scenes.json)")
+    s.add_argument("--bless", action="store_true", help="write the capture AS the golden reference")
+    s.add_argument("--out", default=None, help="dir for captures + diffs (default <config-dir>/_regress)")
+    s.add_argument("--settle", type=float, default=1.2, help="seconds after steps before capturing")
+    s.set_defaults(fn=_cmd_scene)
 
     sub.add_parser("screen").set_defaults(fn=_cmd_screen)
 
