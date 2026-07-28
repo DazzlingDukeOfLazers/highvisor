@@ -65,3 +65,34 @@ hv raw '{"op":"ping"}'
 
 The protocol is dependency-free framed JSON (`highvisor/protocol.py`), so any
 language can speak it in a few lines.
+
+## Notepad golem (structural reconstruction demo)
+
+`tools/gen_notepad_depth.py` turns a captured window into a runnable **golem** —
+a Godot reconstruction that reflows like the source. It reads a UIA tree (`hv
+inspect`) plus a capture (`hv shot`) and emits a small Godot 4.7 project whose
+layout, fills, menus, and flyouts mirror Windows 11 Notepad. Fixtures for the
+demo ship in `tools/fixtures/`, so it regenerates the same golem on macOS or
+Windows with no capture step:
+
+```
+python tools/gen_notepad_depth.py                 # -> ./notepad_golem
+python tools/gen_notepad_depth.py --out /tmp/golem # custom output dir
+```
+
+Flags: `--tree`, `--png`, `--out`, `--scale` (physical/logical DPI ratio; the
+bundled capture is 200 % → `2`). Requires `pillow` (already a dependency).
+
+Open the generated project in Godot 4.7:
+
+```
+# macOS
+/Applications/Godot.app/Contents/MacOS/Godot --path notepad_golem
+
+# Windows
+Godot_v4.7.1-stable_win64.exe --path notepad_golem
+```
+
+The golem's popups are Godot Controls drawn *inside* the window, so `hv shot`
+(PrintWindow-backed) captures them — you can verify hover/click states over the
+same RPC, without stealing focus.
