@@ -129,6 +129,26 @@ def flatten_ax_text(tree):
     return "\n".join(out)
 
 
+# Per-agent I/O: which window, how to read it, how to find its composer, and (for
+# Claude) how to recognize its permission buttons. Composer hint is matched against
+# OCR/AX text; the fallback is a window fraction if the hint isn't found.
+AGENTS = {
+    "chatgpt": {
+        "window": "ChatGPT", "read": "ocr", "submit": "return",
+        "composer_hint": r"(?i)do anything|ask anything|message chatgpt|send a message",
+        "composer_fallback": (0.25, 0.90),
+    },
+    "claude": {
+        "window": "Claude", "read": "ax", "submit": "return",
+        "composer_hint": r"(?i)reply to claude|how can i help|message|write",
+        "composer_fallback": (0.5, 0.95),
+        "approve": [r"(?i)^\s*yes\b", r"(?i)\ballow\b", r"(?i)\bapprove\b", r"(?i)^\s*proceed"],
+        "approve-all": [r"(?i)don.?t ask", r"(?i)always allow", r"(?i)approve all", r"(?i)yes.*all"],
+        "deny": [r"(?i)^\s*no\b", r"(?i)\bdeny\b", r"(?i)\breject\b", r"(?i)don.?t allow", r"(?i)^\s*cancel"],
+    },
+}
+
+
 class Source:
     """One agent to watch. ``name`` is the routing id ("mac/claude"); ``target`` is
     the highvisor window ref; ``mode`` is "ax" (rich a11y) or "ocr" (opaque apps)."""
@@ -178,6 +198,121 @@ class Orchestrator:
                 n += 1
         self.bus.publish("orch", msg="primed: %d existing opcode(s) ignored" % n)
         return n
+
+    # ---- drivers: turn an opcode into an action on the target agent -------------
+    def _window_info(self, win):
+        r = self.engine.submit({"op": P.OP_LIST})
+        low = win.lower()
+        for t in r.get("targets", []):
+            if low in (t.get("title") or "").lower() or low in (t.get("class_name") or "").lower():
+                return t
+        return None
+
+    def _click_win(self, win, x, y):
+        return self.engine.submit({"op": P.OP_CLICK, "target": win, "x": int(x), "y": int(y)})
+
+    def _find_ax(self, win, roles=None, text_patterns=None):
+        """First AX node matching a role and/or a text pattern. Returns its bounds
+        [x,y,w,h] (global points), or None."""
+        r = self.engine.submit({"op": P.OP_INSPECT, "target": win, "depth": 50})
+        if not r.get("ok"):
+            return None
+        hit = [None]
+
+        def walk(n):
+            if hit[0]:
+                return
+            role = n.get("role", "")
+            txt = "%s %s" % (n.get("name", ""), n.get("value", ""))
+            role_ok = (roles is None) or any(role.endswith(x) for x in roles)
+            text_ok = (text_patterns is None) or any(re.search(p, txt) for p in text_patterns)
+            if role_ok and text_ok and n.get("bounds"):
+                hit[0] = n.get("bounds")
+            for c in n.get("children", []) or []:
+                walk(c)
+
+        walk(r.get("tree", {}))
+        return hit[0]
+
+    def _focus_composer(self, win, a):
+        """Click the target's text input so typing lands there."""
+        if a["read"] == "ocr":
+            r = self.engine.submit({"op": P.OP_OCR, "target": win})
+            if not r.get("ok"):
+                return False
+            ow, oh = r["w"] or 1, r["h"] or 1
+            info = self._window_info(win)
+            scale = (info["w"] / ow) if info else 1.0
+            cands = [b for b in r["boxes"] if re.search(a["composer_hint"], b["text"])]
+            if cands:
+                bb = max(cands, key=lambda b: b["bbox"][1])["bbox"]
+                cx, cy = bb[0] + bb[2] // 2, bb[1] + bb[3] // 2
+            else:
+                cx, cy = a["composer_fallback"][0] * ow, a["composer_fallback"][1] * oh
+            self._click_win(win, cx * scale, cy * scale)
+            return True
+        # ax: find an editable text area, click its centre; else fall back
+        info = self._window_info(win)
+        if info is None:
+            return False
+        b = self._find_ax(win, roles=("TextArea", "TextField", "ComboBox"))
+        if b:
+            self._click_win(win, b[0] - info["x"] + b[2] // 2, b[1] - info["y"] + b[3] // 2)
+        else:
+            self._click_win(win, a["composer_fallback"][0] * info["w"],
+                            a["composer_fallback"][1] * info["h"])
+        return True
+
+    def deliver(self, agent, body, submit=True):
+        """`ask`: focus the agent's composer, replace its contents with ``body``,
+        and (optionally) submit."""
+        a = AGENTS.get(agent)
+        if a is None:
+            return {"ok": False, "error": "unknown agent: %s" % agent}
+        win = a["window"]
+        if not self._focus_composer(win, a):
+            return {"ok": False, "error": "composer not found for %s" % agent}
+        time.sleep(0.15)
+        # NB: no cmd+a clear — its tier-4 activate disrupts composer focus so the
+        # following type doesn't land. The composer is empty after every submit, so
+        # in the normal loop there's nothing to clear.
+        self.engine.submit({"op": P.OP_TEXT, "target": win, "text": body})
+        time.sleep(0.1)
+        if submit:
+            self.engine.submit({"op": P.OP_KEY, "target": win, "keys": a["submit"], "focus": True})
+        return {"ok": True, "agent": agent, "submitted": submit}
+
+    def press(self, agent, which):
+        """`approve` / `approve-all` / `deny`: find the target's matching button in
+        the AX tree and click it. Only meaningful for AX agents (Claude)."""
+        a = AGENTS.get(agent)
+        if a is None or which not in a:
+            return {"ok": False, "error": "no %s button for %s" % (which, agent)}
+        win = a["window"]
+        info = self._window_info(win)
+        if info is None:
+            return {"ok": False, "error": "%s window not found" % win}
+        b = self._find_ax(win, roles=("Button",), text_patterns=a[which])
+        if b is None:
+            return {"ok": False, "error": "no '%s' button on screen (is a prompt showing?)" % which}
+        self._click_win(win, b[0] - info["x"] + b[2] // 2, b[1] - info["y"] + b[3] // 2)
+        return {"ok": True, "agent": agent, "pressed": which}
+
+    def execute(self, op: "Opcode"):
+        """Run a (gated-approved) opcode against its target agent."""
+        agent = op.agent
+        if op.verb == "ask":
+            res = self.deliver(agent, op.body, submit=True)
+        elif op.verb in ("approve", "approve-all", "deny"):
+            res = self.press(agent, op.verb)
+        elif op.verb == "key":
+            res = self.engine.submit({"op": P.OP_KEY, "target": AGENTS.get(agent, {}).get("window", agent),
+                                      "keys": op.body, "focus": True})
+        else:
+            res = {"ok": False, "error": "verb %s not executable" % op.verb}
+        self.bus.publish("orch", msg="exec %s %s -> %s" % (op.verb, op.target,
+                                                           "ok" if res.get("ok") else res.get("error")))
+        return res
 
     def start(self, interval=2.0):
         self.prime()
