@@ -160,6 +160,13 @@ class Engine:
                               int(req["w"]), int(req["h"]))
             return b.move(req["target"], x, y, w, h, topmost).to_dict()
 
+        if op == P.OP_STACK:
+            return self._stack_above(b, req.get("top"), req.get("bottom"),
+                                     int(req.get("gap", 8)))
+
+        if op == P.OP_DOCK:
+            return self._dock(b, req.get("target"))
+
         if op == P.OP_LAYOUT_LIST:
             from .layouts import load_layouts
             return {"ok": True, "layouts": [
@@ -186,8 +193,14 @@ class Engine:
             spec = resolve(req.get("name", ""))
             if not spec:
                 return {"ok": False, "error": "no launcher/spec %r" % req.get("name")}
+            before = {t.id for t in b.list_targets()}
             d = b.launch(spec).to_dict()
             d["spec"] = spec
+            # defacto: if the just-launched window carries a standing dock rule
+            # (e.g. Raves -> above Caves of Qud), highvisor stacks it on its own.
+            dock = self._autodock_new(b, before)
+            if dock is not None:
+                d["dock"] = dock
             return d
 
         if op == P.OP_LAUNCH_LIST:
@@ -219,6 +232,61 @@ class Engine:
                     "detail": "%d windows -> %s" % (len(placements), req["name"])}
 
         return {"ok": False, "error": "unknown op: %r" % op}
+
+    def _find_win(self, wins, label):
+        """First window whose title/owner contains ``label`` (case-insensitive)."""
+        m = (label or "").lower()
+        for t in wins:
+            if m and (m in (t.title or "").lower() or m in (t.class_name or "").lower()):
+                return t
+        return None
+
+    def _stack_above(self, b, top_label, bottom_label, gap=8):
+        """Move ``top`` into the anchor's column (matched x + width), directly above it."""
+        if not top_label or not bottom_label:
+            return {"ok": False, "error": "stack needs top and bottom"}
+        wins = b.list_targets()
+        top = self._find_win(wins, top_label)
+        bot = self._find_win(wins, bottom_label)
+        if bot is None:
+            return {"ok": False, "error": "anchor %r not found" % bottom_label}
+        if top is None:
+            return {"ok": False, "error": "%r not found" % top_label}
+        x, w, h = bot.x, bot.w, bot.h            # same column + size as the anchor
+        y = bot.y - gap - h                      # stacked directly above it
+        r = b.move(top.id, int(x), int(y), int(w), int(h), None)
+        return {"ok": r.ok, "top": top.id, "bottom": bot.id,
+                "rect": [int(x), int(y), int(w), int(h)], "error": r.error}
+
+    def _dock(self, b, target):
+        """Apply the standing dock rule for ``target`` (id or title substring)."""
+        wins = b.list_targets()
+        win = next((t for t in wins if t.id == target), None) or self._find_win(wins, target)
+        if win is None:
+            return {"ok": False, "error": "no window %r" % target}
+        from .docks import rule_for
+        label = win.title or win.class_name or ""
+        rule = rule_for(label)
+        if not (rule and rule.get("above")):
+            return {"ok": False, "error": "no dock rule for %r" % label}
+        return self._stack_above(b, label, rule["above"], int(rule.get("gap", 8)))
+
+    def _autodock_new(self, b, before_ids, deadline_s=5.0):
+        """Poll briefly for a newly-appeared window with a dock rule; apply it once.
+        Bounded — returns the dock result as soon as the new window shows, or None."""
+        import time
+        from .docks import rule_for
+        end = time.monotonic() + deadline_s
+        while time.monotonic() < end:
+            for t in b.list_targets():
+                if t.id in before_ids:
+                    continue
+                label = t.title or t.class_name or ""
+                rule = rule_for(label)
+                if rule and rule.get("above"):
+                    return self._stack_above(b, label, rule["above"], int(rule.get("gap", 8)))
+            time.sleep(0.4)
+        return None
 
     def _apply_layout(self, b, name):
         from .layouts import load_layouts, placement_rect

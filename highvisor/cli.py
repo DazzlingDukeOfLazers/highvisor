@@ -118,6 +118,14 @@ def _cmd_move(a):
     _print_json(_call(req))
 
 
+def _cmd_stack(a):
+    _print_json(_call({"op": P.OP_STACK, "top": a.top, "bottom": a.bottom, "gap": a.gap}))
+
+
+def _cmd_dock(a):
+    _print_json(_call({"op": P.OP_DOCK, "target": a.target}))
+
+
 def _cmd_screen(a):
     _print_json(_call({"op": P.OP_SCREEN}))
 
@@ -358,6 +366,16 @@ def build_parser():
     g.add_argument("--no-topmost", dest="topmost", action="store_false",
                    help="clear the window's topmost bit")
     s.set_defaults(fn=_cmd_move)
+
+    s = sub.add_parser("stack", help="stack one window directly above another (same column)")
+    s.add_argument("top", help="window to place on top (title substring)")
+    s.add_argument("bottom", help="anchor window it sits above (title substring)")
+    s.add_argument("--gap", type=int, default=8, help="pixels between them (default 8)")
+    s.set_defaults(fn=_cmd_stack)
+
+    s = sub.add_parser("dock", help="apply a window's standing dock rule (see docks.py)")
+    s.add_argument("target", help="window id or title substring")
+    s.set_defaults(fn=_cmd_dock)
 
     sub.add_parser("screen").set_defaults(fn=_cmd_screen)
 
