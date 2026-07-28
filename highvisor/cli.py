@@ -13,6 +13,9 @@ other language could reimplement this in a few lines (that's the point).
     hv inspect <target> [depth]
     hv move <target> <zone | x y w h> [--topmost | --no-topmost]
     hv screen
+    hv layouts
+    hv layout <name>
+    hv layout-save <name> [description...]
     hv diff <a.png> <b.png> [--out heat.png]
     hv zones <img.png> [--top N]
     hv responsive <golem> <source> [--threshold P] [--out-dir DIR]
@@ -126,6 +129,34 @@ def _cmd_responsive(a):
     return 0 if report["verdict"] == "PASS" else 1
 
 
+def _cmd_layouts(a):
+    resp = _call({"op": P.OP_LAYOUT_LIST})
+    if not resp.get("ok"):
+        _print_json(resp)
+        return 1
+    for l in resp.get("layouts", []):
+        print("%-14s %2d  %s" % (l["name"], l["placements"], l.get("description", "")))
+
+
+def _cmd_layout(a):
+    resp = _call({"op": P.OP_LAYOUT_APPLY, "name": a.name})
+    if not resp.get("ok") and "results" not in resp:
+        _print_json(resp)
+        return 1
+    for r in resp.get("results", []):
+        mark = "ok " if r.get("ok") else "MISS"
+        print("  %s %-12s %s %s" % (mark, r.get("match", ""),
+                                    r.get("title", r.get("target", "")),
+                                    r.get("error") or ""))
+    print("%d/%d placed" % (resp.get("applied", 0), len(resp.get("results", []))))
+    return 0 if resp.get("ok") else 1
+
+
+def _cmd_layout_save(a):
+    _print_json(_call({"op": P.OP_LAYOUT_SAVE, "name": a.name,
+                       "description": " ".join(a.description) if a.description else ""}))
+
+
 def _cmd_raw(a):
     _print_json(_call(json.loads(a.json)), strip=("png_b64",))
 
@@ -198,6 +229,17 @@ def build_parser():
     s.add_argument("--out-dir", default=None, dest="out_dir",
                    help="where to write per-frame captures + heatmaps")
     s.set_defaults(fn=_cmd_responsive)
+
+    sub.add_parser("layouts", help="list known window layouts").set_defaults(fn=_cmd_layouts)
+
+    s = sub.add_parser("layout", help="apply a named window layout")
+    s.add_argument("name")
+    s.set_defaults(fn=_cmd_layout)
+
+    s = sub.add_parser("layout-save", help="snapshot the current arrangement as a layout")
+    s.add_argument("name")
+    s.add_argument("description", nargs="*")
+    s.set_defaults(fn=_cmd_layout_save)
 
     s = sub.add_parser("raw")
     s.add_argument("json")

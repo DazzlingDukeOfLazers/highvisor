@@ -22,6 +22,20 @@
         <ul id="windows" class="list"></ul>
       </div>
       <div class="panel">
+        <div class="panel-hd">layout</div>
+        <div class="layout">
+          <div class="layout-row">
+            <select id="layoutsel"></select>
+            <button id="applylayout">apply</button>
+          </div>
+          <div class="layout-row">
+            <input id="savename" placeholder="save current as…">
+            <button id="savelayout" title="snapshot current window positions">save</button>
+          </div>
+          <div id="layoutdesc" class="muted"></div>
+        </div>
+      </div>
+      <div class="panel">
         <div class="panel-hd">peers</div>
         <ul id="peers" class="list"><li class="muted">no bridge / no peers</li></ul>
       </div>

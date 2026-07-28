@@ -83,6 +83,42 @@ async function sendContext() {
   else { addRow({ kind: "error", t: Date.now() / 1000, msg: (res && res.error) || "bridge offline — is it running?" }); }
 }
 
+// ---------------------------------------------------------------- layouts
+let layoutCache = {};
+async function refreshLayouts() {
+  const res = await rpc("layout_list");
+  const sel = $("layoutsel");
+  sel.innerHTML = "";
+  layoutCache = {};
+  if (!res.ok) return;
+  for (const l of res.layouts) {
+    layoutCache[l.name] = l;
+    const o = document.createElement("option");
+    o.value = l.name;
+    o.textContent = `${l.name} (${l.placements})`;
+    sel.appendChild(o);
+  }
+  showLayoutDesc();
+}
+function showLayoutDesc() {
+  const l = layoutCache[$("layoutsel").value];
+  $("layoutdesc").textContent = l ? l.description : "";
+}
+async function applyLayout() {
+  const name = $("layoutsel").value;
+  if (!name) return;
+  $("applylayout").disabled = true;
+  await rpc("layout_apply", { name });   // result streams into the log via the bus
+  $("applylayout").disabled = false;
+  refreshWindows();
+}
+async function saveLayout() {
+  const name = $("savename").value.trim();
+  if (!name) return;
+  const res = await rpc("layout_save", { name });
+  if (res.ok) { $("savename").value = ""; await refreshLayouts(); $("layoutsel").value = name; showLayoutDesc(); }
+}
+
 // ----------------------------------------------------------------- log
 const logEl = () => $("log");
 function fmtTime(t) {
@@ -144,11 +180,15 @@ async function init() {
   if (p.ok) $("backend").textContent = "backend: " + p.backend;
   $("refresh").onclick = refreshWindows;
   $("send").onclick = sendContext;
+  $("applylayout").onclick = applyLayout;
+  $("savelayout").onclick = saveLayout;
+  $("layoutsel").onchange = showLayoutDesc;
   $("clearlog").onclick = () => (logEl().innerHTML = "");
   $("ctx").addEventListener("keydown", (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") sendContext();
   });
   await refreshWindows();
+  await refreshLayouts();
   await refreshPeers();
   connectEvents();
   setInterval(refreshPeers, 4000);

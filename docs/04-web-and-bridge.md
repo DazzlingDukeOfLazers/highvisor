@@ -23,6 +23,26 @@ The **EventBus** (`highvisor/events.py`) is a thread-safe pub/sub with a bounded
 history ring so a late-joining browser replays the last N events. The engine
 publishes a compact event per op (`ping`/`list` filtered out as noise).
 
+## Layouts (named window arrangements)
+
+`highvisor/layouts.py` turns the `move`/`zone` ops into named, repeatable window
+arrangements — the deterministic *stage* the 1:1 loop runs in. A layout is an
+ordered list of placements; applying it drops the first still-unused window whose
+title/owner matches into a rect. A rect is a named `zone` (halves/quadrants), a
+`frac` [x,y,w,h] in 0..1 of the display (portable, hand-authored), or an absolute
+`rect` (an exact freeze, incl. negative-origin secondary monitors).
+
+- `hv layouts` — list; `hv layout <name>` — apply; `hv layout-save <name>` —
+  snapshot the current arrangement (absolute rects) into the user file.
+- Ops: `layout_list`, `layout_apply`, `layout_save`. The cockpit has a dropdown +
+  apply + "save current as…".
+- Built-ins (`loop`/`halves`/`quads`) are generic; user layouts live in
+  `~/.config/highvisor/layouts.json` and override by name (machine-specific, not
+  committed). Order makes `apply` deterministic.
+
+Note: some apps refuse AX repositioning (macOS **Finder** returns
+`cannot-complete`); those windows self-manage and are simply left out of a layout.
+
 ## Bridge (LAN-facing, token-gated, DATA ONLY)
 
 `highvisor/bridge.py` is the automated replacement for copy/pasting context

@@ -145,7 +145,74 @@ class Engine:
                               int(req["w"]), int(req["h"]))
             return b.move(req["target"], x, y, w, h, topmost).to_dict()
 
+        if op == P.OP_LAYOUT_LIST:
+            from .layouts import load_layouts
+            return {"ok": True, "layouts": [
+                {"name": n, "description": l.get("description", ""),
+                 "placements": len(l.get("placements", []))}
+                for n, l in load_layouts().items()]}
+
+        if op == P.OP_LAYOUT_APPLY:
+            return self._apply_layout(b, req.get("name"))
+
+        if op == P.OP_LAYOUT_SAVE:
+            from .layouts import save_layout
+            placements = []
+            for t in b.list_targets():
+                label = t.title or t.class_name
+                if not label:
+                    continue  # skip the untitled desktop/wallpaper layer
+                # Absolute rects: an exact freeze of the current arrangement, which
+                # round-trips faithfully across displays (incl. negative-origin
+                # secondary monitors). Hand-authored layouts use zone/frac instead.
+                placements.append({"match": label,
+                                   "rect": [t.x, t.y, t.w, t.h]})
+            path = save_layout(req["name"], {
+                "description": req.get("description", "saved arrangement"),
+                "placements": placements})
+            return {"ok": True, "saved": req["name"], "path": path,
+                    "windows": len(placements),
+                    "detail": "%d windows -> %s" % (len(placements), req["name"])}
+
         return {"ok": False, "error": "unknown op: %r" % op}
+
+    def _apply_layout(self, b, name):
+        from .layouts import load_layouts, placement_rect
+        lay = load_layouts().get(name)
+        if not lay:
+            return {"ok": False, "error": "no layout %r" % name}
+        sw, sh = b.screen_size()
+        wins = b.list_targets()
+        used = set()
+        results = []
+        for pl in lay.get("placements", []):
+            m = (pl.get("match") or "").lower()
+            win = None
+            for t in wins:
+                if t.id in used:
+                    continue
+                if (not m or m in (t.title or "").lower()
+                        or m in (t.class_name or "").lower()):
+                    win = t
+                    break
+            if win is None:
+                results.append({"match": pl.get("match"), "ok": False,
+                                "error": "no matching window"})
+                continue
+            used.add(win.id)
+            try:
+                x, y, w, h = placement_rect(pl, sw, sh)
+            except Exception as e:
+                results.append({"match": pl.get("match"), "target": win.id,
+                                "ok": False, "error": str(e)})
+                continue
+            r = b.move(win.id, x, y, w, h, pl.get("topmost"))
+            results.append({"match": pl.get("match"), "target": win.id,
+                            "title": win.title, "ok": r.ok,
+                            "rect": [x, y, w, h], "error": r.error})
+        applied = sum(1 for x in results if x["ok"])
+        return {"ok": applied > 0, "applied": applied, "results": results,
+                "detail": "%s: %d/%d placed" % (name, applied, len(results))}
 
     def stop(self):
         job = _Job(None)
