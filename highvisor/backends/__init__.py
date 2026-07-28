@@ -11,6 +11,6 @@ def make_backend() -> PlatformBackend:
         from .windows import WindowsBackend
         return WindowsBackend()
     if sys.platform == "darwin":
-        raise NotImplementedError(
-            "macOS backend not built yet (see spike/mac_slice0.py for the plan)")
+        from .darwin import MacBackend
+        return MacBackend()
     raise NotImplementedError("unsupported platform: %s" % sys.platform)
