@@ -24,6 +24,7 @@ other language could reimplement this in a few lines (that's the point).
     hv launch <name | spec>
     hv launchers
     hv launch-save <name> <spec>
+    hv tunnel <host> [--user U] [--bridge] [--print]   (drive a remote highvisor over SSH)
     hv responsive <golem> <source> [--threshold P] [--out-dir DIR]
     hv raw '{"op":"ping"}'
 
@@ -276,6 +277,30 @@ def _cmd_parity(a):
     _print_json(res)
 
 
+def _cmd_tunnel(a):
+    """SSH-tunnel a remote highvisor to this machine: forward the remote daemon +
+    cockpit (+ optional bridge) to local ports over an encrypted SSH connection.
+    Reuses the whole daemon/CLI unchanged — only the wire becomes SSH."""
+    host = "%s@%s" % (a.user, a.host) if a.user else a.host
+    fwds = [(a.control, P.PORT), (a.web, 48721)]          # remote 48721 = cockpit
+    if a.bridge:
+        fwds.append((a.bridge_port, P.BRIDGE_PORT))
+    ssh = ["ssh", "-N"]
+    for lp, rp in fwds:
+        ssh += ["-L", "127.0.0.1:%d:127.0.0.1:%d" % (lp, rp)]
+    ssh.append(host)
+    print("→ tunnelling %s's highvisor here (encrypted). Needs sshd + key auth on it." % a.host)
+    print("    control : hv --port %d <cmd>   (e.g. hv --port %d ls)" % (a.control, a.control))
+    print("    cockpit : http://127.0.0.1:%d" % a.web)
+    if a.bridge:
+        print("    bridge  : 127.0.0.1:%d" % a.bridge_port)
+    print("    ssh     : %s" % " ".join(ssh))
+    if a.print_only:
+        return
+    print("  (holds the tunnel open until Ctrl-C)")
+    os.execvp("ssh", ssh)
+
+
 def _cmd_raw(a):
     _print_json(_call(json.loads(a.json)), strip=("png_b64",))
 
@@ -404,6 +429,20 @@ def build_parser():
     s.add_argument("--settle", type=float, default=0.4,
                    help="seconds to wait after resizing for repaint (default 0.4)")
     s.set_defaults(fn=_cmd_parity)
+
+    s = sub.add_parser("tunnel",
+                       help="SSH-tunnel a remote highvisor to this machine (encrypted)")
+    s.add_argument("host", help="ssh host or user@host (remote needs sshd + key auth)")
+    s.add_argument("--user", default=None, help="ssh user (if not in the host)")
+    s.add_argument("--control", type=int, default=48730,
+                   help="local port for the remote control daemon (default 48730)")
+    s.add_argument("--web", type=int, default=48731,
+                   help="local port for the remote cockpit (default 48731)")
+    s.add_argument("--bridge", action="store_true", help="also forward the bridge port")
+    s.add_argument("--bridge-port", type=int, default=48732, dest="bridge_port")
+    s.add_argument("--print", dest="print_only", action="store_true",
+                   help="show the ssh command instead of running it")
+    s.set_defaults(fn=_cmd_tunnel)
 
     s = sub.add_parser("raw")
     s.add_argument("json")
