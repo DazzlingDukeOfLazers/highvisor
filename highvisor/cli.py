@@ -323,12 +323,27 @@ def _run_steps(window, steps):
             time.sleep(float(st["wait"]))
 
 
-def _cmd_scene(a):
-    """Drive a window to a named UI state and regression-diff the capture vs its golden.
-    `--bless` writes the capture AS the golden instead. Scenes should run from a known
-    start (e.g. a freshly launched app); use per-scene "reset" steps to normalize."""
-    import os
+def _drive_capture(spec, out_path, settle):
+    """Resize (if `size`), run `reset` then `steps`, settle, and capture the window."""
     import time
+    win = spec["window"]
+    if spec.get("size"):
+        sw, sh = (int(v) for v in str(spec["size"]).lower().split("x"))
+        _resize_local(win, sw, sh)
+    _run_steps(win, spec.get("reset"))
+    _run_steps(win, spec.get("steps"))
+    time.sleep(settle)
+    _capture(win, None, out_path)
+
+
+def _cmd_scene(a):
+    """Drive a window to a named UI state, then one of three modes:
+      • default  — regression-diff the capture vs its stored golden (pass/fail + regions);
+      • --bless  — write the capture AS the golden (establish/update the reference);
+      • --parity — also drive the scene's `reference` window (e.g. Qud) to the same screen
+                   and diff the two LIVE captures (parity match% + regions + side-by-side).
+    Scenes run from a known start (a fresh app / Qud at its title); `reset` steps normalize."""
+    import os
     import shutil
     from . import imageops
     from . import scenes as scenes_mod
@@ -345,15 +360,30 @@ def _cmd_scene(a):
         if sc is None:
             results.append({"scene": nm, "error": "not in config"})
             continue
-        win = sc["window"]
-        if sc.get("size"):
-            sw, sh = (int(v) for v in str(sc["size"]).lower().split("x"))
-            _resize_local(win, sw, sh)
-        _run_steps(win, sc.get("reset"))
-        _run_steps(win, sc.get("steps"))
-        time.sleep(a.settle)
         cur = os.path.join(out_dir, nm + ".png")
-        _capture(win, None, cur)
+        _drive_capture(sc, cur, a.settle)
+
+        if a.parity:                                   # diff vs a LIVE reference window (Qud)
+            ref_spec = sc.get("reference")
+            if not ref_spec:
+                results.append({"scene": nm, "error": "no `reference` block for --parity", "current": cur})
+                continue
+            ref = os.path.join(out_dir, nm + "_ref.png")
+            _drive_capture(ref_spec, ref, a.settle)
+            ct = int(ref_spec.get("crop_top", sc.get("crop_top", 58)))
+            d = imageops.diff(ref, cur, crop_top=ct)
+            ann = os.path.join(out_dir, nm + "_parity.png")
+            reg = imageops.regions(ref, cur, crop_top=ct, out=ann)
+            sbs = os.path.join(out_dir, nm + "_sbs.png")
+            imageops.sidebyside(ref, cur, sbs, label_a=ref_spec.get("window", "reference"),
+                                label_b=sc.get("window", "current"))
+            thr = float(sc.get("parity_threshold", 90.0))
+            results.append({"scene": nm, "mode": "parity", "parity_match": d["content_match"],
+                            "pass": d["content_match"] >= thr, "threshold": thr,
+                            "worst": reg["worst"][:5], "reference": ref, "current": cur,
+                            "sidebyside": sbs, "diff": ann})
+            continue
+
         golden = scenes_mod.rel(a.config, sc.get("golden", "golden/" + nm + ".png"))
         if a.bless:
             os.makedirs(os.path.dirname(golden), exist_ok=True)
@@ -423,12 +453,19 @@ def _cmd_parity_sweep(a):
         _capture(a.b, a.peer_b, bp)
         heat = os.path.join(outdir, tag + "_heat.png")
         d = imageops.diff(ap, bp, crop_top=a.crop_top, out=heat)
+        worst = None
+        if a.regions:   # per-size punch-list: where do they diverge at this shape
+            worst = imageops.regions(ap, bp, crop_top=a.crop_top,
+                                     out=os.path.join(outdir, tag + "_regions.png"))["worst"][:5]
         cmp_path = os.path.join(outdir, tag + "_cmp.png")
         imageops.sidebyside(ap, bp, cmp_path, label_a="%s  %s" % (a.a, tag),
                             label_b="%s  %s" % (a.b, tag), height=a.height)
         cmps.append(cmp_path)
-        results.append({"size": [w, h], "content_match": d["content_match"],
-                        "full_match": d["full_match"], "compare": cmp_path, "heatmap": heat})
+        entry = {"size": [w, h], "content_match": d["content_match"],
+                 "full_match": d["full_match"], "compare": cmp_path, "heatmap": heat}
+        if worst is not None:
+            entry["worst"] = worst
+        results.append(entry)
     sheet = os.path.join(outdir, "sweep.png")
     imageops.stack_vertical(cmps, sheet)
     if not a.no_restore:                           # put both windows back as they were
@@ -545,6 +582,8 @@ def build_parser():
     s.add_argument("--all", action="store_true", help="run every scene in the config")
     s.add_argument("--config", default="scenes.json", help="scenes JSON (default ./scenes.json)")
     s.add_argument("--bless", action="store_true", help="write the capture AS the golden reference")
+    s.add_argument("--parity", action="store_true",
+                   help="also drive the scene's `reference` window (e.g. Qud) and diff the two live")
     s.add_argument("--out", default=None, help="dir for captures + diffs (default <config-dir>/_regress)")
     s.add_argument("--settle", type=float, default=1.2, help="seconds after steps before capturing")
     s.set_defaults(fn=_cmd_scene)
@@ -641,6 +680,8 @@ def build_parser():
     s.add_argument("--settle", type=float, default=1.2,
                    help="seconds to wait after each resize (default 1.2)")
     s.add_argument("--height", type=int, default=520, help="per-row height in the sheet")
+    s.add_argument("--regions", action="store_true",
+                   help="also emit a per-size divergence punch-list + annotated image")
     s.add_argument("--no-restore", action="store_true", dest="no_restore",
                    help="leave windows at the last size instead of restoring originals")
     s.set_defaults(fn=_cmd_parity_sweep)
