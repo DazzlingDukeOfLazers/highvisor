@@ -202,9 +202,14 @@ class MacBackend(PlatformBackend):
             img = Quartz.CGDisplayCreateImage(Quartz.CGMainDisplayID())
         else:
             wid = int(w["kCGWindowNumber"])
+            # BestResolution captures at the window's native backing scale (2x on a
+            # Retina display) instead of point size, so a 1913x1062-pt window comes
+            # back as ~3826x2124 px — full fidelity for the parity diff.
+            opts = (Quartz.kCGWindowImageBoundsIgnoreFraming
+                    | getattr(Quartz, "kCGWindowImageBestResolution", 0))
             img = Quartz.CGWindowListCreateImage(
                 Quartz.CGRectNull, Quartz.kCGWindowListOptionIncludingWindow,
-                wid, Quartz.kCGWindowImageBoundsIgnoreFraming)
+                wid, opts)
         if img is None:
             raise BackendError(
                 "capture returned nothing — is Screen Recording granted? "

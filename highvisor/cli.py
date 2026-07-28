@@ -188,11 +188,41 @@ def _capture(target, peer, path):
     return r.get("bytes", 0)
 
 
+def _find_target(ref):
+    """The current Target dict for a ref (id, or title/owner substring), or None."""
+    low = ref.lower()
+    for t in _call({"op": P.OP_LIST}).get("targets", []):
+        if (t["id"] == ref or low in (t.get("title") or "").lower()
+                or low in (t.get("class_name") or "").lower()):
+            return t
+    return None
+
+
+def _resize_local(ref, w, h):
+    """Resize a local window to w x h in place (keeps its current origin)."""
+    t = _find_target(ref)
+    if not t:
+        raise SystemExit("resize: no local window matching %r" % ref)
+    _call({"op": P.OP_MOVE, "target": t["id"], "x": t["x"], "y": t["y"],
+           "w": w, "h": h, "topmost": False})
+
+
 def _cmd_parity(a):
     """One-shot visual parity: capture A and B (each local or from a peer) and
     screenshot-diff them with imageops — no LLM in the loop."""
     import tempfile
+    import time
     from . import imageops
+    if a.size:
+        try:
+            sw, sh = (int(v) for v in a.size.lower().split("x"))
+        except ValueError:
+            raise SystemExit("--size must be WxH, e.g. 1920x1080")
+        if not a.peer_a:
+            _resize_local(a.a, sw, sh)
+        if not a.peer_b:
+            _resize_local(a.b, sw, sh)
+        time.sleep(a.settle)   # let both apps repaint at the new size
     d = tempfile.mkdtemp(prefix="hv-parity-")
     ap, bp = os.path.join(d, "a.png"), os.path.join(d, "b.png")
     _capture(a.a, a.peer_a, ap)
@@ -302,6 +332,10 @@ def build_parser():
     s.add_argument("--out", default=None, help="write the diff heatmap here")
     s.add_argument("--crop-top", type=int, default=58, dest="crop_top",
                    help="px of chrome to skip for the content score")
+    s.add_argument("--size", default=None,
+                   help="resize both local sides to WxH before capturing (e.g. 1920x1080)")
+    s.add_argument("--settle", type=float, default=0.4,
+                   help="seconds to wait after resizing for repaint (default 0.4)")
     s.set_defaults(fn=_cmd_parity)
 
     s = sub.add_parser("raw")
