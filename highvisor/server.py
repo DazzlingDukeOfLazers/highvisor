@@ -34,10 +34,19 @@ def _serve_conn(conn, addr, engine):
                 break
 
 
-def serve_forever(host=P.HOST, port=P.PORT, backend=None):
+def serve_forever(host=P.HOST, port=P.PORT, backend=None, web=True):
+    from .events import EventBus
     backend = backend or make_backend()
-    engine = Engine(backend)
+    bus = EventBus()
+    engine = Engine(backend, bus=bus)
     engine.start()
+
+    if web:
+        from .web import make_web_server, WEB_PORT
+        web_srv = make_web_server(engine, bus, host=host)
+        threading.Thread(target=web_srv.serve_forever, name="hv-web",
+                         daemon=True).start()
+        print("highvisor web cockpit: http://%s:%d" % (host, WEB_PORT), flush=True)
 
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -45,6 +54,7 @@ def serve_forever(host=P.HOST, port=P.PORT, backend=None):
     srv.listen(16)
     print("highvisor daemon: backend=%s listening on %s:%d"
           % (backend.name, host, port), flush=True)
+    bus.publish("boot", backend=backend.name, msg="daemon up on %d" % port)
     try:
         while True:
             conn, addr = srv.accept()

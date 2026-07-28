@@ -24,3 +24,6 @@ hvd = "highvisor.server:main"
 
 [tool.setuptools.packages.find]
 include = ["highvisor*"]
+
+[tool.setuptools.package-data]
+highvisor = ["webui/*"]

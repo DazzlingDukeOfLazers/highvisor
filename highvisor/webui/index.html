@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>highvisor</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <span class="logo">highvisor</span>
+    <span id="self" class="muted">…</span>
+    <span class="spacer"></span>
+    <span id="backend" class="badge">backend: …</span>
+    <span id="conn" class="dot" title="event stream">●</span>
+  </header>
+
+  <main>
+    <section class="col left">
+      <div class="panel">
+        <div class="panel-hd">windows <button id="refresh" title="refresh">⟳</button></div>
+        <ul id="windows" class="list"></ul>
+      </div>
+      <div class="panel">
+        <div class="panel-hd">peers</div>
+        <ul id="peers" class="list"><li class="muted">no bridge / no peers</li></ul>
+      </div>
+    </section>
+
+    <section class="col mid">
+      <div class="panel grow">
+        <div class="panel-hd">preview <span id="shotlabel" class="muted"></span></div>
+        <div id="shotwrap" class="shotwrap"><span class="muted">click a window to capture</span></div>
+      </div>
+      <div class="panel">
+        <div class="panel-hd">context handoff <span class="muted">→ peers</span></div>
+        <div class="handoff">
+          <textarea id="ctx" placeholder="type or paste context to send to the other machine…"></textarea>
+          <button id="send">send</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="col right">
+      <div class="panel grow">
+        <div class="panel-hd">log <button id="clearlog" title="clear">clear</button></div>
+        <div id="log" class="log"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

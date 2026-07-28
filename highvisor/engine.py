@@ -30,8 +30,9 @@ class _Job:
 
 
 class Engine:
-    def __init__(self, backend):
+    def __init__(self, backend, bus=None):
         self.backend = backend
+        self.bus = bus  # optional EventBus: each op is published for the onscreen log
         self._q: "queue.Queue[_Job]" = queue.Queue()
         self._thread = threading.Thread(target=self._run, name="hv-engine",
                                         daemon=True)
@@ -74,6 +75,29 @@ class Engine:
                               "error": "%s: %s" % (type(e).__name__, e)}
             finally:
                 job.event.set()
+            if self.bus is not None:
+                self._publish_op(job.request, job.result)
+
+    def _publish_op(self, req: dict, res: dict) -> None:
+        """Emit a compact event for the onscreen log — never the screenshot bytes."""
+        op = req.get("op")
+        if op in (P.OP_PING, P.OP_LIST):  # polled constantly; would drown the log
+            return
+        f = {"op": op, "ok": bool(res.get("ok"))}
+        if req.get("target"):
+            f["target"] = req["target"]
+        if res.get("tier") is not None:
+            f["tier"] = res["tier"]
+        if res.get("detail"):
+            f["detail"] = res["detail"]
+        if op == P.OP_SHOT and res.get("ok"):
+            f["detail"] = "%d bytes" % res.get("bytes", 0)
+        if res.get("error"):
+            f["error"] = res["error"]
+        try:
+            self.bus.publish("op", **f)
+        except Exception:
+            pass
 
     def _dispatch(self, req: dict) -> dict:
         op = req.get("op")
