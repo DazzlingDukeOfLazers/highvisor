@@ -212,6 +212,27 @@ class WindowsBackend(PlatformBackend):
             return ActionResult.fail("launch failed: %s" % e)
         return ActionResult(ok=True, detail="startfile %s" % spec)
 
+    def click(self, target: str, x: int, y: int, button: str = "left",
+              double: bool = False) -> ActionResult:
+        hwnd = self._resolve(target)
+        if hwnd is None:
+            return ActionResult.fail("click needs a window target")
+        rect = wintypes.RECT()
+        user32.GetWindowRect(hwnd, ctypes.byref(rect))
+        gx, gy = rect.left + int(x), rect.top + int(y)   # window-relative -> screen px
+        self.activate(target)
+        time.sleep(0.06)
+        user32.SetCursorPos(gx, gy)
+        time.sleep(0.02)
+        dn, up = (0x0008, 0x0010) if button == "right" else (0x0002, 0x0004)
+        for _ in range(2 if double else 1):
+            user32.mouse_event(dn, 0, 0, 0, 0)
+            user32.mouse_event(up, 0, 0, 0, 0)
+            time.sleep(0.02)
+        return ActionResult(ok=True, tier=4,
+                            detail="%s%s click @ (%d,%d)"
+                                   % ("double " if double else "", button, gx, gy))
+
     def screenshot(self, target: Optional[str]) -> bytes:
         from io import BytesIO
         from PIL import Image

@@ -24,6 +24,7 @@ OP_SHOT = "screenshot"      # target -> {ok, png_b64, bytes, w, h}
 OP_ACTIVATE = "activate"    # target -> ActionResult
 OP_TEXT = "text"            # target, text -> ActionResult
 OP_KEY = "key"              # target, keys -> ActionResult
+OP_CLICK = "click"          # target, x, y (window-relative), [button, double] -> ActionResult
 OP_INSPECT = "inspect"      # target, depth -> {ok, tree}
 OP_MOVE = "move"            # target, (zone | x,y,w,h), [topmost] -> ActionResult
 OP_SCREEN = "screen_size"   # -> {ok, w, h}  (physical pixels of primary display)

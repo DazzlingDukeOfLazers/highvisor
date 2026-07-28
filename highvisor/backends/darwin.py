@@ -246,6 +246,44 @@ class MacBackend(PlatformBackend):
         data = rep.representationUsingType_properties_(_PNG, None)
         return bytes(data)
 
+    def click(self, target: str, x: int, y: int, button: str = "left",
+              double: bool = False) -> ActionResult:
+        w = self._resolve(target)
+        if w is None:
+            return ActionResult.fail("click needs a window target")
+        wx, wy, ww, wh = self._bounds(w)
+        gx, gy = wx + int(x), wy + int(y)          # window-relative -> global points
+        self.activate(target)                       # a click on a bg app should focus it
+        time.sleep(0.06)
+        src = Quartz.CGEventSourceCreate(Quartz.kCGEventSourceStateHIDSystemState)
+        pt = Quartz.CGPointMake(gx, gy)
+        right = button == "right"
+        b = Quartz.kCGMouseButtonRight if right else Quartz.kCGMouseButtonLeft
+        down = Quartz.kCGEventRightMouseDown if right else Quartz.kCGEventLeftMouseDown
+        up = Quartz.kCGEventRightMouseUp if right else Quartz.kCGEventLeftMouseUp
+        # WARP the real OS cursor to the point — Unity (and others) read the actual
+        # cursor position, not the event's, so a click without a warp lands nowhere.
+        Quartz.CGWarpMouseCursorPosition(pt)
+        Quartz.CGAssociateMouseAndMouseCursorPosition(True)
+        mv = Quartz.CGEventCreateMouseEvent(src, Quartz.kCGEventMouseMoved, pt, b)
+        Quartz.CGEventPost(Quartz.kCGHIDEventTap, mv)
+        time.sleep(0.03)
+        for n in range(2 if double else 1):
+            ed = Quartz.CGEventCreateMouseEvent(src, down, pt, b)
+            eu = Quartz.CGEventCreateMouseEvent(src, up, pt, b)
+            # click-state must be set (>=1) or many UI toolkits treat the pair as a
+            # drag/move rather than a click and never fire the button.
+            cs = n + 1 if double else 1
+            Quartz.CGEventSetIntegerValueField(ed, Quartz.kCGMouseEventClickState, cs)
+            Quartz.CGEventSetIntegerValueField(eu, Quartz.kCGMouseEventClickState, cs)
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap, ed)
+            time.sleep(0.06)   # real dwell so the EventSystem registers down then up
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap, eu)
+            time.sleep(0.04)
+        return ActionResult(ok=True, tier=4,
+                            detail="%s%s click @ global (%d,%d)"
+                                   % ("double " if double else "", button, gx, gy))
+
     def inspect(self, target: str, depth: int = 3) -> Element:
         w = self._resolve(target)
         if w is None:

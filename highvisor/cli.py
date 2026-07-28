@@ -92,6 +92,11 @@ def _cmd_key(a):
                        "focus": a.focus}))
 
 
+def _cmd_click(a):
+    _print_json(_call({"op": P.OP_CLICK, "target": a.target, "x": a.x, "y": a.y,
+                       "button": "right" if a.right else "left", "double": a.double}))
+
+
 def _cmd_activate(a):
     _print_json(_call({"op": P.OP_ACTIVATE, "target": a.target}))
 
@@ -288,6 +293,14 @@ def build_parser():
     s.add_argument("--focus", action="store_true",
                    help="activate + HID-tap delivery (for Unity/games that ignore background keys)")
     s.set_defaults(fn=_cmd_key)
+
+    s = sub.add_parser("click", help="click at window-relative x y (points)")
+    s.add_argument("target")
+    s.add_argument("x", type=int)
+    s.add_argument("y", type=int)
+    s.add_argument("--right", action="store_true", help="right-click")
+    s.add_argument("--double", action="store_true", help="double-click")
+    s.set_defaults(fn=_cmd_click)
 
     s = sub.add_parser("activate")
     s.add_argument("target")

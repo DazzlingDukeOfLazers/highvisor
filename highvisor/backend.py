@@ -145,6 +145,13 @@ class PlatformBackend:
         (Unity/other engines)."""
         raise NotImplementedError
 
+    def click(self, target: str, x: int, y: int, button: str = "left",
+              double: bool = False) -> ActionResult:
+        """Click at (x, y) given RELATIVE to the target window's top-left, in the
+        window's coordinate units. Synthetic mouse events reach many apps that
+        drop synthetic keys (Unity games); this activates the window first."""
+        raise NotImplementedError
+
     def inspect(self, target: str, depth: int = 3) -> Element:
         raise NotImplementedError
 
