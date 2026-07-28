@@ -225,6 +225,12 @@ async function init() {
   $("savelayout").onclick = saveLayout;
   $("layoutsel").onchange = showLayoutDesc;
   $("clearlog").onclick = () => (logEl().innerHTML = "");
+  $("off").onclick = async () => {
+    if (!confirm("Shut down the highvisor daemon? You'll restart it from a terminal.")) return;
+    try { await fetch("/shutdown", { method: "POST" }); } catch {}
+    document.body.classList.add("down");   // dim + show the stopped overlay
+    $("conn").classList.remove("on");
+  };
   $("ctx").addEventListener("keydown", (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") sendContext();
   });

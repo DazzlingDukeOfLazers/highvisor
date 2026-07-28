@@ -13,6 +13,8 @@ the TCP control port (cross-machine data rides the separate bridge, not this).
 import json
 import os
 import queue
+import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import protocol as P
@@ -92,6 +94,14 @@ def make_web_server(engine, bus, bridge=None, orchestrator=None,
             if self.path == "/orch/act" and orchestrator is not None:
                 return self._send(200, json.dumps(orchestrator.act(
                     req.get("fp"), req.get("action"))))
+            if self.path == "/shutdown":
+                # localhost-only cockpit -> local off switch. Reply first, then exit
+                # after a beat so the response reaches the browser.
+                bus.publish("boot", msg="shutdown requested from cockpit")
+                self._send(200, json.dumps({"ok": True, "msg": "highvisor shutting down"}))
+                threading.Thread(target=lambda: (time.sleep(0.3), os._exit(0)),
+                                 daemon=True).start()
+                return
             return self._send(404, "not found", "text/plain")
 
         # -------------------------------------------------------------- SSE

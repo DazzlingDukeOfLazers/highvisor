@@ -23,6 +23,13 @@ header {
 }
 .dot { color: var(--err); font-size: 15px; transition: color .3s; }
 .dot.on { color: var(--ok); }
+.off { background: var(--panel2); color: var(--muted); border: 1px solid var(--line);
+  border-radius: 4px; cursor: pointer; font-size: 13px; line-height: 1; padding: 3px 8px; }
+.off:hover { color: var(--err); border-color: var(--err); }
+body.down { opacity: .55; }
+#downmsg { position: fixed; inset: 0; display: none; align-items: center;
+  justify-content: center; background: rgba(8,11,16,.8); font-size: 15px; color: var(--fg); z-index: 9; }
+body.down #downmsg { display: flex; }
 
 main {
   flex: 1; min-height: 0; display: grid;
