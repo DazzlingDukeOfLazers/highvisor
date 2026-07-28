@@ -334,7 +334,7 @@ class MacBackend(PlatformBackend):
         return ActionResult(ok=True, tier=4,
                             detail="activate + CGEvent typing (tier1: %s)" % tier1_err)
 
-    def key(self, target: str, keys: str) -> ActionResult:
+    def key(self, target: str, keys: str, focus: bool = False) -> ActionResult:
         w = self._resolve(target)
         if w is None:
             return ActionResult.fail("key needs a window target")
@@ -346,8 +346,17 @@ class MacBackend(PlatformBackend):
         code = self._keycode_for(base)
         if code is None:
             return ActionResult.fail("unknown key %r" % keys)
+        # Tier 4: activate + post to the HID event tap (global). Needed for apps that
+        # read from the focused HID stream and ignore per-pid posts — Unity games
+        # (Caves of Qud) and other engines. Steals focus, so it's opt-in.
+        if focus:
+            self.activate(target)
+            time.sleep(0.06)
+            self._post_key(code, flags, pid=None)
+            return ActionResult(ok=True, tier=4,
+                                detail="activate + CGEvent(HID) keycode=0x%02X flags=0x%X" % (code, flags))
         # Tier 2: post the key to the target pid without stealing focus. Effectiveness
-        # varies by app; if it no-ops the caller can retry with activate.
+        # varies by app; if it no-ops the caller can retry with focus=true.
         self._post_key(code, flags, pid=pid)
         return ActionResult(ok=True, tier=2,
                             detail="CGEventPostToPid keycode=0x%02X flags=0x%X" % (code, flags))

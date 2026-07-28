@@ -88,7 +88,8 @@ def _cmd_text(a):
 
 
 def _cmd_key(a):
-    _print_json(_call({"op": P.OP_KEY, "target": a.target, "keys": a.keys}))
+    _print_json(_call({"op": P.OP_KEY, "target": a.target, "keys": a.keys,
+                       "focus": a.focus}))
 
 
 def _cmd_activate(a):
@@ -284,6 +285,8 @@ def build_parser():
     s = sub.add_parser("key")
     s.add_argument("target")
     s.add_argument("keys")
+    s.add_argument("--focus", action="store_true",
+                   help="activate + HID-tap delivery (for Unity/games that ignore background keys)")
     s.set_defaults(fn=_cmd_key)
 
     s = sub.add_parser("activate")

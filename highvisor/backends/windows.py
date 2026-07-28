@@ -384,10 +384,23 @@ class WindowsBackend(PlatformBackend):
         return ActionResult(ok=False, tier=None,
                             error="tier1(%s); no child hwnd for tier2" % tier1_err)
 
-    def key(self, target: str, keys: str) -> ActionResult:
+    def key(self, target: str, keys: str, focus: bool = False) -> ActionResult:
         hwnd = self._resolve(target)
         if hwnd is None:
             return ActionResult.fail("key needs a window target")
+        name = keys.strip()
+        upper = name.upper()
+        # Tier 4 (opt-in): activate + SendKeys for apps that ignore PostMessage
+        # (Unity/games). Named keys become SendKeys syntax ({DOWN}/{ENTER}/…).
+        if focus:
+            try:
+                self.activate(target)
+                time.sleep(0.06)
+                seq = ("{%s}" % upper) if upper in VK else keys
+                auto.SendKeys(seq, waitTime=0)
+                return ActionResult(ok=True, tier=4, detail="activate + SendKeys %s" % seq)
+            except Exception as e:
+                return ActionResult.fail("SendKeys failed: %s" % e)
         # Deliver to the editable child if present, else the top-level window.
         edit = self._find_editable(auto.ControlFromHandle(hwnd))
         dest = (edit.NativeWindowHandle if edit and edit.NativeWindowHandle

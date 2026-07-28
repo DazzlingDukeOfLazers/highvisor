@@ -138,9 +138,11 @@ class PlatformBackend:
         possible (tier ladder)."""
         raise NotImplementedError
 
-    def key(self, target: str, keys: str) -> ActionResult:
+    def key(self, target: str, keys: str, focus: bool = False) -> ActionResult:
         """Deliver a keystroke (named key like 'Return', a single char, or a
-        combo) to the target, unfocused if possible (tier ladder)."""
+        combo) to the target, unfocused if possible (tier ladder). ``focus=True``
+        forces the focus-stealing path for apps that ignore background keys
+        (Unity/other engines)."""
         raise NotImplementedError
 
     def inspect(self, target: str, depth: int = 3) -> Element:

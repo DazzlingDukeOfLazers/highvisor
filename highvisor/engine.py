@@ -124,7 +124,8 @@ class Engine:
             return b.text(req["target"], req.get("text", "")).to_dict()
 
         if op == P.OP_KEY:
-            return b.key(req["target"], req.get("keys", "")).to_dict()
+            return b.key(req["target"], req.get("keys", ""),
+                         focus=bool(req.get("focus", False))).to_dict()
 
         if op == P.OP_INSPECT:
             tree = b.inspect(req["target"], int(req.get("depth", 3)))
