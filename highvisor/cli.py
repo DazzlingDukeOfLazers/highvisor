@@ -303,6 +303,46 @@ def _cmd_parity(a):
     _print_json(res)
 
 
+def _ocr_words(res, minlen=4):
+    """Set of distinctive words (>= minlen, lowercased, alphanumeric) from an OCR result.
+    Word-level is robust to the fact that Vision segments the same text into DIFFERENT boxes
+    on two captures of stylized fonts — line-level set-diff can't align those, words can."""
+    import re
+    words = set()
+    for b in (res.get("boxes") or []):
+        for w in re.sub(r"[^a-z0-9]+", " ", (b.get("text") or "").lower()).split():
+            if len(w) >= minlen:
+                words.add(w)
+    return words
+
+
+def _text_diff(a_target, b_target, thr=0.8):
+    """OCR both windows and word-level diff — the SEMANTIC layer pixel diff can't isolate:
+    which content words appear on the reference but not the current, and vice versa. Reports
+    `coverage` (% of the reference's distinctive words fuzzily present in the current) plus the
+    `missing` (reference-only) and `extra` (current-only) word lists. Still OCR-rough on
+    stylized fonts — read `missing` as a candidate checklist of content the current lacks."""
+    import difflib
+    wa = _ocr_words(_call({"op": P.OP_OCR, "target": a_target}))
+    wb = _ocr_words(_call({"op": P.OP_OCR, "target": b_target}))
+
+    def present(w, pool):
+        return w in pool or any(difflib.SequenceMatcher(None, w, p).ratio() >= thr for p in pool)
+
+    missing = sorted(w for w in wa if not present(w, wb))
+    extra = sorted(w for w in wb if not present(w, wa))
+    covered = len(wa) - len(missing)
+    coverage = round(100.0 * covered / max(1, len(wa)), 1)
+    return {"coverage": coverage, "missing": missing, "extra": extra,
+            "counts": {"reference_words": len(wa), "current_words": len(wb), "covered": covered}}
+
+
+def _cmd_text_diff(a):
+    d = _text_diff(a.a, a.b, thr=a.threshold)
+    d["a"], d["b"] = a.a, a.b
+    _print_json(d)
+
+
 def _run_steps(window, steps):
     import time
     for st in steps or []:
@@ -378,10 +418,13 @@ def _cmd_scene(a):
             imageops.sidebyside(ref, cur, sbs, label_a=ref_spec.get("window", "reference"),
                                 label_b=sc.get("window", "current"))
             thr = float(sc.get("parity_threshold", 90.0))
-            results.append({"scene": nm, "mode": "parity", "parity_match": d["content_match"],
-                            "pass": d["content_match"] >= thr, "threshold": thr,
-                            "worst": reg["worst"][:5], "reference": ref, "current": cur,
-                            "sidebyside": sbs, "diff": ann})
+            entry = {"scene": nm, "mode": "parity", "parity_match": d["content_match"],
+                     "pass": d["content_match"] >= thr, "threshold": thr,
+                     "worst": reg["worst"][:5], "reference": ref, "current": cur,
+                     "sidebyside": sbs, "diff": ann}
+            if a.text:   # also OCR both live windows + diff their text (label/wording gaps)
+                entry["text"] = _text_diff(ref_spec["window"], sc["window"])
+            results.append(entry)
             continue
 
         golden = scenes_mod.rel(a.config, sc.get("golden", "golden/" + nm + ".png"))
@@ -577,6 +620,12 @@ def build_parser():
     s.add_argument("--port", type=int, default=None, help="state-indicating localhost port")
     s.set_defaults(fn=_cmd_probe)
 
+    s = sub.add_parser("text-diff", help="OCR two windows + diff their text (wrong labels/wording)")
+    s.add_argument("a", help="reference window (e.g. CavesOfQud)")
+    s.add_argument("b", help="current window (e.g. 'Raves of Qud')")
+    s.add_argument("--threshold", type=float, default=0.82, help="fuzzy line-match ratio 0..1")
+    s.set_defaults(fn=_cmd_text_diff)
+
     s = sub.add_parser("scene", help="drive to a named UI state + regression-diff vs its golden")
     s.add_argument("name", nargs="?", help="scene name (omit when using --all)")
     s.add_argument("--all", action="store_true", help="run every scene in the config")
@@ -584,6 +633,8 @@ def build_parser():
     s.add_argument("--bless", action="store_true", help="write the capture AS the golden reference")
     s.add_argument("--parity", action="store_true",
                    help="also drive the scene's `reference` window (e.g. Qud) and diff the two live")
+    s.add_argument("--text", action="store_true",
+                   help="with --parity: also OCR both windows + diff their text (label/wording gaps)")
     s.add_argument("--out", default=None, help="dir for captures + diffs (default <config-dir>/_regress)")
     s.add_argument("--settle", type=float, default=1.2, help="seconds after steps before capturing")
     s.set_defaults(fn=_cmd_scene)
