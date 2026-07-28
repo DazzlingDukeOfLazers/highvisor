@@ -10,8 +10,11 @@ it. See [`docs/`](docs/) for the full design.
 
 ## Status
 
-Early. Windows backend is built and verified end-to-end; macOS is spec'd but not
-yet implemented. See `docs/03-research-findings.md`.
+Both backends built. Windows verified end-to-end; the **macOS backend** is
+implemented and heavily exercised — window capture/move/dock, AX inspect, Vision
+OCR, and the synthetic-input tier ladder incl. the Unity/Qud click (`--hover`) —
+driving Caves of Qud + Godot apps for the visual-parity kit (`docs/08-parity-kit.md`).
+See `docs/03-research-findings.md`.
 
 ## Architecture (one paragraph)
 
@@ -65,6 +68,24 @@ hv raw '{"op":"ping"}'
 
 The protocol is dependency-free framed JSON (`highvisor/protocol.py`), so any
 language can speak it in a few lines.
+
+### Visual parity & regression
+
+Drive two apps to the same screen, localize where they differ, and catch layout
+regressions — the toolchain built to bring a reconstruction 1:1 with its source
+(Raves of Qud vs Caves of Qud):
+
+```
+hv probe --app qud                     # off / menu / in-game
+hv diff a.png b.png --regions          # match % + WHERE they diverge (+ annotated)
+hv text-diff CavesOfQud "Raves of Qud" # OCR word-level content gaps (rough)
+hv parity-sweep A B --regions          # compare across window sizes
+hv scene mods --parity --text          # drive BOTH + diff live vs the reference
+hv scene --all --bless                 # lock goldens;  hv scene --all  to regress
+```
+
+See [`docs/08-parity-kit.md`](docs/08-parity-kit.md) for the workflows, the scenes
+file format, and the gotchas (the `--hover` click, matched sizes, OCR limits).
 
 ## Notepad golem (structural reconstruction demo)
 

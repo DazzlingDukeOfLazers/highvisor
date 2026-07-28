@@ -90,3 +90,8 @@ generalizing the `godot_cmd` trick instead of leaving it per-project.
 3. `02-research-agenda.md` — the open tooling questions to resolve before we pick
    a stack.
 4. `03-research-findings.md` — filled in after research; the stack recommendation.
+5. `04-web-and-bridge.md` — the web cockpit + the cross-machine LAN bridge.
+6. `05-driving-input.md` — the tier ladder + the synthetic-click gotcha (Unity/Qud).
+7. `06-agent-loop.md` — the human-gated Claude↔ChatGPT opcode loop.
+8. `07-ssh-transport.md` — tunnelling a remote highvisor over SSH.
+9. `08-parity-kit.md` — visual parity & regression tooling (drive both, diff, golden).
