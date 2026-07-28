@@ -7,6 +7,7 @@ only do socket I/O and block on ``engine.submit``.
 
 Run it with ``python -m highvisor.server`` (or the ``hvd`` console script).
 """
+import os
 import socket
 import threading
 
@@ -41,9 +42,21 @@ def serve_forever(host=P.HOST, port=P.PORT, backend=None, web=True):
     engine = Engine(backend, bus=bus)
     engine.start()
 
+    bridge = None
+    if os.environ.get("HIGHVISOR_BRIDGE", "1") != "0":
+        try:
+            from .bridge import Bridge
+            bridge = Bridge(engine, bus)
+            bridge.start()
+            print("highvisor bridge: LAN peer channel on %s:%d (token-gated)"
+                  % (bridge.host, bridge.port), flush=True)
+        except Exception as e:
+            print("highvisor bridge: disabled (%s)" % e, flush=True)
+            bridge = None
+
     if web:
         from .web import make_web_server, WEB_PORT
-        web_srv = make_web_server(engine, bus, host=host)
+        web_srv = make_web_server(engine, bus, bridge=bridge, host=host)
         threading.Thread(target=web_srv.serve_forever, name="hv-web",
                          daemon=True).start()
         print("highvisor web cockpit: http://%s:%d" % (host, WEB_PORT), flush=True)

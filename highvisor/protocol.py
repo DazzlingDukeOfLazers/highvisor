@@ -14,6 +14,8 @@ import struct
 
 HOST = "127.0.0.1"          # localhost only, single machine — never bind public
 PORT = 48720                # arbitrary high port (raves used 48710; avoid clash)
+BRIDGE_PORT = 48722         # LAN-facing peer bridge: token-gated, DATA ONLY (never
+                            # exposes control ops). Discovered over mDNS/zeroconf.
 
 # Op names the engine understands. Clients send op=<one of these>.
 OP_PING = "ping"            # -> {ok, backend, version}
