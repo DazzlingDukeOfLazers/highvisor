@@ -30,6 +30,8 @@ OP_SCREEN = "screen_size"   # -> {ok, w, h}  (physical pixels of primary display
 OP_LAYOUT_LIST = "layout_list"    # -> {ok, layouts:[{name, description, placements}]}
 OP_LAYOUT_APPLY = "layout_apply"  # name -> {ok, applied, results:[...]}
 OP_LAYOUT_SAVE = "layout_save"    # name, [description] -> {ok, saved, path, windows}
+OP_PEERS = "peers"                # -> {ok, peers:[{name,host,port}], self} (bridge)
+OP_PEER_SHOT = "peer_shot"        # peer, target -> {ok, png_b64, bytes} (via bridge)
 
 MAX_FRAME = 64 * 1024 * 1024  # 64 MiB guard (a 4k screenshot fits easily)
 

@@ -47,6 +47,7 @@ def serve_forever(host=P.HOST, port=P.PORT, backend=None, web=True):
         try:
             from .bridge import Bridge
             bridge = Bridge(engine, bus)
+            engine.bridge = bridge   # enable peer_* ops over the TCP protocol
             bridge.start()
             print("highvisor bridge: LAN peer channel on %s:%d (token-gated)"
                   % (bridge.host, bridge.port), flush=True)

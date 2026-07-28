@@ -33,6 +33,7 @@ class Engine:
     def __init__(self, backend, bus=None):
         self.backend = backend
         self.bus = bus  # optional EventBus: each op is published for the onscreen log
+        self.bridge = None  # optional Bridge: set by the server for peer_* ops
         self._q: "queue.Queue[_Job]" = queue.Queue()
         self._thread = threading.Thread(target=self._run, name="hv-engine",
                                         daemon=True)
@@ -154,6 +155,17 @@ class Engine:
 
         if op == P.OP_LAYOUT_APPLY:
             return self._apply_layout(b, req.get("name"))
+
+        if op == P.OP_PEERS:
+            if self.bridge is None:
+                return {"ok": False, "error": "bridge not running"}
+            return {"ok": True, "peers": self.bridge.peers(),
+                    "self": self.bridge.identity()}
+
+        if op == P.OP_PEER_SHOT:
+            if self.bridge is None:
+                return {"ok": False, "error": "bridge not running"}
+            return self.bridge.request_shot(req.get("peer"), req.get("target"))
 
         if op == P.OP_LAYOUT_SAVE:
             from .layouts import save_layout

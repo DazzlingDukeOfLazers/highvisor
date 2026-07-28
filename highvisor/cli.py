@@ -18,6 +18,8 @@ other language could reimplement this in a few lines (that's the point).
     hv layout-save <name> [description...]
     hv diff <a.png> <b.png> [--out heat.png]
     hv zones <img.png> [--top N]
+    hv peers
+    hv parity <a> <b> [--peer-a NAME] [--peer-b NAME] [--out heat.png]
     hv responsive <golem> <source> [--threshold P] [--out-dir DIR]
     hv raw '{"op":"ping"}'
 
@@ -26,6 +28,7 @@ other language could reimplement this in a few lines (that's the point).
 import argparse
 import base64
 import json
+import os
 import socket
 import sys
 
@@ -157,6 +160,51 @@ def _cmd_layout_save(a):
                        "description": " ".join(a.description) if a.description else ""}))
 
 
+def _cmd_peers(a):
+    resp = _call({"op": P.OP_PEERS})
+    if not resp.get("ok"):
+        _print_json(resp)
+        return 1
+    me = resp.get("self") or {}
+    print("self: %s@%s:%s" % (me.get("name"), me.get("host"), me.get("port")))
+    for p in resp.get("peers", []):
+        print("  %-16s %s:%s" % (p["name"], p["host"], p["port"]))
+    if not resp.get("peers"):
+        print("  (no peers discovered yet)")
+
+
+def _capture(target, peer, path):
+    """Write a PNG of ``target`` — from a peer over the bridge if ``peer`` set,
+    else from the local daemon."""
+    if peer:
+        r = _call({"op": P.OP_PEER_SHOT, "peer": peer, "target": target})
+    else:
+        r = _call({"op": P.OP_SHOT, "target": target})
+    if not r.get("ok") or not r.get("png_b64"):
+        raise SystemExit("capture %s%s failed: %s"
+                         % (peer + ":" if peer else "", target, r.get("error")))
+    with open(path, "wb") as f:
+        f.write(base64.b64decode(r["png_b64"]))
+    return r.get("bytes", 0)
+
+
+def _cmd_parity(a):
+    """One-shot visual parity: capture A and B (each local or from a peer) and
+    screenshot-diff them with imageops — no LLM in the loop."""
+    import tempfile
+    from . import imageops
+    d = tempfile.mkdtemp(prefix="hv-parity-")
+    ap, bp = os.path.join(d, "a.png"), os.path.join(d, "b.png")
+    _capture(a.a, a.peer_a, ap)
+    _capture(a.b, a.peer_b, bp)
+    heat = a.out or os.path.join(d, "heat.png")
+    res = imageops.diff(ap, bp, crop_top=a.crop_top, out=heat)
+    res["a"] = (a.peer_a + ":" if a.peer_a else "") + a.a
+    res["b"] = (a.peer_b + ":" if a.peer_b else "") + a.b
+    res["captures"] = [ap, bp]
+    _print_json(res)
+
+
 def _cmd_raw(a):
     _print_json(_call(json.loads(a.json)), strip=("png_b64",))
 
@@ -240,6 +288,21 @@ def build_parser():
     s.add_argument("name")
     s.add_argument("description", nargs="*")
     s.set_defaults(fn=_cmd_layout_save)
+
+    sub.add_parser("peers", help="list discovered bridge peers").set_defaults(fn=_cmd_peers)
+
+    s = sub.add_parser("parity",
+                       help="capture two windows (local or --peer) and screenshot-diff them")
+    s.add_argument("a", help="window ref for side A")
+    s.add_argument("b", help="window ref for side B")
+    s.add_argument("--peer-a", dest="peer_a", default=None,
+                   help="capture A from this bridge peer instead of locally")
+    s.add_argument("--peer-b", dest="peer_b", default=None,
+                   help="capture B from this bridge peer instead of locally")
+    s.add_argument("--out", default=None, help="write the diff heatmap here")
+    s.add_argument("--crop-top", type=int, default=58, dest="crop_top",
+                   help="px of chrome to skip for the content score")
+    s.set_defaults(fn=_cmd_parity)
 
     s = sub.add_parser("raw")
     s.add_argument("json")
