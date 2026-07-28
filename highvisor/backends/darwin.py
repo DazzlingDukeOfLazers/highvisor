@@ -1,428 +1,379 @@
-"""MacBackend — observe + control via Accessibility (AX) and Quartz.
+"""MacBackend — observe + control via the Accessibility API (AX) and CoreGraphics.
 
-*** WRITTEN ON WINDOWS — UNTESTED ON A REAL MAC. ***
-Every pyobjc call here is a hypothesis until it goes green on macOS. It mirrors
-the Windows backend's tier ladder using the APIs the Slice 0 mac spike
-(spike/mac_slice0.py) and docs/03-research-findings.md identified:
+Mirrors WindowsBackend behind the same PlatformBackend seam (docs/01-architecture):
+  - ``CGWindowListCopyWindowInfo`` enumerates on-screen windows; the target id is
+    the CGWindowNumber (``win:<n>``).
+  - ``CGWindowListCreateImage`` captures a SPECIFIC window even when it is
+    unfocused/occluded — the macOS analogue of PrintWindow (tier-3 observation).
+  - ``AXUIElement`` actions (``AXSetValue`` / ``AXPress`` / set ``AXPosition``)
+    act on a background window WITHOUT bringing it frontmost — the reliable
+    background path (tier 1). Hammerspoon's hs.axuielement proves this.
+  - ``CGEventPostToPid`` delivers a keystroke to a pid (tier 2); ``activate`` +
+    ``CGEventPost`` is the focus-stealing last resort (tier 4).
 
-  - tier 1 (accessibility): AXUIElementSetAttributeValue(kAXValueAttribute) — a
-    semantic, focus-free write, the mac analog of UIA ValuePattern.SetValue.
-  - tier 4 (global input): activate the app + synthesize CGEvent keystrokes.
-  - capture: Quartz CGWindowListCreateImage grabs a SPECIFIC window even when it
-    is not frontmost.
+Coordinates: everything here is in **points** (the top-left-origin global display
+coordinate space that AX and CGWindow bounds use) — uniform across displays and
+what window positioning needs, so no per-monitor scale juggling. Only the captured
+PNG is in native pixels (its own resolution). NB: on the Windows backend the unit
+is physical pixels; a client that mixes the two across OSes must account for that.
 
-TCC permissions the daemon must have (surfaced as BackendError with guidance):
-  - Accessibility (AXIsProcessTrusted) — required for all AX read/write.
-  - Screen Recording — required for CGWindowListCreateImage to return pixels
-    (else a black/desktop-only image on macOS 10.15+).
-
-pyobjc is imported lazily so this module only needs the frameworks on macOS.
-
-Deps: pyobjc-framework-Cocoa, pyobjc-framework-Quartz,
-      pyobjc-framework-ApplicationServices
+TCC: AX needs the *Accessibility* grant (``AXIsProcessTrusted``); window capture
+needs *Screen Recording*. We detect and raise a precise BackendError rather than
+failing opaque (docs/03 risk table).
 """
 import time
+from io import BytesIO
 from typing import List, Optional
+
+import Quartz
+from AppKit import NSBitmapImageRep, NSRunningApplication, NSWorkspace
+from ApplicationServices import (
+    AXIsProcessTrusted, AXUIElementCopyActionNames,
+    AXUIElementCopyAttributeValue, AXUIElementCreateApplication,
+    AXUIElementPerformAction, AXUIElementSetAttributeValue, AXValueCreate,
+    AXValueGetValue)
+try:  # the CGPoint/CGSize AXValue-type constants were renamed across pyobjc versions
+    from ApplicationServices import kAXValueCGPointType, kAXValueCGSizeType
+except ImportError:  # newer pyobjc
+    from ApplicationServices import (
+        kAXValueTypeCGPoint as kAXValueCGPointType,
+        kAXValueTypeCGSize as kAXValueCGSizeType)
 
 from ..backend import ActionResult, BackendError, Element, PlatformBackend, Target
 
-# Editable AX roles we target for text/key delivery, in preference order.
-_EDIT_ROLES = ("AXTextArea", "AXTextField", "AXComboBox")
+# NSBitmapImageFileTypePNG is 4; the symbol moved across pyobjc versions, so pin it.
+_PNG = 4
 
-# mac virtual keycodes for named keys (ANSI layout).
-_KEYCODE_NAMED = {
+# AX attribute / action names as plain strings — robust across pyobjc versions.
+_ROLE, _TITLE, _DESC = "AXRole", "AXTitle", "AXDescription"
+_VALUE, _POS, _SIZE = "AXValue", "AXPosition", "AXSize"
+_CHILDREN, _WINDOWS = "AXChildren", "AXWindows"
+_FOCUSED_ELEM = "AXFocusedUIElement"
+_PRESS, _RAISE = "AXPress", "AXRaise"
+_EDITABLE_ROLES = ("AXTextArea", "AXTextField", "AXComboBox")
+
+# key name -> macOS virtual keycode (for CGEventCreateKeyboardEvent).
+KEYCODE = {
     "RETURN": 0x24, "ENTER": 0x24, "TAB": 0x30, "SPACE": 0x31,
-    "BACKSPACE": 0x33, "BACK": 0x33, "DELETE": 0x75, "DEL": 0x75,
-    "ESC": 0x35, "ESCAPE": 0x35, "LEFT": 0x7B, "RIGHT": 0x7C,
-    "DOWN": 0x7D, "UP": 0x7E, "HOME": 0x73, "END": 0x77,
-    "PAGEUP": 0x74, "PAGEDOWN": 0x79,
-    "F1": 0x7A, "F2": 0x78, "F3": 0x63, "F4": 0x76, "F5": 0x60,
-    "F6": 0x61, "F7": 0x62, "F8": 0x64, "F9": 0x65, "F10": 0x6D,
-    "F11": 0x67, "F12": 0x6F,
-}
-
-# mac virtual keycodes for printable chars (ANSI), for combos like cmd+s.
-_KEYCODE_CHAR = {
-    "a": 0, "s": 1, "d": 2, "f": 3, "h": 4, "g": 5, "z": 6, "x": 7, "c": 8,
-    "v": 9, "b": 11, "q": 12, "w": 13, "e": 14, "r": 15, "y": 16, "t": 17,
-    "1": 18, "2": 19, "3": 20, "4": 21, "6": 22, "5": 23, "=": 24, "9": 25,
-    "7": 26, "-": 27, "8": 28, "0": 29, "]": 30, "o": 31, "u": 32, "[": 33,
-    "i": 34, "p": 35, "l": 37, "j": 38, "'": 39, "k": 40, ";": 41, "\\": 42,
-    ",": 43, "/": 44, "n": 45, "m": 46, ".": 47, "`": 50, " ": 49,
-}
-
-_MODIFIER_ALIASES = {
-    "CMD": "cmd", "COMMAND": "cmd", "WIN": "cmd", "META": "cmd", "SUPER": "cmd",
-    "CTRL": "ctrl", "CONTROL": "ctrl", "ALT": "alt", "OPT": "alt", "OPTION": "alt",
-    "SHIFT": "shift",
+    "DELETE": 0x33, "BACKSPACE": 0x33, "BACK": 0x33,
+    "ESC": 0x35, "ESCAPE": 0x35, "FORWARDDELETE": 0x75, "DEL": 0x75,
+    "LEFT": 0x7B, "RIGHT": 0x7C, "DOWN": 0x7D, "UP": 0x7E,
+    "HOME": 0x73, "END": 0x77, "PAGEUP": 0x74, "PAGEDOWN": 0x79,
+    "F1": 0x7A, "F2": 0x78, "F3": 0x63, "F4": 0x76, "F5": 0x60, "F6": 0x61,
+    "F7": 0x62, "F8": 0x64, "F9": 0x65, "F10": 0x6D, "F11": 0x67, "F12": 0x6F,
 }
 
 
 class MacBackend(PlatformBackend):
-    name = "darwin"
+    name = "macos"
 
-    # --------------------------------------------------------------- lifecycle
     def thread_init(self):
-        # Soft preflight: don't hard-fail here (that would kill the engine).
-        # Per-op helpers raise a clear BackendError if a permission is missing.
-        try:
-            import AppKit  # noqa: F401  (import cost paid once on the worker thread)
-            import Quartz  # noqa: F401
-            import ApplicationServices  # noqa: F401
-        except Exception as e:  # pragma: no cover - only meaningful on mac
-            raise BackendError(
-                "pyobjc frameworks missing: %s\n"
-                "  pip install pyobjc-framework-Cocoa pyobjc-framework-Quartz "
-                "pyobjc-framework-ApplicationServices" % e)
+        pass  # no COM apartment analogue; AX/CG are fine on our single worker thread
 
-    # ------------------------------------------------------------------ AX glue
-    @staticmethod
-    def _require_ax():
-        from ApplicationServices import AXIsProcessTrusted
+    def _require_ax(self):
         if not AXIsProcessTrusted():
             raise BackendError(
-                "Accessibility permission not granted. Grant it in "
-                "System Settings > Privacy & Security > Accessibility for the "
-                "process running the highvisor daemon, then restart it.")
+                "Accessibility permission is not granted to this process. Grant it in "
+                "System Settings > Privacy & Security > Accessibility (add the terminal / "
+                "python running highvisor), then retry.")
 
-    @staticmethod
-    def _ax_raw(el, attr):
-        """Copy an AX attribute; return the raw value (may be an AXValue) or None."""
-        from ApplicationServices import AXUIElementCopyAttributeValue
+    # -------------------------------------------------------- window enumeration
+    def _windows(self):
+        """On-screen normal app windows (layer 0), front-to-back. Raw CGWindow dicts."""
+        opts = (Quartz.kCGWindowListOptionOnScreenOnly
+                | Quartz.kCGWindowListExcludeDesktopElements)
+        info = Quartz.CGWindowListCopyWindowInfo(opts, Quartz.kCGNullWindowID) or []
+        out = []
+        for w in info:
+            if int(w.get("kCGWindowLayer", 0)) != 0:      # 0 == the normal window layer
+                continue
+            if not w.get("kCGWindowBounds"):
+                continue
+            out.append(w)
+        return out
+
+    def _resolve(self, ref: Optional[str]):
+        """None/"screen" -> None. Else the raw CGWindow dict for the target.
+        Accepts "win:<CGWindowNumber>", "pid:<n>" (that pid's frontmost window), or
+        a case-insensitive title/owner substring."""
+        if ref is None or ref == "screen":
+            return None
+        wins = self._windows()
+        if ref.startswith("win:"):
+            wid = int(ref.split(":", 1)[1])
+            for w in wins:
+                if int(w.get("kCGWindowNumber", -1)) == wid:
+                    return w
+            raise BackendError("no window with id %d" % wid)
+        if ref.startswith("pid:"):
+            pid = int(ref.split(":", 1)[1])
+            for w in wins:                                # _windows is front-to-back
+                if int(w.get("kCGWindowOwnerPID", -1)) == pid:
+                    return w
+            raise BackendError("no on-screen window for pid %d" % pid)
+        low = ref.lower()
+        for w in wins:
+            if (low in (w.get("kCGWindowName") or "").lower()
+                    or low in (w.get("kCGWindowOwnerName") or "").lower()):
+                return w
+        raise BackendError("no window matching ~ %r" % ref)
+
+    def _bounds(self, w) -> tuple:
+        """(x, y, w, h) of a CGWindow dict, in points."""
+        b = w["kCGWindowBounds"]
+        return (int(b["X"]), int(b["Y"]), int(b["Width"]), int(b["Height"]))
+
+    # -------------------------------------------------------------- AX plumbing
+    def _ax_app(self, pid: int):
+        return AXUIElementCreateApplication(pid)
+
+    def _ax_get(self, el, attr):
+        if el is None:
+            return None
         err, val = AXUIElementCopyAttributeValue(el, attr, None)
         return val if err == 0 else None
 
-    @classmethod
-    def _ax_str(cls, el, attr):
-        v = cls._ax_raw(el, attr)
-        return "" if v is None else str(v)
-
-    @classmethod
-    def _ax_children(cls, el):
-        from ApplicationServices import kAXChildrenAttribute
-        kids = cls._ax_raw(el, kAXChildrenAttribute)
-        return list(kids) if kids else []
-
-    @classmethod
-    def _ax_role(cls, el):
-        from ApplicationServices import kAXRoleAttribute
-        return cls._ax_str(el, kAXRoleAttribute)
-
-    @classmethod
-    def _ax_point(cls, el):
-        """Unwrap kAXPositionAttribute (an AXValue wrapping CGPoint)."""
-        from ApplicationServices import kAXPositionAttribute
-        v = cls._ax_raw(el, kAXPositionAttribute)
-        return cls._unwrap_axvalue(v, point=True)
-
-    @classmethod
-    def _ax_size(cls, el):
-        """Unwrap kAXSizeAttribute (an AXValue wrapping CGSize)."""
-        from ApplicationServices import kAXSizeAttribute
-        v = cls._ax_raw(el, kAXSizeAttribute)
-        return cls._unwrap_axvalue(v, point=False)
+    def _ax_window(self, w):
+        """The AXWindow element for a CGWindow dict: the app window whose title
+        matches, else its main/first window. Needs the Accessibility grant."""
+        self._require_ax()
+        pid = int(w["kCGWindowOwnerPID"])
+        app = self._ax_app(pid)
+        windows = self._ax_get(app, _WINDOWS) or []
+        want = (w.get("kCGWindowName") or "").strip()
+        if want:
+            for ax in windows:
+                if (self._ax_get(ax, _TITLE) or "").strip() == want:
+                    return ax, pid
+        return (windows[0] if windows else app), pid
 
     @staticmethod
-    def _unwrap_axvalue(v, point):
+    def _unwrap_axvalue(v, point: bool) -> tuple:
+        """Pull (x, y) out of an AXPosition or (w, h) out of an AXSize AXValue box.
+        Returns (0, 0) when v is None or the extraction fails."""
         if v is None:
             return (0, 0)
-        try:
-            from ApplicationServices import AXValueGetValue
-            try:  # constant name differs across pyobjc versions
-                from ApplicationServices import kAXValueCGPointType, kAXValueCGSizeType
-            except Exception:
-                from ApplicationServices import (
-                    kAXValueTypeCGPoint as kAXValueCGPointType,
-                    kAXValueTypeCGSize as kAXValueCGSizeType)
-            import Quartz
-            if point:
-                ok, out = AXValueGetValue(v, kAXValueCGPointType, Quartz.CGPoint())
-                return (int(out.x), int(out.y)) if ok else (0, 0)
-            ok, out = AXValueGetValue(v, kAXValueCGSizeType, Quartz.CGSize())
-            return (int(out.width), int(out.height)) if ok else (0, 0)
-        except Exception:
-            return (0, 0)
+        if point:
+            ok, pt = AXValueGetValue(v, kAXValueCGPointType, None)
+            return (int(pt.x), int(pt.y)) if ok else (0, 0)
+        ok, sz = AXValueGetValue(v, kAXValueCGSizeType, None)
+        return (int(sz.width), int(sz.height)) if ok else (0, 0)
 
-    @classmethod
-    def _find_role(cls, el, roles, depth=8):
-        """DFS for the first descendant whose AX role is in ``roles``."""
-        if cls._ax_role(el) in roles:
-            return el
-        if depth <= 0:
+    def _find_editable(self, el, depth=8):
+        """DFS for a text/editable descendant (for text delivery)."""
+        if el is None or depth < 0:
             return None
-        for kid in cls._ax_children(el):
-            hit = cls._find_role(kid, roles, depth - 1)
+        role = self._ax_get(el, _ROLE)
+        if role in _EDITABLE_ROLES:
+            return el
+        for k in (self._ax_get(el, _CHILDREN) or []):
+            hit = self._find_editable(k, depth - 1)
             if hit is not None:
                 return hit
         return None
 
-    # ------------------------------------------------------------ window model
-    @staticmethod
-    def _window_infos():
-        """On-screen, real application windows (layer 0), newest first."""
-        import Quartz
-        opts = (Quartz.kCGWindowListOptionOnScreenOnly
-                | Quartz.kCGWindowListExcludeDesktopElements)
-        out = []
-        for w in Quartz.CGWindowListCopyWindowInfo(opts, Quartz.kCGNullWindowID):
-            if w.get("kCGWindowLayer", 0) != 0:
-                continue
-            b = w.get("kCGWindowBounds") or {}
-            out.append({
-                "wid": int(w.get("kCGWindowNumber", 0)),
-                "pid": int(w.get("kCGWindowOwnerPID", 0)),
-                "owner": w.get("kCGWindowOwnerName") or "",
-                "title": w.get("kCGWindowName") or "",
-                "x": int(b.get("X", 0)), "y": int(b.get("Y", 0)),
-                "w": int(b.get("Width", 0)), "h": int(b.get("Height", 0)),
-            })
-        return out
-
-    def _resolve_info(self, ref: Optional[str]):
-        """Turn a target ref into a window-info dict (or None for the screen).
-        Accepts: None/"screen"; "win:1234"; "pid:1234"; else title substring."""
-        if ref is None or ref == "screen":
-            return None
-        infos = self._window_infos()
-        if ref.startswith("win:"):
-            wid = int(ref.split(":", 1)[1])
-            for info in infos:
-                if info["wid"] == wid:
-                    return info
-            raise BackendError("no window with id %d" % wid)
-        if ref.startswith("pid:"):
-            pid = int(ref.split(":", 1)[1])
-            for info in infos:
-                if info["pid"] == pid:
-                    return info
-            raise BackendError("no window for pid %d" % pid)
-        low = ref.lower()
-        for info in infos:
-            if low in info["title"].lower() or low in info["owner"].lower():
-                return info
-        raise BackendError("no window matching title ~ %r" % ref)
-
-    def _ax_window_for(self, info):
-        """Best-effort AXUIElement for the window described by ``info``.
-        AX has no direct CGWindowNumber lookup, so match by title, else by
-        position/size, else fall back to the app's first window."""
-        self._require_ax()
-        from ApplicationServices import (
-            AXUIElementCreateApplication, kAXWindowsAttribute, kAXTitleAttribute)
-        ax_app = AXUIElementCreateApplication(info["pid"])
-        windows = self._ax_raw(ax_app, kAXWindowsAttribute)
-        windows = list(windows) if windows else []
-        if not windows:
-            raise BackendError("no AX windows for pid %d (permission?)" % info["pid"])
-        if info["title"]:
-            for win in windows:
-                if self._ax_str(win, kAXTitleAttribute) == info["title"]:
-                    return win
-        for win in windows:
-            px, py = self._ax_point(win)
-            if abs(px - info["x"]) <= 2 and abs(py - info["y"]) <= 2:
-                return win
-        return windows[0]
-
-    @staticmethod
-    def _frontmost_pid():
-        from AppKit import NSWorkspace
-        app = NSWorkspace.sharedWorkspace().frontmostApplication()
-        return app.processIdentifier() if app else -1
-
     # ----------------------------------------------------------------- observe
     def list_targets(self) -> List[Target]:
-        fg = self._frontmost_pid()
+        front_pid = -1
+        fa = NSWorkspace.sharedWorkspace().frontmostApplication()
+        if fa is not None:
+            front_pid = int(fa.processIdentifier())
         out = []
-        for info in self._window_infos():
-            title = info["title"] or info["owner"]
-            if not title and info["w"] <= 0:
-                continue
+        for w in self._windows():
+            pid = int(w.get("kCGWindowOwnerPID", -1))
+            x, y, ww, hh = self._bounds(w)
+            wid = int(w.get("kCGWindowNumber", 0))
             out.append(Target(
-                id="win:%d" % info["wid"], kind="window", pid=info["pid"],
-                title=title, class_name=info["owner"],
-                x=info["x"], y=info["y"], w=info["w"], h=info["h"],
-                focused=(info["pid"] == fg), visible=True))
+                id="win:%d" % wid, kind="window", pid=pid,
+                title=w.get("kCGWindowName") or "",
+                class_name=w.get("kCGWindowOwnerName") or "",
+                x=x, y=y, w=ww, h=hh,
+                focused=(pid == front_pid),
+                visible=bool(w.get("kCGWindowIsOnscreen", True))))
         return out
+
+    def screen_size(self):
+        d = Quartz.CGMainDisplayID()
+        return (int(Quartz.CGDisplayPixelsWide(d)), int(Quartz.CGDisplayPixelsHigh(d)))
 
     def screenshot(self, target: Optional[str]) -> bytes:
-        import Quartz
-        from Cocoa import NSBitmapImageRep, NSPNGFileType
-        info = self._resolve_info(target)
-        if info is None:  # whole screen
-            img = Quartz.CGWindowListCreateImage(
-                Quartz.CGRectInfinite, Quartz.kCGWindowListOptionOnScreenOnly,
-                Quartz.kCGNullWindowID, Quartz.kCGWindowImageDefault)
+        w = self._resolve(target)
+        if w is None:
+            img = Quartz.CGDisplayCreateImage(Quartz.CGMainDisplayID())
         else:
+            wid = int(w["kCGWindowNumber"])
             img = Quartz.CGWindowListCreateImage(
                 Quartz.CGRectNull, Quartz.kCGWindowListOptionIncludingWindow,
-                info["wid"], Quartz.kCGWindowImageBoundsIgnoreFraming)
+                wid, Quartz.kCGWindowImageBoundsIgnoreFraming)
         if img is None:
             raise BackendError(
-                "CGWindowListCreateImage returned no pixels. Grant Screen "
-                "Recording in System Settings > Privacy & Security > Screen "
-                "Recording for the daemon process, then restart it.")
-        rep = NSBitmapImageRep.alloc().initWithCGImage_(img)
-        data = rep.representationUsingType_properties_(NSPNGFileType, None)
-        if data is None:
-            raise BackendError("failed to encode PNG from window image")
-        return bytes(data)  # NSData supports the buffer protocol
+                "capture returned nothing — is Screen Recording granted? "
+                "(System Settings > Privacy & Security > Screen Recording)")
+        return self._png(img)
+
+    def _png(self, cgimage) -> bytes:
+        rep = NSBitmapImageRep.alloc().initWithCGImage_(cgimage)
+        data = rep.representationUsingType_properties_(_PNG, None)
+        return bytes(data)
 
     def inspect(self, target: str, depth: int = 3) -> Element:
-        info = self._resolve_info(target)
-        if info is None:
+        w = self._resolve(target)
+        if w is None:
             raise BackendError("inspect needs a window target")
-        win = self._ax_window_for(info)
-        return self._to_element(win, depth)
+        ax, _pid = self._ax_window(w)
+        return self._to_element(ax, depth)
 
     def _to_element(self, el, depth) -> Element:
-        from ApplicationServices import (
-            kAXTitleAttribute, kAXDescriptionAttribute, kAXValueAttribute,
-            AXUIElementIsAttributeSettable, AXUIElementCopyActionNames)
-        role = self._ax_role(el) or "Unknown"
-        name = self._ax_str(el, kAXTitleAttribute) or self._ax_str(el, kAXDescriptionAttribute)
-        value = self._ax_str(el, kAXValueAttribute)
-        x, y = self._ax_point(el)
-        w, h = self._ax_size(el)
-        out = Element(role=role, name=name, value=value, x=x, y=y, w=w, h=h)
-        try:
-            err, settable = AXUIElementIsAttributeSettable(el, kAXValueAttribute, None)
-            if err == 0 and settable:
-                out.actions.append("SetValue")
-        except Exception:
-            pass
-        try:
-            err, actions = AXUIElementCopyActionNames(el, None)
-            if err == 0 and actions:
-                out.actions.extend(str(a) for a in actions)
-        except Exception:
-            pass
+        if el is None:
+            return Element(role="Unknown")
+        role = self._ax_get(el, _ROLE) or "AXUnknown"
+        name = self._ax_get(el, _TITLE) or self._ax_get(el, _DESC) or ""
+        val = self._ax_get(el, _VALUE)
+        val = "" if val is None else str(val)
+        x, y = self._unwrap_axvalue(self._ax_get(el, _POS), point=True)
+        ww, hh = self._unwrap_axvalue(self._ax_get(el, _SIZE), point=False)
+        err, acts = AXUIElementCopyActionNames(el, None)
+        el_out = Element(role=str(role), name=str(name), value=val,
+                         x=x, y=y, w=ww, h=hh,
+                         actions=[str(a) for a in (acts or [])] if err == 0 else [])
         if depth > 0:
-            for kid in self._ax_children(el):
-                out.children.append(self._to_element(kid, depth - 1))
-        return out
+            for k in (self._ax_get(el, _CHILDREN) or []):
+                el_out.children.append(self._to_element(k, depth - 1))
+        return el_out
 
-    # --------------------------------------------------------------------- act
+    # ------------------------------------------------------------------- act
+    def _running(self, pid: int):
+        return NSRunningApplication.runningApplicationWithProcessIdentifier_(pid)
+
     def activate(self, target: str) -> ActionResult:
-        info = self._resolve_info(target)
-        if info is None:
+        w = self._resolve(target)
+        if w is None:
             return ActionResult.fail("activate needs a window target")
-        from AppKit import NSRunningApplication, NSApplicationActivateIgnoringOtherApps
-        app = NSRunningApplication.runningApplicationWithProcessIdentifier_(info["pid"])
+        app = self._running(int(w["kCGWindowOwnerPID"]))
         if app is None:
-            return ActionResult.fail("no running app for pid %d" % info["pid"])
-        ok = app.activateWithOptions_(NSApplicationActivateIgnoringOtherApps)
-        # Best-effort raise of the specific window.
-        try:
-            win = self._ax_window_for(info)
-            from ApplicationServices import AXUIElementPerformAction
-            AXUIElementPerformAction(win, "AXRaise")
-        except Exception:
-            pass
-        return ActionResult(ok=bool(ok), tier=4, detail="activate pid %d" % info["pid"])
+            return ActionResult.fail("no running application for target")
+        # NSApplicationActivateAllWindows(1) | IgnoringOtherApps(2). The latter is
+        # deprecated on macOS 14 but still the reliable "bring me forward" nudge.
+        ok = bool(app.activateWithOptions_(1 | 2))
+        return ActionResult(ok=ok, tier=4, detail="NSRunningApplication.activate")
+
+    def move(self, target: str, x: int, y: int, w: int, h: int,
+             topmost: Optional[bool] = None) -> ActionResult:
+        win = self._resolve(target)
+        if win is None:
+            return ActionResult.fail("move needs a window target")
+        ax, _pid = self._ax_window(win)
+        if ax is None:
+            return ActionResult.fail("no AX window to move")
+        pt = AXValueCreate(kAXValueCGPointType, Quartz.CGPoint(x, y))
+        sz = AXValueCreate(kAXValueCGSizeType, Quartz.CGSize(w, h))
+        e1 = AXUIElementSetAttributeValue(ax, _POS, pt)
+        e2 = AXUIElementSetAttributeValue(ax, _SIZE, sz)
+        # topmost: AX has no persistent always-on-top for another app's window.
+        # True -> raise it now (best-effort, NOT sticky); False/None -> leave z-order.
+        if topmost is True:
+            AXUIElementPerformAction(ax, _RAISE)
+        ok = (e1 == 0 and e2 == 0)
+        note = "" if topmost is not True else " (topmost=raise-once; AX can't pin sticky)"
+        return ActionResult(ok=ok, tier=1,
+                            detail="AXPosition/AXSize %d,%d %dx%d%s" % (x, y, w, h, note),
+                            error=None if ok else "AX set failed (pos=%s size=%s)" % (e1, e2))
 
     def text(self, target: str, text: str) -> ActionResult:
-        info = self._resolve_info(target)
-        if info is None:
+        w = self._resolve(target)
+        if w is None:
             return ActionResult.fail("text needs a window target")
-        win = self._ax_window_for(info)
-        edit = self._find_role(win, _EDIT_ROLES)
-        if edit is None:
-            return ActionResult.fail("no editable (AXTextArea/Field) element found")
-
-        # Tier 1: AX SetAttribute(kAXValue) — semantic, focus-free; verify readback.
-        from ApplicationServices import (
-            AXUIElementSetAttributeValue, kAXValueAttribute)
-        try:
-            err = AXUIElementSetAttributeValue(edit, kAXValueAttribute, text)
-            time.sleep(0.05)
-            got = self._ax_str(edit, kAXValueAttribute)
-            if err == 0 and text in got:
-                return ActionResult(ok=True, tier=1, detail="AX SetAttribute(kAXValue)")
-            tier1_err = "err=%s readback mismatch" % err
-        except Exception as e:
-            tier1_err = str(e)
-
-        # Tier 4: activate then type the text as a unicode CGEvent stream.
-        try:
-            self.activate(target)
-            time.sleep(0.05)
-            self._cg_type_unicode(text)
-            return ActionResult(ok=True, tier=4, detail="activate + CGEvent unicode")
-        except Exception as e:
-            return ActionResult(ok=False, tier=None,
-                                error="tier1(%s) tier4(%s)" % (tier1_err, e))
+        ax, pid = self._ax_window(w)
+        edit = self._find_editable(ax) or self._ax_get(ax, _FOCUSED_ELEM)
+        # Tier 1: AX set the value on the editable element (focus-free), verify by readback.
+        if edit is not None:
+            err = AXUIElementSetAttributeValue(edit, _VALUE, text)
+            if err == 0:
+                time.sleep(0.03)
+                got = self._ax_get(edit, _VALUE)
+                if got is not None and text in str(got):
+                    return ActionResult(ok=True, tier=1, detail="AXSetValue")
+            tier1_err = "AXSetValue err=%s / readback mismatch" % err
+        else:
+            tier1_err = "no editable AX element found"
+        # Tier 4: activate + type the characters via CGEvent (steals focus).
+        self.activate(target)
+        time.sleep(0.06)
+        for ch in text:
+            self._post_char(ch, pid)
+        return ActionResult(ok=True, tier=4,
+                            detail="activate + CGEvent typing (tier1: %s)" % tier1_err)
 
     def key(self, target: str, keys: str) -> ActionResult:
-        info = self._resolve_info(target)
-        if info is None:
+        w = self._resolve(target)
+        if w is None:
             return ActionResult.fail("key needs a window target")
-        # macOS has no reliable background key post (no PostMessage analog); the
-        # dependable path is tier 4: focus the app, then synthesize CGEvents.
-        try:
-            self.activate(target)
-            time.sleep(0.05)
-            mods, keyname = self._parse_combo(keys)
-            up = keyname.upper()
-            if up in _KEYCODE_NAMED:
-                self._cg_key(_KEYCODE_NAMED[up], mods)
-            elif len(keyname) == 1 and keyname.lower() in _KEYCODE_CHAR:
-                self._cg_key(_KEYCODE_CHAR[keyname.lower()], mods)
-            elif len(keyname) == 1:
-                self._cg_type_unicode(keyname)
-            else:
-                return ActionResult.fail("unknown key spec %r" % keys)
-            return ActionResult(ok=True, tier=4, detail="CGEvent key %r" % keys)
-        except Exception as e:
-            return ActionResult.fail("no tier could deliver keys %r: %s" % (keys, e))
-
-    # --------------------------------------------------------------- CGEvent I/O
-    @staticmethod
-    def _parse_combo(keys):
-        """Split 'cmd+shift+s' -> (['cmd','shift'], 's'). Bare keys -> ([], key)."""
-        parts = [p for p in keys.strip().replace("-", "+").split("+") if p]
-        if not parts:
-            return [], ""
-        mods, key = [], parts[-1]
-        for p in parts[:-1]:
-            m = _MODIFIER_ALIASES.get(p.upper())
-            if m:
-                mods.append(m)
-        return mods, key
-
-    @staticmethod
-    def _mod_flags(mods):
-        import Quartz
-        flags = 0
-        for m in mods:
-            if m == "cmd":
-                flags |= Quartz.kCGEventFlagMaskCommand
-            elif m == "ctrl":
-                flags |= Quartz.kCGEventFlagMaskControl
-            elif m == "alt":
-                flags |= Quartz.kCGEventFlagMaskAlternate
-            elif m == "shift":
-                flags |= Quartz.kCGEventFlagMaskShift
-        return flags
-
-    def _cg_key(self, keycode, mods):
-        import Quartz
+        pid = int(w["kCGWindowOwnerPID"])
+        name = keys.strip()
+        parts = [p for p in name.replace("-", "+").split("+") if p]
+        mods, base = parts[:-1], (parts[-1] if parts else "")
         flags = self._mod_flags(mods)
-        for is_down in (True, False):
-            ev = Quartz.CGEventCreateKeyboardEvent(None, keycode, is_down)
+        code = self._keycode_for(base)
+        if code is None:
+            return ActionResult.fail("unknown key %r" % keys)
+        # Tier 2: post the key to the target pid without stealing focus. Effectiveness
+        # varies by app; if it no-ops the caller can retry with activate.
+        self._post_key(code, flags, pid=pid)
+        return ActionResult(ok=True, tier=2,
+                            detail="CGEventPostToPid keycode=0x%02X flags=0x%X" % (code, flags))
+
+    # ---- CGEvent helpers ----
+    def _mod_flags(self, mods) -> int:
+        m = 0
+        for name in mods:
+            u = name.upper()
+            if u in ("CMD", "COMMAND", "META"): m |= Quartz.kCGEventFlagMaskCommand
+            elif u in ("SHIFT",): m |= Quartz.kCGEventFlagMaskShift
+            elif u in ("ALT", "OPTION", "OPT"): m |= Quartz.kCGEventFlagMaskAlternate
+            elif u in ("CTRL", "CONTROL"): m |= Quartz.kCGEventFlagMaskControl
+        return m
+
+    def _keycode_for(self, base: str):
+        u = base.upper()
+        if u in KEYCODE:
+            return KEYCODE[u]
+        if len(base) == 1:
+            return self._char_keycode(base)
+        return None
+
+    def _char_keycode(self, ch: str):
+        return _US_KEYCODES.get(ch.lower())
+
+    def _post_key(self, keycode: int, flags: int, pid: Optional[int] = None):
+        for down in (True, False):
+            ev = Quartz.CGEventCreateKeyboardEvent(None, keycode, down)
             if flags:
                 Quartz.CGEventSetFlags(ev, flags)
-            Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
-            time.sleep(0.005)
+            if pid:
+                Quartz.CGEventPostToPid(pid, ev)
+            else:
+                Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
 
-    @staticmethod
-    def _cg_type_unicode(text):
-        import Quartz
-        for ch in text:
-            ev = Quartz.CGEventCreateKeyboardEvent(None, 0, True)
+    def _post_char(self, ch: str, pid: Optional[int] = None):
+        """Type one character by its unicode (keycode 0 + a unicode payload) so any
+        printable char works regardless of keyboard layout."""
+        for down in (True, False):
+            ev = Quartz.CGEventCreateKeyboardEvent(None, 0, down)
             Quartz.CGEventKeyboardSetUnicodeString(ev, len(ch), ch)
-            Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
-            up = Quartz.CGEventCreateKeyboardEvent(None, 0, False)
-            Quartz.CGEventKeyboardSetUnicodeString(up, len(ch), ch)
-            Quartz.CGEventPost(Quartz.kCGHIDEventTap, up)
-            time.sleep(0.005)
+            if pid:
+                Quartz.CGEventPostToPid(pid, ev)
+            else:
+                Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+
+
+# US ANSI keyboard: char -> virtual keycode, for named keys / combos. Plain text
+# uses unicode typing (_post_char) instead, so this only needs the common set.
+_US_KEYCODES = {
+    "a": 0x00, "s": 0x01, "d": 0x02, "f": 0x03, "h": 0x04, "g": 0x05, "z": 0x06,
+    "x": 0x07, "c": 0x08, "v": 0x09, "b": 0x0B, "q": 0x0C, "w": 0x0D, "e": 0x0E,
+    "r": 0x0F, "y": 0x10, "t": 0x11, "1": 0x12, "2": 0x13, "3": 0x14, "4": 0x15,
+    "6": 0x16, "5": 0x17, "9": 0x19, "7": 0x1A, "8": 0x1C, "0": 0x1D, "o": 0x1F,
+    "u": 0x20, "i": 0x22, "p": 0x23, "l": 0x25, "j": 0x26, "k": 0x28, "n": 0x2D,
+    "m": 0x2E, "=": 0x18, "-": 0x1B, "]": 0x1E, "[": 0x21, "'": 0x27, ";": 0x29,
+    "\\": 0x2A, ",": 0x2B, "/": 0x2C, ".": 0x2F, "`": 0x32,
+}
