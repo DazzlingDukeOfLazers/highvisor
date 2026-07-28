@@ -72,6 +72,6 @@ that self-provisions inbound access — that boundary is deliberate.
 
 ## Retiring the bridge (optional)
 
-Once SSH is the transport, run the daemon with `HIGHVISOR_BRIDGE=0` to drop the
-LAN bridge entirely, or keep it for quick same-LAN peer ops. The token/zeroconf path
-and the SSH path are independent — use whichever fits.
+The LAN bridge is **off by default** now — SSH is the cross-machine path. If you ever
+want the same-LAN peer bridge back for a quick op, opt in with `HIGHVISOR_BRIDGE=1`.
+The token/zeroconf path and the SSH path are independent.

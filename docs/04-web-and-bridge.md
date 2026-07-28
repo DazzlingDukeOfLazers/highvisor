@@ -67,7 +67,9 @@ The token lives at `~/.config/highvisor/token` (auto-generated, `0600`), or
 > same `$HIGHVISOR_TOKEN` on both machines (or copy the token file by hand). Do
 > not commit it.
 
-Disable the bridge entirely with `HIGHVISOR_BRIDGE=0`.
+The bridge is **OFF by default** (fail-closed — the plaintext link stays down unless
+you ask for it). Opt in for a same-LAN peer with `HIGHVISOR_BRIDGE=1`; cross-machine
+otherwise goes over SSH (docs/07).
 
 ### Why the split is safe
 

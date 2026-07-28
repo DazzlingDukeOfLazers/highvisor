@@ -43,7 +43,9 @@ def serve_forever(host=P.HOST, port=P.PORT, backend=None, web=True):
     engine.start()
 
     bridge = None
-    if os.environ.get("HIGHVISOR_BRIDGE", "1") != "0":
+    # The plaintext LAN bridge is OFF by default (fail-closed) — cross-machine goes
+    # over SSH (docs/07). Opt in explicitly with HIGHVISOR_BRIDGE=1 for a same-LAN peer.
+    if os.environ.get("HIGHVISOR_BRIDGE", "0") == "1":
         try:
             from .bridge import Bridge
             bridge = Bridge(engine, bus)
