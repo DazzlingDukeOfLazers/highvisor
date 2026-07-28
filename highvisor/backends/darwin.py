@@ -189,8 +189,33 @@ class MacBackend(PlatformBackend):
                 class_name=w.get("kCGWindowOwnerName") or "",
                 x=x, y=y, w=ww, h=hh,
                 focused=(pid == front_pid),
-                visible=bool(w.get("kCGWindowIsOnscreen", True))))
+                visible=bool(w.get("kCGWindowIsOnscreen", True)),
+                path=self._app_path(pid)))
         return out
+
+    def _app_path(self, pid: int) -> str:
+        app = NSRunningApplication.runningApplicationWithProcessIdentifier_(pid)
+        if app is None:
+            return ""
+        url = app.bundleURL() or app.executableURL()
+        return url.path() if url is not None else ""
+
+    def launch(self, spec: str) -> ActionResult:
+        import subprocess
+        spec = (spec or "").strip()
+        if not spec:
+            return ActionResult.fail("empty launch spec")
+        if "://" in spec:                              # URL scheme (steam://, …)
+            args = ["open", spec]
+        elif spec.startswith("/") or spec.endswith(".app"):
+            args = ["open", spec]                      # a path / .app bundle
+        else:
+            args = ["open", "-a", spec]                # an app name
+        try:
+            subprocess.Popen(args)
+        except Exception as e:
+            return ActionResult.fail("launch failed: %s" % e)
+        return ActionResult(ok=True, detail="open %s" % " ".join(args[1:]))
 
     def screen_size(self):
         d = Quartz.CGMainDisplayID()

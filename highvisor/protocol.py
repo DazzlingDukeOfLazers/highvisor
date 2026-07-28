@@ -32,6 +32,9 @@ OP_LAYOUT_APPLY = "layout_apply"  # name -> {ok, applied, results:[...]}
 OP_LAYOUT_SAVE = "layout_save"    # name, [description] -> {ok, saved, path, windows}
 OP_PEERS = "peers"                # -> {ok, peers:[{name,host,port}], self} (bridge)
 OP_PEER_SHOT = "peer_shot"        # peer, target -> {ok, png_b64, bytes} (via bridge)
+OP_LAUNCH = "launch"              # name (launcher) | raw spec -> ActionResult
+OP_LAUNCH_LIST = "launch_list"    # -> {ok, launchers:{name: spec}}
+OP_LAUNCH_SAVE = "launch_save"    # name, spec -> {ok, saved, path}
 
 MAX_FRAME = 64 * 1024 * 1024  # 64 MiB guard (a 4k screenshot fits easily)
 

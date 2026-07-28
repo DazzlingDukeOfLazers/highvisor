@@ -19,7 +19,10 @@ other language could reimplement this in a few lines (that's the point).
     hv diff <a.png> <b.png> [--out heat.png]
     hv zones <img.png> [--top N]
     hv peers
-    hv parity <a> <b> [--peer-a NAME] [--peer-b NAME] [--out heat.png]
+    hv parity <a> <b> [--peer-a NAME] [--peer-b NAME] [--out heat.png] [--size WxH]
+    hv launch <name | spec>
+    hv launchers
+    hv launch-save <name> <spec>
     hv responsive <golem> <source> [--threshold P] [--out-dir DIR]
     hv raw '{"op":"ping"}'
 
@@ -158,6 +161,26 @@ def _cmd_layout(a):
 def _cmd_layout_save(a):
     _print_json(_call({"op": P.OP_LAYOUT_SAVE, "name": a.name,
                        "description": " ".join(a.description) if a.description else ""}))
+
+
+def _cmd_launch(a):
+    _print_json(_call({"op": P.OP_LAUNCH, "name": a.name}))
+
+
+def _cmd_launchers(a):
+    resp = _call({"op": P.OP_LAUNCH_LIST})
+    if not resp.get("ok"):
+        _print_json(resp)
+        return 1
+    launchers = resp.get("launchers") or {}
+    for n, s in launchers.items():
+        print("%-14s %s" % (n, s))
+    if not launchers:
+        print("(no launchers saved — hv launch-save <name> <spec>)")
+
+
+def _cmd_launch_save(a):
+    _print_json(_call({"op": P.OP_LAUNCH_SAVE, "name": a.name, "spec": a.spec}))
 
 
 def _cmd_peers(a):
@@ -318,6 +341,17 @@ def build_parser():
     s.add_argument("name")
     s.add_argument("description", nargs="*")
     s.set_defaults(fn=_cmd_layout_save)
+
+    s = sub.add_parser("launch", help="start a program by launcher name or raw spec")
+    s.add_argument("name", help="a saved launcher name, or an OS spec (steam://…, /path.app, App Name)")
+    s.set_defaults(fn=_cmd_launch)
+
+    sub.add_parser("launchers", help="list saved launchers").set_defaults(fn=_cmd_launchers)
+
+    s = sub.add_parser("launch-save", help="save a named launcher (name -> spec)")
+    s.add_argument("name")
+    s.add_argument("spec")
+    s.set_defaults(fn=_cmd_launch_save)
 
     sub.add_parser("peers", help="list discovered bridge peers").set_defaults(fn=_cmd_peers)
 

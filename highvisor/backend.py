@@ -24,6 +24,8 @@ class Target:
     h: int
     focused: bool
     visible: bool
+    path: str = ""        # app bundle/executable path, when the OS exposes it —
+                          # so highvisor can report how to relaunch what it sees
 
     def to_dict(self):
         return self.__dict__.copy()
@@ -116,6 +118,11 @@ class PlatformBackend:
         """Called once on the worker thread before any op (e.g. COM init)."""
 
     def list_targets(self) -> List[Target]:
+        raise NotImplementedError
+
+    def launch(self, spec: str) -> "ActionResult":
+        """Start a program. ``spec`` is OS-interpreted: a URL scheme
+        (``steam://rungameid/...``), an app path/bundle, or an app name."""
         raise NotImplementedError
 
     def screenshot(self, target: Optional[str]) -> bytes:

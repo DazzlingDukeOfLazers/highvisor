@@ -201,6 +201,17 @@ class WindowsBackend(PlatformBackend):
                 continue
         return out
 
+    def launch(self, spec: str) -> ActionResult:
+        import os
+        spec = (spec or "").strip()
+        if not spec:
+            return ActionResult.fail("empty launch spec")
+        try:
+            os.startfile(spec)  # a path, a URL scheme (steam://…), or a doc/app
+        except Exception as e:
+            return ActionResult.fail("launch failed: %s" % e)
+        return ActionResult(ok=True, detail="startfile %s" % spec)
+
     def screenshot(self, target: Optional[str]) -> bytes:
         from io import BytesIO
         from PIL import Image

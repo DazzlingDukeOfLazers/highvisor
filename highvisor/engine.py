@@ -167,6 +167,24 @@ class Engine:
                 return {"ok": False, "error": "bridge not running"}
             return self.bridge.request_shot(req.get("peer"), req.get("target"))
 
+        if op == P.OP_LAUNCH:
+            from .launch import resolve
+            spec = resolve(req.get("name", ""))
+            if not spec:
+                return {"ok": False, "error": "no launcher/spec %r" % req.get("name")}
+            d = b.launch(spec).to_dict()
+            d["spec"] = spec
+            return d
+
+        if op == P.OP_LAUNCH_LIST:
+            from .launch import load_launchers
+            return {"ok": True, "launchers": load_launchers()}
+
+        if op == P.OP_LAUNCH_SAVE:
+            from .launch import save_launcher
+            path = save_launcher(req["name"], req["spec"])
+            return {"ok": True, "saved": req["name"], "spec": req["spec"], "path": path}
+
         if op == P.OP_LAYOUT_SAVE:
             from .layouts import save_layout
             placements = []
