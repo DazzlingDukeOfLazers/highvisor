@@ -50,6 +50,44 @@ def diff(a_path: str, b_path: str, crop_top: int = 58,
             "crop_top": crop_top, "heatmap": out}
 
 
+def sidebyside(a_path: str, b_path: str, out: str, label_a: str = "A",
+               label_b: str = "B", height: int = 760) -> str:
+    """Scale two captures to a common height and lay them side by side, labelled."""
+    from PIL import Image, ImageDraw
+    a, b = _load(a_path), _load(b_path)
+    def sc(im):
+        return im.resize((max(1, round(im.width * height / im.height)), height))
+    a, b = sc(a), sc(b)
+    gap, top = 14, 24
+    c = Image.new("RGB", (a.width + b.width + gap, height + top), (18, 18, 18))
+    c.paste(a, (0, top))
+    c.paste(b, (a.width + gap, top))
+    d = ImageDraw.Draw(c)
+    d.text((6, 7), label_a, fill=(210, 210, 170))
+    d.text((a.width + gap + 6, 7), label_b, fill=(210, 210, 170))
+    c.save(out)
+    return out
+
+
+def stack_vertical(paths: List[str], out: str, pad: int = 10,
+                   bg=(20, 20, 20)) -> Optional[str]:
+    """Stack images into one tall contact sheet (each normalized to a common width)."""
+    from PIL import Image
+    ims = [_load(p) for p in paths]
+    if not ims:
+        return None
+    w = max(im.width for im in ims)
+    ims = [im if im.width == w else im.resize((w, round(im.height * w / im.width))) for im in ims]
+    total = sum(im.height for im in ims) + pad * (len(ims) + 1)
+    c = Image.new("RGB", (w + 2 * pad, total), bg)
+    y = pad
+    for im in ims:
+        c.paste(im, (pad, y))
+        y += im.height + pad
+    c.save(out)
+    return out
+
+
 def detect_zones(path: str, top: int = 0, tol: int = 40,
                  min_frac: float = 0.003, sat_min: int = 35) -> List[dict]:
     """Find the saturated colour rectangles in an image. Skips greys/near-black

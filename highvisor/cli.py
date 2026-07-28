@@ -296,6 +296,71 @@ def _cmd_parity(a):
     _print_json(res)
 
 
+def _parse_sizes(spec):
+    out = []
+    for tok in spec.split(","):
+        tok = tok.strip().lower()
+        if not tok:
+            continue
+        try:
+            w, h = (int(v) for v in tok.split("x"))
+        except ValueError:
+            raise SystemExit("--sizes items must be WxH, got %r" % tok)
+        out.append((w, h))
+    if not out:
+        raise SystemExit("--sizes is empty")
+    return out
+
+
+def _cmd_parity_sweep(a):
+    """Resize A and B through several window sizes TOGETHER, capturing + diffing each,
+    to see how a reconstruction tracks the source across shapes — e.g. Raves' menu vs
+    Qud's own at 16:9 / square / portrait / ultrawide. Both sides should be showing
+    the comparable screen (put Qud at its title). Writes per-size side-by-sides, diff
+    heatmaps + scores, and one stacked sweep.png. Restores original sizes when done."""
+    import os
+    import time
+    import tempfile
+    from . import imageops
+    sizes = _parse_sizes(a.sizes)
+    outdir = a.out or tempfile.mkdtemp(prefix="hv-sweep-")
+    os.makedirs(outdir, exist_ok=True)
+    orig = {}
+    if not a.peer_a:
+        orig["a"] = _find_target(a.a)
+    if not a.peer_b:
+        orig["b"] = _find_target(a.b)
+    results, cmps = [], []
+    for (w, h) in sizes:
+        if not a.peer_a:
+            _resize_local(a.a, w, h)
+        if not a.peer_b:
+            _resize_local(a.b, w, h)
+        time.sleep(a.settle)                       # let both apps relayout + repaint
+        tag = "%dx%d" % (w, h)
+        ap = os.path.join(outdir, tag + "_a.png")
+        bp = os.path.join(outdir, tag + "_b.png")
+        _capture(a.a, a.peer_a, ap)
+        _capture(a.b, a.peer_b, bp)
+        heat = os.path.join(outdir, tag + "_heat.png")
+        d = imageops.diff(ap, bp, crop_top=a.crop_top, out=heat)
+        cmp_path = os.path.join(outdir, tag + "_cmp.png")
+        imageops.sidebyside(ap, bp, cmp_path, label_a="%s  %s" % (a.a, tag),
+                            label_b="%s  %s" % (a.b, tag), height=a.height)
+        cmps.append(cmp_path)
+        results.append({"size": [w, h], "content_match": d["content_match"],
+                        "full_match": d["full_match"], "compare": cmp_path, "heatmap": heat})
+    sheet = os.path.join(outdir, "sweep.png")
+    imageops.stack_vertical(cmps, sheet)
+    if not a.no_restore:                           # put both windows back as they were
+        for side, ref in (("a", a.a), ("b", a.b)):
+            t = orig.get(side)
+            if t:
+                _call({"op": P.OP_MOVE, "target": t["id"], "x": t["x"], "y": t["y"],
+                       "w": t["w"], "h": t["h"], "topmost": False})
+    _print_json({"out": outdir, "sheet": sheet, "sizes": results})
+
+
 def _cmd_tunnel(a):
     """SSH-tunnel a remote highvisor to this machine: forward the remote daemon +
     cockpit (+ optional bridge) to local ports over an encrypted SSH connection.
@@ -464,6 +529,24 @@ def build_parser():
     s.add_argument("--settle", type=float, default=0.4,
                    help="seconds to wait after resizing for repaint (default 0.4)")
     s.set_defaults(fn=_cmd_parity)
+
+    s = sub.add_parser("parity-sweep",
+                       help="resize two windows through several sizes together, diffing each")
+    s.add_argument("a", help="window ref for side A (e.g. 'Raves of Qud')")
+    s.add_argument("b", help="window ref for side B (e.g. 'CavesOfQud')")
+    s.add_argument("--sizes", default="1920x1080,1280x720,2560x1080,1000x1000,1080x1350",
+                   help="comma list of WxH to sweep (default covers 16:9/wide/square/portrait)")
+    s.add_argument("--peer-a", dest="peer_a", default=None, help="capture A from this bridge peer")
+    s.add_argument("--peer-b", dest="peer_b", default=None, help="capture B from this bridge peer")
+    s.add_argument("--out", default=None, help="output dir for captures + sweep.png")
+    s.add_argument("--crop-top", type=int, default=58, dest="crop_top",
+                   help="px of chrome to skip for the content score")
+    s.add_argument("--settle", type=float, default=1.2,
+                   help="seconds to wait after each resize (default 1.2)")
+    s.add_argument("--height", type=int, default=520, help="per-row height in the sheet")
+    s.add_argument("--no-restore", action="store_true", dest="no_restore",
+                   help="leave windows at the last size instead of restoring originals")
+    s.set_defaults(fn=_cmd_parity_sweep)
 
     s = sub.add_parser("tunnel",
                        help="SSH-tunnel a remote highvisor to this machine (encrypted)")
