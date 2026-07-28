@@ -284,6 +284,39 @@ class MacBackend(PlatformBackend):
         ax, _pid = self._ax_window(w)
         return self._to_element(ax, depth)
 
+    def ocr(self, target: str) -> dict:
+        """Vision text recognition over the window capture. On-device, no network.
+        The reader for AX-opaque apps (e.g. the ChatGPT desktop app)."""
+        try:
+            import Vision
+            from Foundation import NSData
+        except Exception as e:
+            raise BackendError("OCR needs pyobjc Vision (pip install pyobjc-framework-Vision): %s" % e)
+        png = self.screenshot(target)
+        nsdata = NSData.dataWithBytes_length_(png, len(png))
+        src = Quartz.CGImageSourceCreateWithData(nsdata, None)
+        cg = None if src is None else Quartz.CGImageSourceCreateImageAtIndex(src, 0, None)
+        if cg is None:
+            raise BackendError("OCR: could not decode the capture")
+        w, h = Quartz.CGImageGetWidth(cg), Quartz.CGImageGetHeight(cg)
+        handler = Vision.VNImageRequestHandler.alloc().initWithCGImage_options_(cg, None)
+        req = Vision.VNRecognizeTextRequest.alloc().init()
+        req.setRecognitionLevel_(1)          # 1 = accurate
+        req.setUsesLanguageCorrection_(True)
+        handler.performRequests_error_([req], None)
+        boxes = []
+        for r in (req.results() or []):
+            cand = r.topCandidates_(1)
+            if not cand:
+                continue
+            s = cand[0].string()
+            bb = r.boundingBox()             # normalized, bottom-left origin
+            x = int(bb.origin.x * w)
+            y = int((1.0 - bb.origin.y - bb.size.height) * h)   # -> top-left px
+            boxes.append({"text": str(s),
+                          "bbox": [x, y, int(bb.size.width * w), int(bb.size.height * h)]})
+        return {"w": int(w), "h": int(h), "boxes": boxes}
+
     def _to_element(self, el, depth) -> Element:
         if el is None:
             return Element(role="Unknown")

@@ -136,6 +136,12 @@ class Engine:
             tree = b.inspect(req["target"], int(req.get("depth", 3)))
             return {"ok": True, "tree": tree.to_dict()}
 
+        if op == P.OP_OCR:
+            res = b.ocr(req["target"])
+            res["ok"] = True
+            res["text"] = "\n".join(x["text"] for x in res.get("boxes", []))
+            return res
+
         if op == P.OP_SCREEN:
             w, h = b.screen_size()
             return {"ok": True, "w": w, "h": h}

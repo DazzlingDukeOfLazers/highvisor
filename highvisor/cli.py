@@ -190,6 +190,17 @@ def _cmd_launch_save(a):
     _print_json(_call({"op": P.OP_LAUNCH_SAVE, "name": a.name, "spec": a.spec}))
 
 
+def _cmd_ocr(a):
+    resp = _call({"op": P.OP_OCR, "target": a.target})
+    if not resp.get("ok"):
+        _print_json(resp)
+        return 1
+    if a.boxes:
+        _print_json(resp)
+    else:
+        print(resp.get("text", ""))
+
+
 def _cmd_peers(a):
     resp = _call({"op": P.OP_PEERS})
     if not resp.get("ok"):
@@ -369,6 +380,11 @@ def build_parser():
     s.add_argument("name")
     s.add_argument("spec")
     s.set_defaults(fn=_cmd_launch_save)
+
+    s = sub.add_parser("ocr", help="recognize text in a window (Vision) — read AX-opaque apps")
+    s.add_argument("target")
+    s.add_argument("--boxes", action="store_true", help="include bounding boxes as JSON")
+    s.set_defaults(fn=_cmd_ocr)
 
     sub.add_parser("peers", help="list discovered bridge peers").set_defaults(fn=_cmd_peers)
 

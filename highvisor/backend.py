@@ -155,6 +155,12 @@ class PlatformBackend:
     def inspect(self, target: str, depth: int = 3) -> Element:
         raise NotImplementedError
 
+    def ocr(self, target: str) -> dict:
+        """Recognize text in the target window's capture. Returns
+        {w, h, boxes:[{text, bbox:[x,y,w,h] in capture pixels}]}. The escape hatch
+        for AX-opaque apps (web/Electron/canvas UIs) — read what you can't inspect."""
+        raise NotImplementedError
+
     def screen_size(self):
         """Return (width, height) of the primary display in physical pixels."""
         raise NotImplementedError

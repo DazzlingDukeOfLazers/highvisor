@@ -26,6 +26,7 @@ OP_TEXT = "text"            # target, text -> ActionResult
 OP_KEY = "key"              # target, keys -> ActionResult
 OP_CLICK = "click"          # target, x, y (window-relative), [button, double] -> ActionResult
 OP_INSPECT = "inspect"      # target, depth -> {ok, tree}
+OP_OCR = "ocr"              # target -> {ok, w, h, text, boxes:[{text,bbox}]} (Vision)
 OP_MOVE = "move"            # target, (zone | x,y,w,h), [topmost] -> ActionResult
 OP_SCREEN = "screen_size"   # -> {ok, w, h}  (physical pixels of primary display)
 OP_LAYOUT_LIST = "layout_list"    # -> {ok, layouts:[{name, description, placements}]}
