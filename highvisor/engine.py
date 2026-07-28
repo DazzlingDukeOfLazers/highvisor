@@ -167,6 +167,9 @@ class Engine:
         if op == P.OP_DOCK:
             return self._dock(b, req.get("target"))
 
+        if op == P.OP_PROBE:
+            return self._probe(b, req.get("app"), req.get("window"), req.get("port"))
+
         if op == P.OP_LAYOUT_LIST:
             from .layouts import load_layouts
             return {"ok": True, "layouts": [
@@ -287,6 +290,38 @@ class Engine:
                     return self._stack_above(b, label, rule["above"], int(rule.get("gap", 8)))
             time.sleep(0.4)
         return None
+
+    def _probe(self, b, app=None, window=None, port=None):
+        """Report whether an app is up and in what state, from its window + a
+        state-indicating localhost port. Takes an app profile name (see apps.py)
+        or an explicit window label (+ optional port)."""
+        prof = {}
+        if app:
+            from .apps import PROFILES
+            prof = PROFILES.get(app)
+            if prof is None:
+                return {"ok": False, "error": "no app profile %r" % app}
+            window = window or prof.get("window")
+            if port is None:
+                port = prof.get("port")
+        win = self._find_win(b.list_targets(), window) if window else None
+        port_open = False
+        if port:
+            import socket
+            try:
+                with socket.create_connection(("127.0.0.1", int(port)), timeout=0.5):
+                    port_open = True
+            except OSError:
+                port_open = False
+        if win is None:
+            state = prof.get("off_state", "off")
+        elif port_open:
+            state = prof.get("port_state", "up")
+        else:
+            state = prof.get("window_state", "up")
+        return {"ok": True, "app": app, "running": win is not None, "state": state,
+                "port": port, "port_open": port_open,
+                "window": win.to_dict() if win else None}
 
     def _apply_layout(self, b, name):
         from .layouts import load_layouts, placement_rect

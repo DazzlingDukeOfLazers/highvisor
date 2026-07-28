@@ -30,6 +30,7 @@ OP_OCR = "ocr"              # target -> {ok, w, h, text, boxes:[{text,bbox}]} (V
 OP_MOVE = "move"            # target, (zone | x,y,w,h), [topmost] -> ActionResult
 OP_STACK = "stack"          # top, bottom, [gap] -> stack `top` directly above `bottom`
 OP_DOCK = "dock"            # target -> apply the standing dock rule for this window
+OP_PROBE = "probe"          # app (profile) | window,[port] -> {running, state, window, port_open}
 OP_SCREEN = "screen_size"   # -> {ok, w, h}  (physical pixels of primary display)
 OP_LAYOUT_LIST = "layout_list"    # -> {ok, layouts:[{name, description, placements}]}
 OP_LAYOUT_APPLY = "layout_apply"  # name -> {ok, applied, results:[...]}

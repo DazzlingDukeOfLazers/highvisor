@@ -126,6 +126,17 @@ def _cmd_dock(a):
     _print_json(_call({"op": P.OP_DOCK, "target": a.target}))
 
 
+def _cmd_probe(a):
+    req = {"op": P.OP_PROBE}
+    if a.app:
+        req["app"] = a.app
+    if a.window:
+        req["window"] = a.window
+    if a.port is not None:
+        req["port"] = a.port
+    _print_json(_call(req))
+
+
 def _cmd_screen(a):
     _print_json(_call({"op": P.OP_SCREEN}))
 
@@ -376,6 +387,12 @@ def build_parser():
     s = sub.add_parser("dock", help="apply a window's standing dock rule (see docks.py)")
     s.add_argument("target", help="window id or title substring")
     s.set_defaults(fn=_cmd_dock)
+
+    s = sub.add_parser("probe", help="is an app up, and in what state? (e.g. hv probe --app qud)")
+    s.add_argument("--app", help="known app profile (see apps.py): qud")
+    s.add_argument("--window", help="window title substring (if not using --app)")
+    s.add_argument("--port", type=int, default=None, help="state-indicating localhost port")
+    s.set_defaults(fn=_cmd_probe)
 
     sub.add_parser("screen").set_defaults(fn=_cmd_screen)
 
