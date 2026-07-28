@@ -50,6 +50,48 @@ def diff(a_path: str, b_path: str, crop_top: int = 58,
             "crop_top": crop_top, "heatmap": out}
 
 
+def regions(a_path: str, b_path: str, crop_top: int = 58, grid=(6, 6),
+            threshold: float = 92.0, top_n: int = 12, out: Optional[str] = None) -> dict:
+    """Localize WHERE two captures diverge: tile the content region into a grid, score each
+    cell's match %, and return the worst cells (below ``threshold``) as a ranked punch-list of
+    {bbox, match}. If ``out`` is given, write the reference blended with an amplified diff
+    heatmap and red boxes + match labels on the worst cells. This is mechanical pixel
+    divergence — it says WHERE to look, not WHAT is wrong (font vs colour vs layout)."""
+    from PIL import Image, ImageChops, ImageStat, ImageDraw
+    a, b = _load(a_path), _load(b_path)
+    if a.size != b.size:
+        a = a.resize(b.size)
+    w, h = b.size
+    y0 = min(max(0, crop_top), h)
+    diff = ImageChops.difference(a, b)
+    gx, gy = grid
+    cw = max(1, w // gx)
+    ch = max(1, (h - y0) // gy)
+    cells = []
+    for j in range(gy):
+        for i in range(gx):
+            x = i * cw
+            y = y0 + j * ch
+            x2 = w if i == gx - 1 else x + cw
+            y2 = h if j == gy - 1 else y + ch
+            mean = sum(ImageStat.Stat(diff.crop((x, y, x2, y2))).mean) / 3.0
+            cells.append({"bbox": [x, y, x2 - x, y2 - y], "match": round(100.0 * (1.0 - mean / 255.0), 2)})
+    cells.sort(key=lambda c: c["match"])
+    worst = [c for c in cells if c["match"] < threshold][:top_n]
+    overall = round(sum(c["match"] for c in cells) / max(1, len(cells)), 2)
+    if out:
+        heat = diff.point(lambda p: min(255, p * 4)).convert("RGB")
+        canvas = Image.blend(b, heat, 0.45)
+        d = ImageDraw.Draw(canvas)
+        for c in worst:
+            x, y, ww, hh = c["bbox"]
+            d.rectangle([x, y, x + ww - 1, y + hh - 1], outline=(255, 70, 70), width=3)
+            d.text((x + 4, y + 3), "%.0f%%" % c["match"], fill=(255, 220, 120))
+        canvas.save(out)
+    return {"size": [w, h], "grid": [gx, gy], "overall_match": overall,
+            "worst": worst, "annotated": out}
+
+
 def sidebyside(a_path: str, b_path: str, out: str, label_a: str = "A",
                label_b: str = "B", height: int = 760) -> str:
     """Scale two captures to a common height and lay them side by side, labelled."""

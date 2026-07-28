@@ -145,7 +145,13 @@ def _cmd_screen(a):
 def _cmd_diff(a):
     # Local image analysis — no daemon round-trip.
     from . import imageops
-    _print_json(imageops.diff(a.a, a.b, crop_top=a.crop_top, out=a.out))
+    res = imageops.diff(a.a, a.b, crop_top=a.crop_top, out=a.out)
+    if a.regions:   # add a ranked "where do they diverge" punch-list + annotated image
+        gx, gy = (int(v) for v in a.grid.lower().split("x"))
+        ann = a.regions_out or (a.out + ".regions.png" if a.out else None)
+        res["regions"] = imageops.regions(a.a, a.b, crop_top=a.crop_top, grid=(gx, gy),
+                                          threshold=a.threshold, out=ann)
+    _print_json(res)
 
 
 def _cmd_zones(a):
@@ -470,6 +476,13 @@ def build_parser():
     s.add_argument("--out", default=None, help="write amplified diff heatmap here")
     s.add_argument("--crop-top", type=int, default=58, dest="crop_top",
                    help="px of OS chrome to skip for the content score")
+    s.add_argument("--regions", action="store_true",
+                   help="also localize divergence into a ranked cell punch-list + annotated image")
+    s.add_argument("--grid", default="6x6", help="region grid for --regions (WxH cells)")
+    s.add_argument("--threshold", type=float, default=92.0,
+                   help="cells below this match %% are reported by --regions")
+    s.add_argument("--regions-out", default=None, dest="regions_out",
+                   help="write the annotated region image here")
     s.set_defaults(fn=_cmd_diff)
 
     s = sub.add_parser("zones", help="detect saturated colour rectangles")
