@@ -8,7 +8,8 @@ other language could reimplement this in a few lines (that's the point).
     hv ls
     hv shot <target> [out.png]
     hv text <target> <string...>
-    hv key <target> <keys>
+    hv key <target> <keys> [--focus]
+    hv click <target> <x> <y> [--right] [--double]
     hv activate <target>
     hv inspect <target> [depth]
     hv move <target> <zone | x y w h> [--topmost | --no-topmost]
