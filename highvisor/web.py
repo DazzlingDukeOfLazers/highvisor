@@ -24,9 +24,11 @@ _CTYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript",
            ".ico": "image/x-icon"}
 
 
-def make_web_server(engine, bus, bridge=None, host=P.HOST, port=WEB_PORT):
-    """Build (but don't start) the ThreadingHTTPServer. ``bridge`` is optional —
-    when present, /bridge/* endpoints expose peer discovery + context handoff."""
+def make_web_server(engine, bus, bridge=None, orchestrator=None,
+                    host=P.HOST, port=WEB_PORT):
+    """Build (but don't start) the ThreadingHTTPServer. ``bridge`` exposes /bridge/*
+    (peer discovery + context handoff); ``orchestrator`` exposes /orch/* (the gated
+    agent-loop pending queue)."""
 
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
@@ -57,6 +59,12 @@ def make_web_server(engine, bus, bridge=None, host=P.HOST, port=WEB_PORT):
                 peers = bridge.peers() if bridge else []
                 return self._send(200, json.dumps({"ok": True, "peers": peers,
                                                     "self": bridge.identity() if bridge else None}))
+            if path == "/orch/pending":
+                if orchestrator is None:
+                    return self._send(200, json.dumps({"ok": True, "pending": [], "lanes": []}))
+                return self._send(200, json.dumps({
+                    "ok": True, "pending": orchestrator.pending_list(),
+                    "lanes": sorted(orchestrator.auto_lanes)}))
             fp = os.path.normpath(os.path.join(_WEBUI, path.lstrip("/")))
             if not fp.startswith(_WEBUI) or not os.path.isfile(fp):
                 return self._send(404, "not found", "text/plain")
@@ -81,6 +89,9 @@ def make_web_server(engine, bus, bridge=None, host=P.HOST, port=WEB_PORT):
             if self.path == "/bridge/shot" and bridge is not None:
                 return self._send(200, json.dumps(bridge.request_shot(
                     req.get("peer"), req.get("target"))))
+            if self.path == "/orch/act" and orchestrator is not None:
+                return self._send(200, json.dumps(orchestrator.act(
+                    req.get("fp"), req.get("action"))))
             return self._send(404, "not found", "text/plain")
 
         # -------------------------------------------------------------- SSE

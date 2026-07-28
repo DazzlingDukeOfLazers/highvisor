@@ -119,6 +119,35 @@ async function saveLayout() {
   if (res.ok) { $("savename").value = ""; await refreshLayouts(); $("layoutsel").value = name; showLayoutDesc(); }
 }
 
+// ------------------------------------------------------ pending (agent loop)
+async function refreshPending() {
+  let res;
+  try { res = await (await fetch("/orch/pending")).json(); } catch { return; }
+  $("lanes").textContent = (res.lanes && res.lanes.length) ? "auto: " + res.lanes.join(" · ") : "";
+  const el = $("pending");
+  if (!res.pending || !res.pending.length) { el.innerHTML = `<div class="muted">nothing pending</div>`; return; }
+  el.innerHTML = "";
+  for (const p of res.pending) {
+    const d = document.createElement("div");
+    d.className = "pend";
+    d.innerHTML =
+      `<div class="pend-hd"><b>${escapeHtml(p.verb)}</b> → ${escapeHtml(p.target)} `
+      + `<span class="muted">from ${escapeHtml(p.src || "")}</span></div>`
+      + `<div class="pend-body">${escapeHtml(p.body || "(no body)")}</div>`
+      + `<div class="pend-btns">`
+      + `<button class="ok" data-fp="${p.fp}" data-a="approve">approve</button>`
+      + `<button data-fp="${p.fp}" data-a="approve-all">approve lane</button>`
+      + `<button class="no" data-fp="${p.fp}" data-a="deny">deny</button></div>`;
+    el.appendChild(d);
+  }
+  el.querySelectorAll("button[data-fp]").forEach(b =>
+    b.onclick = () => actOpcode(b.dataset.fp, b.dataset.a));
+}
+async function actOpcode(fp, action) {
+  await post("/orch/act", { fp, action });
+  refreshPending();
+}
+
 // ----------------------------------------------------------------- log
 const logEl = () => $("log");
 function fmtTime(t) {
@@ -156,6 +185,12 @@ function renderEvent(ev) {
     const body = escapeHtml(ev.text || "");
     return `${from}${body} <span class="copy" onclick="copyText(this)" data-t="${encodeURIComponent(ev.text || "")}">copy</span>`;
   }
+  if (ev.kind === "opcode") {
+    const st = ev.status || "";
+    const cls = st === "denied" ? "bad" : "k-peer";
+    return `<span class="${cls}">${escapeHtml(st)}</span> <b>${escapeHtml(ev.verb || "")}</b> → `
+      + `${escapeHtml(ev.target || "")} <span class="muted">${escapeHtml((ev.body || "").slice(0, 60))}</span>`;
+  }
   if (ev.kind === "peer") return `${escapeHtml(ev.event || "")} <b>${escapeHtml(ev.name || "")}</b> <span class="muted">${escapeHtml(ev.host || "")}</span>`;
   if (ev.msg) return escapeHtml(ev.msg);
   return escapeHtml(JSON.stringify(ev));
@@ -172,7 +207,13 @@ function connectEvents() {
   const es = new EventSource("/events");
   es.onopen = () => $("conn").classList.add("on");
   es.onerror = () => $("conn").classList.remove("on");
-  es.onmessage = (m) => { try { addRow(JSON.parse(m.data)); } catch {} };
+  es.onmessage = (m) => {
+    try {
+      const ev = JSON.parse(m.data);
+      addRow(ev);
+      if (ev.kind === "opcode" || ev.kind === "orch") refreshPending();
+    } catch {}
+  };
 }
 
 async function init() {
@@ -190,7 +231,9 @@ async function init() {
   await refreshWindows();
   await refreshLayouts();
   await refreshPeers();
+  await refreshPending();
   connectEvents();
   setInterval(refreshPeers, 4000);
+  setInterval(refreshPending, 3000);
 }
 init();

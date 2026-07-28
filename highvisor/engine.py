@@ -82,7 +82,9 @@ class Engine:
     def _publish_op(self, req: dict, res: dict) -> None:
         """Emit a compact event for the onscreen log — never the screenshot bytes."""
         op = req.get("op")
-        if op in (P.OP_PING, P.OP_LIST):  # polled constantly; would drown the log
+        # polled constantly / internal reads (the orchestrator watches via these) —
+        # would drown the log, so keep them out of the onscreen stream.
+        if op in (P.OP_PING, P.OP_LIST, P.OP_INSPECT, P.OP_OCR):
             return
         f = {"op": op, "ok": bool(res.get("ok"))}
         if req.get("target"):

@@ -55,9 +55,25 @@ def serve_forever(host=P.HOST, port=P.PORT, backend=None, web=True):
             print("highvisor bridge: disabled (%s)" % e, flush=True)
             bridge = None
 
+    orchestrator = None
+    if os.environ.get("HIGHVISOR_ORCH", "1") != "0":
+        try:
+            from .orchestrator import Orchestrator, Source
+            orchestrator = Orchestrator(engine, bus, [
+                Source("mac/claude", "Claude", "ax"),
+                Source("mac/chatgpt", "ChatGPT", "ocr"),
+            ])
+            orchestrator.start(interval=3.0)
+            print("highvisor orchestrator: watching Claude(AX)+ChatGPT(OCR), GATED",
+                  flush=True)
+        except Exception as e:
+            print("highvisor orchestrator: disabled (%s)" % e, flush=True)
+            orchestrator = None
+
     if web:
         from .web import make_web_server, WEB_PORT
-        web_srv = make_web_server(engine, bus, bridge=bridge, host=host)
+        web_srv = make_web_server(engine, bus, bridge=bridge,
+                                  orchestrator=orchestrator, host=host)
         threading.Thread(target=web_srv.serve_forever, name="hv-web",
                          daemon=True).start()
         print("highvisor web cockpit: http://%s:%d" % (host, WEB_PORT), flush=True)

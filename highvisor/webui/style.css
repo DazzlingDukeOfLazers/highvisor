@@ -87,7 +87,22 @@ main {
 #applylayout { background: var(--accent); color: #071019; border: none; font-weight: 700; }
 #layoutdesc { font-size: 11px; min-height: 1em; }
 
+.pending { max-height: 40vh; overflow: auto; padding: 6px; display: flex; flex-direction: column; gap: 6px; }
+.pend { border: 1px solid var(--line); border-left: 2px solid var(--peer);
+  border-radius: 5px; background: var(--panel2); padding: 6px 8px; }
+.pend-hd { font-size: 12px; }
+.pend-body { color: var(--fg); font-size: 12px; margin: 4px 0 6px; white-space: pre-wrap;
+  word-break: break-word; max-height: 6em; overflow: auto; }
+.pend-btns { display: flex; gap: 6px; }
+.pend-btns button { font: inherit; font-size: 11px; padding: 2px 10px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--fg); }
+.pend-btns button.ok { background: var(--ok); color: #071019; border: none; font-weight: 700; }
+.pend-btns button.no { border-color: var(--err); color: var(--err); }
+.pend-btns button:hover { border-color: var(--accent); }
+
 .log { flex: 1; overflow: auto; padding: 6px 10px; font-size: 12px; }
+.log .k-opcode { color: var(--peer); }
+.log .k-orch { color: var(--warn); }
 .log .row { display: flex; gap: 8px; padding: 1px 0; align-items: baseline; }
 .log .ts { color: var(--muted); flex: none; }
 .log .k { flex: none; min-width: 62px; }

@@ -6,19 +6,20 @@ and — GATED — drives the target agent: types a message into its input, or cl
 Claude's Approve / Approve-all / Deny buttons. Everything detected/done is published
 to the EventBus, so the cockpit shows a live, interruptible audit trail.
 
-Opcode grammar — human-readable and OCR-safe. The marker is a VISIBLE header line,
-NOT a code-fence info string (which renders invisibly, so OCR can't see it):
+Opcode grammar — human-readable and OCR-safe. A VISIBLE header line, the payload,
+and a REQUIRED ``hv: end`` terminator:
 
     hv: <verb> <machine>/<agent>
-    ```
     <payload / reason>
-    ```
+    hv: end
 
 verbs: ``ask`` (type payload + submit), ``approve`` / ``approve-all`` / ``deny``
-(click Claude's buttons; body = optional reason), ``key`` (send a key), ``end``
-(stop). The body runs to the next ``hv:`` header, an ``hv: end`` line, or end of
-text; surrounding ``` fences are stripped so the SAME grammar parses from raw AX
-text and from OCR (which drops the fence markers) alike.
+(click Claude's buttons; body = optional reason), ``key`` (send a key). The
+``hv: end`` is mandatory and is what makes the protocol safe to watch in a window
+that also DISCUSSES it: an ``hv:`` written in prose (a grammar example, this
+docstring) has no terminator, so it is never mistaken for a command. Code-fence
+``` marks are NOT a delimiter — AX and OCR both drop them when reading rendered
+text — so ``hv: end`` is the one thing that survives.
 """
 import hashlib
 import re
@@ -27,9 +28,7 @@ import time
 
 from . import protocol as P
 
-VERBS = {"ask", "approve", "approve-all", "deny", "key", "end"}
-# Button/control verbs carry at most a one-line reason (never a multi-line payload).
-BUTTON_VERBS = {"approve", "approve-all", "deny", "end"}
+VERBS = {"ask", "approve", "approve-all", "deny", "key"}
 
 # A header line: "hv: ask mac/claude". Tolerant of OCR — allow ':' or whitespace
 # after hv, and spaces around the '/'. Verb is validated against VERBS below.
@@ -37,7 +36,6 @@ _HEADER = re.compile(
     r"(?im)^[ \t>]*hv[:\s][ \t]*(?P<verb>[a-z][a-z-]*)[ \t]+"
     r"(?P<machine>[a-z0-9]+)[ \t]*/[ \t]*(?P<agent>[a-z0-9]+)[ \t]*$")
 _END = re.compile(r"(?i)^[ \t>]*hv[:\s]\s*end\s*$")
-_FENCE = re.compile(r"^\s*```")
 
 
 class Opcode:
@@ -54,7 +52,8 @@ class Opcode:
 
     @property
     def fp(self):
-        raw = "%s|%s|%s" % (self.verb, self.target, self.body)
+        norm = re.sub(r"\s+", " ", self.body).strip()[:300]  # whitespace-stable
+        raw = "%s|%s|%s" % (self.verb, self.target, norm)
         return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
 
     def as_event(self):
@@ -62,51 +61,37 @@ class Opcode:
                 "body": self.body[:400], "src": self.source, "fp": self.fp}
 
 
-def _fence_body(region):
-    """Content between the first ```…``` pair in ``region``, or None if no pair."""
-    start = None
-    for i, ln in enumerate(region):
-        if _FENCE.match(ln):
-            if start is None:
-                start = i
-            else:
-                return "\n".join(region[start + 1:i]).strip()
-    return None
-
-
 def parse_opcodes(text, source=""):
     """Extract opcodes from a blob of on-screen text (AX-flattened or OCR).
 
-    Body rules, so the same grammar survives AX (fenced) and OCR (fences dropped):
-      - if a ```…``` pair is present, the body is exactly its content;
-      - else a button/control verb takes the first non-empty line (a reason);
-      - else (ask/key, no fence — the OCR case) the body runs to an ``hv: end``
-        line or the next opcode.
+    EVERY opcode must be closed by an ``hv: end`` line. This is the one delimiter
+    that survives rendering — code-fence ``` marks do NOT (AX and OCR both drop
+    them) — and, crucially, it means an ``hv:`` MENTIONED in prose (a grammar
+    example, this very docstring, a discussion of the protocol) is NOT a command:
+    no terminator, no opcode. The body is everything between the header and the
+    ``hv: end``.
     """
     lines = text.splitlines()
     headers = []
+    ends = []
     for idx, ln in enumerate(lines):
+        if _END.match(ln):
+            ends.append(idx)
+            continue
         m = _HEADER.match(ln)
         if m and m.group("verb") in VERBS:
             headers.append((idx, m))
     ops = []
-    for hi, (idx, m) in enumerate(headers):
-        verb = m.group("verb")
-        nxt = headers[hi + 1][0] if hi + 1 < len(headers) else len(lines)
-        region = lines[idx + 1:nxt]
-        fenced = _fence_body(region)
-        if fenced is not None:
-            body = fenced
-        elif verb in BUTTON_VERBS:
-            body = next((ln.strip() for ln in region if ln.strip()), "")
-        else:
-            keep = []
-            for ln in region:
-                if _END.match(ln):
-                    break
-                keep.append(ln)
-            body = "\n".join(keep).strip()
-        ops.append(Opcode(verb, m.group("machine"), m.group("agent"), body, source))
+    used_ends = set()
+    for idx, m in headers:
+        end_i = next((e for e in ends if e > idx and e not in used_ends), None)
+        if end_i is None:
+            continue                      # unterminated -> prose, not a command
+        used_ends.add(end_i)
+        body_lines = [ln for ln in lines[idx + 1:end_i] if ln.strip() != "```"]
+        body = "\n".join(body_lines).strip()
+        ops.append(Opcode(m.group("verb"), m.group("machine"),
+                          m.group("agent"), body, source))
     return ops
 
 
@@ -166,6 +151,9 @@ class Orchestrator:
         self.sources = sources or []
         self._seen = set()          # opcode fingerprints already emitted (dedup)
         self._run = False
+        self.pending = {}           # fp -> Opcode awaiting the user's approval
+        self.auto_lanes = set()     # "verb target" lanes the user approved wholesale
+        self._lock = threading.Lock()
 
     def read_source(self, s: Source) -> str:
         if s.mode == "ocr":
@@ -175,16 +163,60 @@ class Orchestrator:
         return flatten_ax_text(r.get("tree", {})) if r.get("ok") else ""
 
     def scan_once(self):
-        """Read every source, emit any NEW opcodes to the bus. Returns the new ones."""
+        """Read every source; queue any NEW opcodes (gated). Returns the new ones."""
         found = []
         for s in self.sources:
             for op in parse_opcodes(self.read_source(s), s.name):
                 if op.fp in self._seen:
                     continue
                 self._seen.add(op.fp)
-                self.bus.publish("opcode", **op.as_event())
+                self._ingest(op)
                 found.append(op)
         return found
+
+    # ---- gated queue ------------------------------------------------------------
+    def _lane(self, op):
+        return "%s %s" % (op.verb, op.target)
+
+    def _ingest(self, op):
+        """A new opcode: auto-run it if its lane is pre-approved, else hold it
+        pending for the user."""
+        if self._lane(op) in self.auto_lanes:
+            self.bus.publish("opcode", status="auto", **op.as_event())
+            self.execute(op)
+            return
+        with self._lock:
+            self.pending[op.fp] = op
+        self.bus.publish("opcode", status="pending", **op.as_event())
+
+    def pending_list(self):
+        with self._lock:
+            ops = list(self.pending.values())
+        return [dict(op.as_event(), lane=self._lane(op)) for op in ops]
+
+    def act(self, fp, action):
+        """User verdict on a pending opcode: approve / approve-all / deny."""
+        with self._lock:
+            op = self.pending.pop(fp, None)
+        if op is None:
+            return {"ok": False, "error": "no pending opcode %s" % fp}
+        if action == "deny":
+            self.bus.publish("opcode", status="denied", **op.as_event())
+            return {"ok": True, "action": "denied", "fp": fp}
+        if action == "approve-all":
+            self.auto_lanes.add(self._lane(op))
+            self.bus.publish("orch", msg="lane auto-approved: %s" % self._lane(op))
+        res = self.execute(op)
+        # approve-all: also drain any other pending opcodes already in this lane
+        if action == "approve-all":
+            lane = self._lane(op)
+            with self._lock:
+                drain = [o for o in self.pending.values() if self._lane(o) == lane]
+                for o in drain:
+                    self.pending.pop(o.fp, None)
+            for o in drain:
+                self.execute(o)
+        return {"ok": bool(res.get("ok", True)), "action": action, "fp": fp}
 
     def prime(self):
         """Mark every opcode currently on screen as already-seen WITHOUT acting on
