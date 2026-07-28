@@ -247,7 +247,7 @@ class MacBackend(PlatformBackend):
         return bytes(data)
 
     def click(self, target: str, x: int, y: int, button: str = "left",
-              double: bool = False) -> ActionResult:
+              double: bool = False, hover: bool = False) -> ActionResult:
         w = self._resolve(target)
         if w is None:
             return ActionResult.fail("click needs a window target")
@@ -264,9 +264,26 @@ class MacBackend(PlatformBackend):
         # WARP the real OS cursor to the point so hover/position is correct (Unity
         # reads the actual cursor). Then post down/up exactly like a known-good
         # auto-clicker (othyn/macos-auto-clicker): HID source, HID tap, no click-state
-        # field, no pre-move — just the button pair at the cursor position.
-        Quartz.CGWarpMouseCursorPosition(pt)
-        time.sleep(0.03)
+        # field, no pre-move — just the button pair at the cursor position. This drives
+        # Unity UI buttons (Qud's toolbar, main menu) fine.
+        # `hover=True`: some UIs — Qud's LEGACY console popups (the in-game menu, "press
+        # [Space]" prompts) — activate the item under Input.mousePosition, which a warp
+        # alone does NOT update. Post a real mouseMoved (approach + settle) first so the
+        # target is hovered before the click. OFF by default: a pre-move BREAKS
+        # world-cell clicks (Qud then hovers-but-never-selects the tile).
+        if hover:
+            approach = Quartz.CGPointMake(gx, gy - 24.0)
+            Quartz.CGWarpMouseCursorPosition(approach)
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap,
+                Quartz.CGEventCreateMouseEvent(src, Quartz.kCGEventMouseMoved, approach, b))
+            time.sleep(0.08)
+            Quartz.CGWarpMouseCursorPosition(pt)
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap,
+                Quartz.CGEventCreateMouseEvent(src, Quartz.kCGEventMouseMoved, pt, b))
+            time.sleep(0.2)
+        else:
+            Quartz.CGWarpMouseCursorPosition(pt)
+            time.sleep(0.03)
         for _ in range(2 if double else 1):
             ed = Quartz.CGEventCreateMouseEvent(src, down, pt, b)
             eu = Quartz.CGEventCreateMouseEvent(src, up, pt, b)
@@ -274,8 +291,9 @@ class MacBackend(PlatformBackend):
             Quartz.CGEventPost(Quartz.kCGHIDEventTap, eu)
             time.sleep(0.02)
         return ActionResult(ok=True, tier=4,
-                            detail="%s%s click @ global (%d,%d)"
-                                   % ("double " if double else "", button, gx, gy))
+                            detail="%s%s%s click @ global (%d,%d)"
+                                   % ("hover+" if hover else "", "double " if double else "",
+                                      button, gx, gy))
 
     def inspect(self, target: str, depth: int = 3) -> Element:
         w = self._resolve(target)

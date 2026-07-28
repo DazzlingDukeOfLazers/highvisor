@@ -96,7 +96,8 @@ def _cmd_key(a):
 
 def _cmd_click(a):
     _print_json(_call({"op": P.OP_CLICK, "target": a.target, "x": a.x, "y": a.y,
-                       "button": "right" if a.right else "left", "double": a.double}))
+                       "button": "right" if a.right else "left", "double": a.double,
+                       "hover": a.hover}))
 
 
 def _cmd_activate(a):
@@ -421,6 +422,8 @@ def build_parser():
     s.add_argument("y", type=int)
     s.add_argument("--right", action="store_true", help="right-click")
     s.add_argument("--double", action="store_true", help="double-click")
+    s.add_argument("--hover", action="store_true",
+                   help="post a real mouseMoved first (needed for Qud's legacy popups)")
     s.set_defaults(fn=_cmd_click)
 
     s = sub.add_parser("activate")

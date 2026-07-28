@@ -146,10 +146,15 @@ class PlatformBackend:
         raise NotImplementedError
 
     def click(self, target: str, x: int, y: int, button: str = "left",
-              double: bool = False) -> ActionResult:
+              double: bool = False, hover: bool = False) -> ActionResult:
         """Click at (x, y) given RELATIVE to the target window's top-left, in the
         window's coordinate units. Synthetic mouse events reach many apps that
-        drop synthetic keys (Unity games); this activates the window first."""
+        drop synthetic keys (Unity games); this activates the window first.
+        ``hover``: post a real mouseMoved before the click, for UIs that activate the
+        item under the reported mouse position rather than the OS cursor (e.g. Qud's
+        legacy popups). Off by default — a pre-move breaks direct world-cell clicks.
+        Backends that don't implement hover ignore it; the engine only forwards it
+        when explicitly requested, so it never reaches a backend that lacks the arg."""
         raise NotImplementedError
 
     def inspect(self, target: str, depth: int = 3) -> Element:
