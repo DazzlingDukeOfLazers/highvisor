@@ -1,114 +1,121 @@
-# SEO keywords and page mapping
+# SEO keywords and page mapping — Round 2
 
-Use these phrases naturally in titles, opening paragraphs, image alt text, and task headings. Prefer one primary phrase and two or three supporting phrases per page. Do not repeat keywords mechanically.
+Factual accuracy outranks keyword work. Apply these only after the P0 contract tickets. Use one primary phrase plus two or three natural supporting phrases in the H1/opening paragraph; never dump a keyword list into public prose.
 
 ## highvisor
 
-### README / overview
+### README
 
 - Primary: **desktop automation for background windows**
-- Supporting: cross-platform desktop automation; AI desktop control; control unfocused application; local desktop automation daemon
-- Reader intent: “I need to automate a specific desktop app without taking over the screen.”
-
-Suggested title:
+- Supporting: macOS and Windows desktop automation; control an unfocused app; AI desktop control; local automation daemon
+- Current H1 is already strong. Optional fuller title:
 
 > highvisor: desktop automation and background window control for macOS and Windows
 
-### Architecture / research
+### `docs/00-overview.md`
 
-- macOS Accessibility automation
-- Windows UI Automation
-- background window input
-- AXUIElement automation
-- UIA background control
-- cross-platform accessibility automation
-- targeted synthetic input
+- Primary: **background desktop automation**
+- Supporting: visual parity testing; AI agent coordination; cross-platform window automation
+- Suggested H1:
 
-### Input
+> highvisor overview: background desktop automation, visual parity, and agent coordination
 
-- synthetic mouse input macOS
-- send keyboard input to background window
-- Unity synthetic mouse click
-- CGEventPostToPid
-- Windows PostMessage keyboard input
+### `docs/01-architecture.md`
 
-### Visual parity
+- Primary: **cross-platform desktop automation architecture**
+- Supporting: macOS AX automation; Windows UI Automation; targeted window input; local JSON RPC
+- Put “architecture” plus platform/category language before internal layer names.
 
-- visual regression testing
-- screenshot diff tool
-- golden image testing
-- UI parity testing
-- cross-application screenshot comparison
+### `docs/05-driving-input.md`
 
-### Agent loop
+- Primary: **synthetic mouse and keyboard input for desktop apps**
+- Supporting: macOS CGEvent; Windows PostMessage; Unity synthetic click; background window input
+- Search-intent headings worth keeping: “send keyboard input to a background window,” “Unity/Qud mouse click,” and “window points vs screenshot pixels.”
 
-- human-in-the-loop AI agent orchestration
-- desktop AI agent coordination
-- gated agent automation
-- local multi-agent workflow
+### `docs/06-agent-loop.md`
 
-### SSH
+- Primary: **human-in-the-loop AI agent orchestration**
+- Supporting: desktop AI agent coordination; gated agent automation; local multi-agent workflow
+- Suggested H1:
 
-- remote desktop automation over SSH
-- SSH tunnel local RPC
-- encrypted cross-machine automation
+> Human-in-the-loop desktop agent coordination with highvisor opcodes
+
+### `docs/07-ssh-transport.md`
+
+- Primary: **remote desktop automation over SSH**
+- Supporting: SSH tunnel local RPC; encrypted cross-machine automation; remote window control
+- Suggested H1:
+
+> Remote desktop automation over SSH with highvisor
+
+### `docs/08-parity-kit.md`
+
+- Primary: **visual regression testing with screenshot diffs**
+- Supporting: golden image testing; UI parity testing; cross-application screenshot comparison
+- Current lede already matches reader intent well.
 
 ## raves-of-qud
 
 ### README
 
 - Primary: **Caves of Qud 3D viewer**
-- Supporting: Caves of Qud mod; Godot front end for Caves of Qud; Caves of Qud 2.5D; roguelike 3D viewer
-- Reader intent: “What is Raves of Qud, and does it replace or require the game?”
-
-Suggested title:
+- Supporting: Caves of Qud mod; Godot front end for Caves of Qud; 2.5D roguelike viewer
+- Current H1 is good. Prefer the natural-order variant if touched:
 
 > Raves of Qud: a 2.5D/3D Godot viewer for Caves of Qud
 
-### Rendering
+### `docs/architecture.md`
 
-- Caves of Qud tile rendering
-- Godot voxel walls
-- 2.5D tile rendering
-- roguelike lighting in Godot
-- billboard sprite rendering
-- Godot day/night overlay
+- Primary: **Caves of Qud Godot architecture**
+- Supporting: C# mod bridge; Qud thread model; Unity main thread; Godot game-state client
+- Suggested H1:
 
-### Protocol / integration
+> Raves of Qud architecture: Godot client, C# bridge, and Qud thread model
 
-- Caves of Qud mod API
-- Godot TCP JSON bridge
-- Unity game state bridge
-- Godot legacy game integration
-- mod-to-viewer protocol
+### `docs/protocol.md`
 
-### Tools
+- Primary: **Caves of Qud mod-to-Godot protocol**
+- Supporting: Godot TCP JSON bridge; Caves of Qud mod API; Unity game-state bridge
+- Suggested H1:
 
-- Caves of Qud screenshot automation
-- Godot visual regression testing
-- Caves of Qud testing tools
-- game UI automation macOS
+> Caves of Qud mod-to-Godot bridge protocol
 
-### Cameras
+### `docs/rendering.md`
 
-- Raves of Qud camera controls
-- Godot multi-camera view
-- 2.5D camera controls
-- top-down orthographic camera Godot
+- Primary: **Caves of Qud tile rendering in Godot**
+- Supporting: Godot voxel walls; 2.5D tile rendering; billboard sprites; roguelike lighting
+- Current H1 and mental-model lede are already good.
 
-### Multiplayer proposal
+### `docs/qud-api.md`
 
-- Caves of Qud multiplayer mod
-- Caves of Qud co-op proposal
-- Godot WebRTC game networking
+- Primary: **Caves of Qud mod API reference**
+- Supporting: Qud C# modding; Assembly-CSharp reflection; XRL API signatures
+- Suggested H1:
 
-Use “proposal” in the title/description until multiplayer exists.
+> Verified Caves of Qud C# mod API reference
 
-## Metadata/content gaps that matter more than keywords
+### `docs/cameras.md`
 
-- Add a short meta-description-ready opening paragraph to both READMEs.
-- Add representative screenshots with descriptive alt text.
-- Keep one H1 per page and make it describe the user-visible subject.
-- Use descriptive link text instead of “see docs/05” or “read here.”
-- Add stable, human-readable headings; avoid opaque labels such as “ask 4.”
-- State tested versions and dates without putting dates in evergreen page titles.
+- Primary: **Raves of Qud camera controls**
+- Supporting: Godot multi-camera view; 2.5D camera controls; top-down orthographic camera
+- Current H1 is good.
+
+### `docs/legacy-integration-playbook.md`
+
+- Primary: **Godot legacy game integration**
+- Supporting: Unity-to-Godot bridge; background game automation; game-state socket bridge
+
+### `docs/multiplayer.md`
+
+- Primary: **Caves of Qud multiplayer proposal**
+- Supporting: Caves of Qud co-op architecture; Godot WebRTC game networking
+- Keep “proposal” in the H1/opening until it exists.
+
+## Content opportunities bigger than keywords
+
+- Add one representative screenshot/GIF to each root README only when it can be kept current; use descriptive alt text naming the product and visible result.
+- Keep one descriptive H1 per page.
+- Put tested version/date in a status note, not an evergreen title.
+- Use descriptive link text; do not make readers decode “docs/05.”
+- Prefer current-status tables over date-stamped claims scattered through prose.
+- For niche technical pages, define internal terms (“Holodeck,” “tier,” “bridge”) after the plain-language category, not before it.

@@ -1,70 +1,115 @@
-# Documentation review update — 2026-07-28 (verbose)
+# Documentation review update — 2026-07-28 (Round 2, verbose)
 
-## What was reviewed
+## Outcome
 
-The active documentation surfaces in:
+Round 1’s restructuring worked. Both projects now have usable front doors, clearer status labels, and better canonical subsystem pages. This pass therefore focused on a harder standard: whether normative prose agrees with the current implementation.
 
-- `/Users/homefolder/personal-git/highvisor`: root README, numbered docs, loop startup context, and review convention.
-- `/Users/homefolder/personal-git/raves-of-qud`: root README, `CLAUDE.md`, subsystem docs, merge runbook, and regression-preset README.
+No source documentation was edited. Seventeen new dated tickets were written under the target repositories’ `reviews/` directories:
 
-No source documentation was edited. New review tickets were written under each repository’s `reviews/`.
+- raves-of-qud: 8 tickets;
+- highvisor: 9 tickets.
 
-## Editorial direction
+A local Markdown path scan found no missing repository-relative target files. Remaining cross-link problems are semantic: a link reaches a page successfully, but that “canonical” page can still contain obsolete behavior.
 
-The recommended information order is:
+## Highest-impact findings
 
-1. State what the tool/product does in the reader’s language.
-2. Give the smallest verified path to a useful result.
-3. State prerequisites, status, limitations, and safety boundaries.
-4. Offer a task-based documentation map.
-5. Link to detailed architecture, implementation, and historical reasoning.
+### 1. Raves’ protocol is not currently normative
 
-This preserves the hard-won engineering record without forcing a first-time reader to consume it before succeeding.
+`docs/protocol.md` says frames can be 4 GiB, omits most current snapshot blocks, lists fewer than half the implemented commands, conflates Qud’s turn thread with Unity’s graphics main thread, repeats the rejected trailing-letter color rule, and calls already-shipped stats/messages “deferred.”
 
-## Highest-impact highvisor changes
+The implementation says:
 
-- Turn README/overview into a task-oriented entry point with one canonical first-success sequence.
-- Add a current capability matrix and distinguish implemented, partial, planned, and historical material.
-- Scope absolute background-control claims by OS/app class and treat event posting as best-effort until verified.
-- Reconcile Qud click guidance: bare click, hover/pre-move behavior, and UI surface must be described as a matrix.
-- Put LAN bridge bind/authentication/encryption boundaries before feature detail.
-- Add explicit executable-config warning for parity scene `shell` steps.
-- Keep agent startup cards minimal and link to one canonical protocol contract.
+- inbound commands are capped at 16 MiB;
+- snapshots include game/build/timing, structured zone coordinates, world terrain, stats, target/context, abilities, messages, palette, and cells;
+- six commands are consumed inline on the socket reader and seven more are queued;
+- graphics work alone is marshalled through `uiQueue`.
 
-## Highest-impact raves-of-qud changes
+Fix this before expanding the protocol further.
 
-- Reduce the 590-line README to product description, prerequisites, quickstart, current capabilities, limitations, and documentation map.
-- Reduce `CLAUDE.md` to behavioral instructions and daily commands; move debugging history to durable subsystem/decision docs.
-- Declare canonical owners for duplicated facts (camera controls, protocol, rendering, tool behavior).
-- Fix known drift:
-  - camera modes 1–6 vs 1–7;
-  - Escape resets to COMPASS vs keeps current mode;
-  - synthetic mouse pre-move/click-state requirements vs rejection;
-  - old “Claude cannot capture” claims after highvisor window capture;
-  - protocol color parsing by trailing letter vs current foreground-before-`^` rule;
-  - “unshaded world” absolutes vs optional shaded geometry.
-- Make the protocol a normative wire contract: limits, types, required fields, lifecycle, compatibility, errors, thread/execution semantics, and localhost-only security.
-- Separate roadmap status from historical design, and label multiplayer clearly as an unimplemented proposal.
-- Add the missing raves-of-qud `reviews/README.md` convention.
+### 2. Raves’ roadmap opens with the opposite of current reality
 
-## SEO approach
+The page says “No code yet” and “not started,” then later says Phase 0 is done and Phase 1 landed. `WorldStore.gd`, persistence tests, `gameId`, structured zone coordinates, remembered neighbors, and disk persistence confirm the latter.
 
-Use plain search phrases in page titles, first paragraphs, and task headings—never as a keyword dump. Lead pages should name the category and outcome:
+Make the first screen a shipped/partial/planned status matrix. Cut completed “smallest first steps” and move old design prose into history.
 
-- highvisor: desktop automation, background window control, macOS Accessibility automation, Windows UI Automation, screenshot diff, golden image testing.
-- raves-of-qud: Caves of Qud 3D viewer, Godot front end, Caves of Qud mod, 2.5D roguelike viewer, legacy game integration.
+### 3. Highvisor’s machine-qualified opcode boundary is unsafe in code and docs
 
-Detailed keyword-to-page recommendations are in `reviews/seo-keywords.md`.
+The parser records `<machine>/<agent>`, but execution ignores `machine`. An approved `floorputer/claude` opcode can therefore resolve to the local Claude entry. Documentation must not imply remote routing until code rejects non-`mac` machines or implements an explicit route.
 
-## Suggested integration order
+This is the most important highvisor finding.
 
-1. Fix factual contradictions and overbroad security/accuracy claims.
-2. Establish canonical source pages and replace duplicates with links.
-3. Rewrite README first screens and verified quickstarts.
-4. Add status labels to research, roadmap, multiplayer, and historical runbooks.
-5. Split encyclopedic material from README/`CLAUDE.md`.
-6. Apply heading/title/lede SEO improvements after information architecture stabilizes.
+### 4. Highvisor’s architecture examples do not match the RPC
 
-## Review coverage note
+`docs/01-architecture.md` labels its examples implemented but uses an object target, `press`, `mode:auto`, response metadata the engine does not return, and unimplemented session operations. Replace them with payloads accepted by `Engine._dispatch`.
 
-Some documents did not receive a standalone ticket because their issues are covered by a combined ticket or cross-project rule. The audit still included them. Highvisor’s `docs/02` + `docs/03` and all `loop/*` are intentionally grouped. Raves’ missing review convention has a proposed-target ticket rather than a source-file review.
+### 5. “Delivered” and `ok:true` overstate raw input guarantees
+
+For several key/click paths, highvisor knows the OS call/event post completed; it does not know the app reacted. The agent loop compounds this: `deliver()` ignores the text and submit action results and returns success.
+
+Use three states consistently:
+
+1. approved;
+2. posted;
+3. confirmed by readback.
+
+Only the third is end-to-end delivery.
+
+### 6. Bridge screenshot consent is broader than the docs say
+
+Once the bridge is enabled and a peer has the shared token, that peer can issue `shot_req`; no local per-request approval occurs. “Opt-in” currently means bridge/token opt-in, not screenshot-by-screenshot consent.
+
+### 7. Several implementation-status claims need provenance
+
+- highvisor currently uses `CGWindowListCreateImage`, `PrintWindow`, and `BitBlt`, not the researched ScreenCaptureKit/DWM/Windows.Graphics.Capture alternatives.
+- `ssh-doctor` is documented but not implemented.
+- Windows capability checkmarks need an environment/date evidence record.
+- Raves’ `Protocol.Build` has not kept up with later mod changes despite a mandatory-bump rule.
+
+## What to restore versus cut
+
+### Restore
+
+- Raves `CLAUDE.md`: one row for `docs/qud-api.md`.
+- Raves `CLAUDE.md`: the allspice author guard next to push instructions.
+- Roadmap: concise acceptance criteria for the next unfinished Phase 1 slice.
+- Research/capability claims: explicit tested OS/app/version/date evidence.
+
+### Cut or rewrite
+
+- fixed `dd/mac` / `dd/pc` branch claims from `CLAUDE.md`;
+- “Claude cannot see/send keys” explanations now superseded by highvisor;
+- raves protocol’s trailing-letter color rule and shipped-as-deferred items;
+- roadmap’s “No code yet,” completed first step, and duplicate progress narratives;
+- highvisor’s unsupported Codex benchmark/market paragraph;
+- nonexistent `ssh-doctor` as a current command;
+- universal synthetic-click recipes;
+- lowercase live opcode examples in watched startup cards.
+
+Do **not** restore the long README data-model dump or the 494-line `CLAUDE.md`. Round 1’s condensation is the right direction.
+
+## Docs that are holding up
+
+No standalone corrective ticket was needed for:
+
+- raves `docs/cameras.md`: seven modes and Escape behavior are now canonical and consistent;
+- raves `docs/rendering.md`: mental model, current shading flag, glossary, and rejected-approaches appendix are useful (appendix numbering is a low-priority cleanup only);
+- raves `docs/multiplayer.md`: clearly labeled proposal;
+- raves debugging-decisions and presets references: appropriate durable homes for detail;
+- highvisor `docs/02-research-agenda.md`: historical status is clear enough;
+- highvisor `docs/08-parity-kit.md`: fast path, executable-scene warning, and limits are clear;
+- highvisor `docs/09-work-cycle.md`: strong overall, with only the routing/completion-gate corrections grouped into the startup-card ticket.
+
+## Integration order
+
+1. Enforce/document the orchestrator machine boundary and propagate delivery-stage failures.
+2. Repair raves `docs/protocol.md`.
+3. Rewrite raves roadmap status from current code.
+4. Correct highvisor RPC examples and input-result terminology.
+5. Correct bridge screenshot trust and nonexistent/current feature labels.
+6. Fix README quickstart/rendering issues and evidence labels.
+7. Apply small CLAUDE/tools/gotchas/legacy-playbook corrections.
+8. Apply SEO title/lede changes after factual contracts are stable.
+
+## SEO
+
+Both root README titles are now substantially better. Remaining opportunity is in specialist pages: put the searchable category in H1/opening copy (“Qud thread model,” “human-in-the-loop agent coordination,” “remote desktop automation over SSH”) and keep project jargon as the secondary phrase. See `reviews/seo-keywords.md`.

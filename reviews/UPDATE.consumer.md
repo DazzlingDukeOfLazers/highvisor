@@ -1,16 +1,18 @@
-# What the documentation should feel like to a reader
+# What Round 2 should improve for readers
 
-A new reader should understand both projects in under a minute:
+Round 1 made both projects much easier to enter. Keep that structure.
 
-- **highvisor** controls and inspects a specific desktop app from scripts or AI tools, including many background-window tasks.
-- **Raves of Qud** is a Godot 2.5D/3D viewer that uses the player’s own Caves of Qud installation as the real game.
+The next improvement is trust: when a page says something is implemented, safe, or confirmed, a reader should be able to rely on it.
 
-From there, each README should offer one short, tested setup path and a few choices such as “control an app,” “compare two interfaces,” “run Raves,” or “understand how rendering works.”
+For **Raves of Qud**, that means the protocol page must describe the data and commands the current mod really sends, and the roadmap must acknowledge that persistent world storage already exists. The quickstart also needs one missing directory-creation command so a new install does not fail immediately.
 
-The deeper documentation is valuable, but much of it currently appears before the basic answer or is repeated in several places. The proposed edits keep that detail while moving it behind clear links. They also label experimental plans as plans, explain security boundaries in plain language, and remove contradictions that make readers unsure which instructions are current.
+For **highvisor**, that means examples must use real RPC fields, remote-looking opcodes must never fall through to a local agent, and “success” must distinguish “the OS accepted an input event” from “the app visibly reacted.” A shared bridge token also grants on-demand screenshot requests without another local prompt; the docs should say that plainly.
 
-The intended result is documentation that works at three speeds:
+The desired reader experience remains:
 
-- a one-minute explanation;
-- a five-minute successful first run;
-- a full engineering reference when the reader needs it.
+- one minute to understand the product;
+- five minutes to reach a verified result;
+- precise engineering contracts when extending it;
+- no surprise gap between “planned,” “posted,” and “confirmed.”
+
+The large README and `CLAUDE.md` cuts should not be reversed. Restore only small operational guardrails; keep the historical detail linked outside the priming path.
