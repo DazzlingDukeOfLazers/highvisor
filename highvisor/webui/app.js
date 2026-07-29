@@ -173,11 +173,11 @@ function optsHtml(p) {
   if (!groups.length) return "";
   let h = `<div class="pend-opts">`;
   for (const g of groups) {
-    h += `<div class="pend-q">` + (g.qn ? `<span class="qn">${escapeHtml(g.qn)}</span>` : "");
+    h += `<div class="pend-q">` + (g.qn ? `<div class="qn">${escapeHtml(g.qn)}</div>` : "");
     for (const o of g.opts)
       h += `<button class="pend-opt" data-fp="${p.fp}" data-src="${escapeHtml(p.src || "")}" `
-        + `data-q="${escapeHtml(g.qn)}" data-opt="${escapeHtml(o.letter)}" data-label="${escapeHtml(o.label)}" `
-        + `title="${escapeHtml(o.label)}">(${escapeHtml(o.letter)})</button>`;
+        + `data-q="${escapeHtml(g.qn)}" data-opt="${escapeHtml(o.letter)}" data-label="${escapeHtml(o.label)}">`
+        + `<b>(${escapeHtml(o.letter)})</b> ${escapeHtml(o.label)}</button>`;
     h += `</div>`;
   }
   return h + `</div>`;
@@ -194,18 +194,26 @@ async function pickOption(btn) {
 }
 
 // Draggable column splitters: dragging a gutter sets --cw-left / --cw-mid (px); right col is 1fr.
+// Draggable splitters: vertical .gutter set column widths (--cw-left/--cw-mid);
+// the horizontal .hgutter sets the pending panel height (--ph) vs the preview.
 function initGutters() {
   const root = document.documentElement;
-  document.querySelectorAll(".gutter").forEach(g => {
+  document.querySelectorAll(".gutter, .hgutter").forEach(g => {
     g.addEventListener("pointerdown", e => {
       e.preventDefault();
       g.classList.add("dragging");
-      const which = g.dataset.resize;
-      const col = document.querySelector(which === "left" ? ".col.left" : ".col.mid");
-      const varName = which === "left" ? "--cw-left" : "--cw-mid";
-      const startX = e.clientX;
-      const startPx = col.getBoundingClientRect().width;
-      const move = ev => root.style.setProperty(varName, Math.max(140, startPx + ev.clientX - startX) + "px");
+      const which = g.dataset.resize;                    // left | mid | pending
+      const vertical = g.classList.contains("hgutter");  // hgutter = drag height
+      let el, varName, min;
+      if (which === "left") { el = document.querySelector(".col.left"); varName = "--cw-left"; min = 140; }
+      else if (which === "mid") { el = document.querySelector(".col.mid"); varName = "--cw-mid"; min = 140; }
+      else { el = document.querySelector(".panel.resizable"); varName = "--ph"; min = 90; }
+      const startPos = vertical ? e.clientY : e.clientX;
+      const startSize = el.getBoundingClientRect()[vertical ? "height" : "width"];
+      const move = ev => {
+        const d = (vertical ? ev.clientY : ev.clientX) - startPos;
+        root.style.setProperty(varName, Math.max(min, startSize + d) + "px");
+      };
       const up = () => {
         g.classList.remove("dragging");
         window.removeEventListener("pointermove", move);
