@@ -1,4 +1,4 @@
-# 05 — Driving input (keyboard & mouse), and the synthetic-click gotcha
+# 05 — Driving input: synthetic keyboard & mouse for background macOS & Windows apps
 
 How highvisor delivers input to a target, the tier ladder it climbs, and the
 hard-won detail that makes clicks land in engines (Unity/Qud) that drop everything

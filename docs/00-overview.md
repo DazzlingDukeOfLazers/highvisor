@@ -106,16 +106,15 @@ If a call throws `OSError: [Errno 49] Can't assign requested address`, that's a
 transient ephemeral-port blip under socket churn — **retry; it is not a config error**
 (the default host is already loopback).
 
-## Reading order
+## Where to go next — by what you want to do
 
-1. `00-overview.md` — this file.
-2. `01-architecture.md` — components, RPC vocabulary, per-OS backend strategy.
-3. `02-research-agenda.md` — the open tooling questions to resolve before we pick
-   a stack.
-4. `03-research-findings.md` — filled in after research; the stack recommendation.
-5. `04-web-and-bridge.md` — the web cockpit + the cross-machine LAN bridge.
-6. `05-driving-input.md` — the tier ladder + the synthetic-click gotcha (Unity/Qud).
-7. `06-agent-loop.md` — the human-gated Claude↔ChatGPT opcode loop.
-8. `07-ssh-transport.md` — tunnelling a remote highvisor over SSH.
-9. `08-parity-kit.md` — visual parity & regression tooling (drive both, diff, golden).
-10. `09-work-cycle.md` — **the work-cycle loop** (goal → prototype → tools → test → goldens → docs → review → integrate); the editable checklist any session follows.
+| I want to… | Read |
+|---|---|
+| Use it on **one app** | the [README](../README.md) quickstart → [`05-driving-input.md`](05-driving-input.md) |
+| **Compare two apps** / catch UI regressions | [`08-parity-kit.md`](08-parity-kit.md) |
+| **Coordinate AI agents** (Claude ↔ ChatGPT) | [`06-agent-loop.md`](06-agent-loop.md) → [`09-work-cycle.md`](09-work-cycle.md) |
+| Reach **another machine** | [`07-ssh-transport.md`](07-ssh-transport.md) (SSH); [`04-web-and-bridge.md`](04-web-and-bridge.md) only for the optional LAN bridge |
+| **Understand / extend** the design | [`01-architecture.md`](01-architecture.md) → [`03-research-findings.md`](03-research-findings.md) (`02` is the historical agenda) |
+
+All pages, in order: `00` overview · `01` architecture · `02` research agenda · `03` findings · `04` web +
+bridge · `05` driving input · `06` agent loop · `07` SSH · `08` parity kit · `09` work-cycle loop.

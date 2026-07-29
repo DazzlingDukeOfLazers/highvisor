@@ -1,4 +1,4 @@
-# highvisor — research findings & stack recommendation
+# highvisor research — desktop automation & background window control (macOS & Windows)
 
 Answers to `02-research-agenda.md`, with the reasoning that leads to a stack.
 Sources are listed at the bottom. Dated 2026-07-27.
