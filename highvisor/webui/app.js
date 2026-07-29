@@ -197,10 +197,11 @@ async function pickOption(btn) {
   btn.parentElement.querySelectorAll(".pend-opt").forEach(x => x.classList.remove("picked"));
   btn.classList.add("picked");
   await post("/pick", { fp, src, q, opt, label, summary });
-  // debounced auto-submit: press Return ~1.8s after the LAST pick, so multi-question asks
-  // accumulate all answers before one send.
+  // debounced auto-submit: ~1.8s after the LAST pick, send the answer AND clear this pending opcode
+  // (it was answered directly, so it should not linger or be forwardable to its target). Multi-question
+  // asks keep resetting the timer, so all answers accumulate before the one send+clear.
   clearTimeout(pickSubmitTimer);
-  pickSubmitTimer = setTimeout(() => post("/pick_submit", { src }), 1800);
+  pickSubmitTimer = setTimeout(() => { post("/pick_submit", { src, fp }); refreshPending(); }, 1800);
 }
 
 // Draggable column splitters: dragging a gutter sets --cw-left / --cw-mid (px); right col is 1fr.

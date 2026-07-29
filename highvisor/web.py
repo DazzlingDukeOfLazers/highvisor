@@ -129,6 +129,14 @@ def make_web_server(engine, bus, bridge=None, orchestrator=None,
                         submitted = res.get("ok")
                     except Exception as e:
                         bus.publish("orch", msg="pick submit failed: %s" % e)
+                    # The ask was answered directly (picks sent to the asker), so REMOVE it from pending —
+                    # it should not linger or be forwardable to its target. `deny` drops it without delivering.
+                    fp = req.get("fp")
+                    if fp:
+                        try:
+                            orchestrator.act(fp, "deny")
+                        except Exception:
+                            pass
                 return self._send(200, json.dumps({"ok": True, "submitted": submitted}))
             if self.path == "/shutdown":
                 # localhost-only cockpit -> local off switch. Reply first, then exit
