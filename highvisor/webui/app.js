@@ -26,7 +26,7 @@ async function refreshWindows() {
   const res = await rpc("list_targets");
   const ul = $("windows");
   ul.innerHTML = "";
-  if (!res.ok) { ul.innerHTML = `<li class="bad">${res.error || "error"}</li>`; return; }
+  if (!res.ok) { ul.innerHTML = `<li class="bad">${res.error || "error"}</li>`; updateUserTestStatus([]); return; }
   for (const t of res.targets) {
     const li = document.createElement("li");
     if (t.focused) li.classList.add("foc");
@@ -36,6 +36,7 @@ async function refreshWindows() {
     li.onclick = () => shoot(t.id, t.title || t.id);
     ul.appendChild(li);
   }
+  updateUserTestStatus(res.targets);
 }
 
 async function shoot(target, label) {
@@ -119,45 +120,86 @@ async function saveLayout() {
   if (res.ok) { $("savename").value = ""; await refreshLayouts(); $("layoutsel").value = name; showLayoutDesc(); }
 }
 
-// One-click user-testing setup: put the Raves window and the Caves of Qud window
-// at 1920×1080 each, side by side, on the roomiest monitor (so a tester sees a
-// standard, non-overlapping pair). Falls back to stacked, then best-effort, when
-// no single display fits two 1080p windows across.
+// Split the open windows into the Raves side and the Caves-of-Qud side. Qud is
+// matched first (owns "caves"); Raves is any "raves" window that isn't the Qud
+// one — so it works for both the dev-run ("Raves of Qud (DEBUG)") and the
+// exported build ("raves-of-qud"). Returns arrays so callers can spot duplicates.
+function classifyRavesQud(targets) {
+  const hay = (t) => ((t.title || "") + " " + (t.class_name || "")).toLowerCase();
+  const list = targets || [];
+  const qud = list.filter(t => /caves|cavesofqud|\bcoq\b/.test(hay(t)));
+  const raves = list.filter(t => /raves/.test(hay(t)) && !qud.includes(t));
+  return { raves, qud };
+}
+
+function _label(t) { return t.title || t.class_name || t.id; }
+
+// Duplicate checker: reflect whether exactly one Raves and one Qud are open,
+// and flag duplicates (which would make the arrange button ambiguous).
+function updateUserTestStatus(targets) {
+  const el = $("uttest-status");
+  if (!el) return;
+  const { raves, qud } = classifyRavesQud(targets);
+  const dup = raves.length > 1 || qud.length > 1;
+  const missing = raves.length === 0 || qud.length === 0;
+  if (dup) {
+    const parts = [];
+    if (raves.length > 1) parts.push(`${raves.length}× Raves`);
+    if (qud.length > 1) parts.push(`${qud.length}× Qud`);
+    el.className = "uttest-status warn";
+    el.textContent = `⚠ duplicate windows (${parts.join(", ")}) — close extras`;
+  } else if (missing) {
+    el.className = "uttest-status muted";
+    el.textContent = `need both: Raves ${raves.length ? "✓" : "✗"} · Qud ${qud.length ? "✓" : "✗"}`;
+  } else {
+    el.className = "uttest-status okline";
+    el.textContent = "Raves ×1 · Qud ×1 ✓";
+  }
+}
+async function refreshUserTestStatus() {
+  const r = await rpc("list_targets");
+  if (r.ok) updateUserTestStatus(r.targets);
+}
+
+function _dupMessage(raves, qud) {
+  const lines = [];
+  if (raves.length === 0) lines.push("• No Raves window found.");
+  else if (raves.length > 1)
+    lines.push(`• ${raves.length} Raves windows:\n    - ` + raves.map(_label).join("\n    - "));
+  if (qud.length === 0) lines.push("• No Caves of Qud window found.");
+  else if (qud.length > 1)
+    lines.push(`• ${qud.length} Caves of Qud windows:\n    - ` + qud.map(_label).join("\n    - "));
+  return "Can't arrange — need exactly one Raves and one Caves of Qud window.\n\n"
+    + lines.join("\n") + "\n\nClose the extra window(s) and try again.";
+}
+
+// One-click user-testing setup: Raves in the UPPER-RIGHT quadrant, Caves of Qud
+// in the LOWER-RIGHT, 1920×1080 each (right-edge aligned in the right half — the
+// same placement the responsive parity test uses). Refuses to run on duplicates.
 async function userTestLayout() {
   const btn = $("usertest");
+  const [wins, disps] = await Promise.all([rpc("list_targets"), rpc("displays")]);
+  if (!wins.ok) { alert("list_targets failed: " + (wins.error || "?")); return; }
+  const { raves, qud } = classifyRavesQud(wins.targets);
+  if (raves.length !== 1 || qud.length !== 1) {
+    updateUserTestStatus(wins.targets);
+    alert(_dupMessage(raves, qud));
+    return;
+  }
   btn.disabled = true;
   try {
-    const [wins, disps] = await Promise.all([rpc("list_targets"), rpc("displays")]);
-    if (!wins.ok) throw new Error(wins.error || "list_targets failed");
-    const hay = (t) => ((t.title || "") + " " + (t.class_name || "")).toLowerCase();
-    // Qud first (matches "caves"); Raves is any raves window that ISN'T the Qud one.
-    const qud = wins.targets.find(t => /caves|cavesofqud|\bcoq\b/.test(hay(t)));
-    const raves = wins.targets.find(t => /raves/.test(hay(t)) && (!qud || t.id !== qud.id));
-    if (!raves || !qud) {
-      alert("Need both a Raves window and a Caves of Qud window open to arrange them.");
-      return;
-    }
     const W = 1920, H = 1080;
     const displays = (disps.ok && disps.displays && disps.displays.length)
-      ? disps.displays : [{ x: 0, y: 0, w: 2 * W, h: H }];
+      ? disps.displays : [{ x: 0, y: 0, w: 2 * W, h: 2 * H }];
+    // A stacked right-half pair needs a full-height column: width >= W and
+    // height >= 2H. Prefer the roomiest such display; else the largest overall.
     const byArea = displays.slice().sort((a, b) => b.w * b.h - a.w * a.h);
-    const across = byArea.find(d => d.w >= 2 * W && d.h >= H);
-    const stack = byArea.find(d => d.w >= W && d.h >= 2 * H);
-    let r, q;
-    if (across) {
-      const x0 = across.x + Math.floor((across.w - 2 * W) / 2);
-      const y0 = across.y + Math.floor((across.h - H) / 2);
-      r = [x0, y0]; q = [x0 + W, y0];
-    } else if (stack) {
-      const x0 = stack.x + Math.floor((stack.w - W) / 2);
-      const y0 = stack.y + Math.floor((stack.h - 2 * H) / 2);
-      r = [x0, y0]; q = [x0, y0 + H];
-    } else {                                   // best effort: both at the biggest display's origin
-      const d = byArea[0];
-      r = [d.x, d.y]; q = [d.x, d.y];
-    }
-    await rpc("move", { target: raves.id, x: r[0], y: r[1], w: W, h: H, topmost: false });
-    await rpc("move", { target: qud.id, x: q[0], y: q[1], w: W, h: H, topmost: false });
+    const d = byArea.find(x => x.w >= W && x.h >= 2 * H) || byArea[0];
+    const x = d.x + Math.max(0, d.w - W);          // right-edge aligned -> right half
+    const yTop = d.y;                              // upper-right quadrant
+    const yBot = d.y + Math.floor(d.h / 2);        // lower-right quadrant
+    await rpc("move", { target: raves[0].id, x, y: yTop, w: W, h: H, topmost: false });
+    await rpc("move", { target: qud[0].id, x, y: yBot, w: W, h: H, topmost: false });
     await refreshWindows();
   } catch (e) {
     alert("user-test layout failed: " + (e.message || e));
@@ -399,6 +441,7 @@ async function init() {
   checkStale();
   setInterval(refreshPeers, 4000);
   setInterval(refreshPending, 3000);
+  setInterval(refreshUserTestStatus, 3000);   // live Raves/Qud duplicate checker
   setInterval(checkStale, 5000);
 }
 init();
