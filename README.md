@@ -1,119 +1,107 @@
-# highvisor
+# highvisor — desktop automation for a single app, even unfocused
 
-A local supervisor for the desktop UI layer. highvisor observes and controls
-native desktop applications on Windows and macOS over a small, brain-agnostic
-RPC — so a Claude/OpenAI/scripted "brain" can drive real apps to speed up and
-focus debug loops.
+**highvisor lets scripts and AI agents inspect, capture, and control a specific macOS or Windows app —
+even when that app is not in the foreground.** One local CLI/RPC gives you background window control,
+screenshot capture, accessibility inspection (macOS AX / Windows UI Automation), synthetic input, and
+cross-app visual-regression (screenshot diff / golden-image) testing.
 
-Named after "hypervisor": it sits above the desktop and coordinates what runs on
-it. See [`docs/`](docs/) for the full design.
+Named after "hypervisor": it sits above the desktop and coordinates what runs on it.
 
-## Status
+## Quickstart (about a minute)
 
-Both backends built. Windows verified end-to-end; the **macOS backend** is
-implemented and heavily exercised — window capture/move/dock, AX inspect, Vision
-OCR, and the synthetic-input tier ladder incl. the Unity/Qud click (`--hover`) —
-driving Caves of Qud + Godot apps for the visual-parity kit (`docs/08-parity-kit.md`).
-See `docs/03-research-findings.md`.
+Requires **Python ≥ 3.9**. On **macOS**, grant the terminal running highvisor two permissions in
+*System Settings → Privacy & Security*: **Accessibility** (for inspection/input) and **Screen Recording**
+(for capture) — highvisor raises a precise error telling you which is missing.
 
-## Architecture (one paragraph)
+```bash
+pip install -e .        # installs Pillow + the per-OS backends (pyobjc on macOS, uiautomation on Windows)
+hvd                     # start the daemon (control on 127.0.0.1:48720)  — or: python -m highvisor.server
+hv ls                   # list windows:  win:<id>  pid=…  W×H  <title>
+hv shot '<title>' shot.png     # capture one window (works while it's unfocused) → shot.png
+hv activate '<title>'          # or drive it: click / text / key (see below)
+```
 
-Four layers: **brain adapters** → **CLI/clients** → **core daemon** (RPC server +
-single-threaded action queue) → **per-OS `PlatformBackend`** (observe + act).
-Everything OS-specific lives behind the `PlatformBackend` seam. The daemon speaks
-framed JSON over localhost TCP (`127.0.0.1:48720`). See
-[`docs/01-architecture.md`](docs/01-architecture.md).
+`<target>` is a window ref — `win:38599`, `pid:1234`, or a title substring.
 
-### Background control (the hard part)
+## What works now
 
-highvisor tries to act on **unfocused** windows via a tier ladder, reporting which
-tier actually delivered each action:
+Verified on macOS (this machine, 2026-07-28); the Windows backend is implemented and exercised end-to-end.
+
+| Capability | Command | macOS | Windows |
+|---|---|---|---|
+| List / find windows | `hv ls` | ✅ | ✅ |
+| Capture an **unfocused** window | `hv shot` | ✅ (CoreGraphics/ScreenCaptureKit) | ✅ (PrintWindow/DWM) |
+| Accessibility inspect | `hv inspect` | ✅ AX | ✅ UI Automation |
+| Move / resize / dock / stack | `hv move` `dock` `stack` | ✅ | ✅ |
+| Synthetic input | `hv click` `text` `key` | ✅ (incl. Unity/Qud `--hover` click) | ✅ |
+| OCR a window | `hv ocr` | ✅ (Vision) | — (macOS only) |
+| Visual parity / golden regression | `hv scene` `diff` `parity` | ✅ | ✅ |
+
+**Background control is the hard part**, and it's tiered — highvisor reports which tier actually delivered:
 
 | tier | mechanism | focus? |
 |------|-----------|--------|
 | 1 | accessibility action (UIA pattern / AX action) | background, semantic |
-| 2 | window message post (`WM_SETTEXT` / `PostMessage`) | background, syntactic |
+| 2 | window message post (`PostMessage` / `WM_SETTEXT`) | background, syntactic |
 | 3 | cooperative hook (target polls our channel) | background, opt-in |
-| 4 | activate + global input (`SendInput` / `CGEvent`) | steals focus |
+| 4 | activate + global input (`SendInput` / `CGEvent`) | steals focus; broadest but target-dependent |
 
-## Install
+## Choose your workflow
 
-```
-pip install -e .
-```
+| I want to… | Start here |
+|---|---|
+| Control / capture **one app** | the Quickstart above → [`docs/05-driving-input.md`](docs/05-driving-input.md) |
+| **Compare two apps** / catch UI regressions | [`docs/08-parity-kit.md`](docs/08-parity-kit.md) |
+| **Coordinate AI agents** (Claude ↔ ChatGPT) | [`docs/06-agent-loop.md`](docs/06-agent-loop.md), [`docs/09-work-cycle.md`](docs/09-work-cycle.md) |
+| Reach **another machine** | [`docs/07-ssh-transport.md`](docs/07-ssh-transport.md) (SSH), [`docs/04-web-and-bridge.md`](docs/04-web-and-bridge.md) (optional LAN bridge) |
+| Understand / extend the design | [`docs/01-architecture.md`](docs/01-architecture.md) → [`docs/03-research-findings.md`](docs/03-research-findings.md) |
 
-Dependencies: `pillow`, plus `uiautomation` on Windows.
+## How it works
 
-## Usage
+Four layers: **brain adapters** → **CLI/clients** → **core daemon** (RPC server + single-threaded action
+queue) → **per-OS `PlatformBackend`** (observe + act). Everything OS-specific lives behind the
+`PlatformBackend` seam. The daemon speaks dependency-free framed JSON over localhost TCP
+(`127.0.0.1:48720`) — any language can drive it in a few lines. See [`docs/01-architecture.md`](docs/01-architecture.md).
 
-Start the daemon:
+The CLI (`<target>` = window ref):
 
-```
-python -m highvisor.server      # or: hvd
-```
-
-Drive it with the CLI client (`<target>` is a window ref — `hwnd:0x1a2b`,
-`pid:1234`, or a title substring):
-
-```
-hv ping
-hv ls
-hv shot <target> [out.png]
-hv text <target> <string...>
-hv key <target> <keys>
-hv activate <target>
-hv inspect <target> [depth]
-hv raw '{"op":"ping"}'
+```bash
+hv ping · ls · shot <t> [out.png] · click [--hover] <t> x y · text <t> <str> · key <t> <keys>
+hv activate <t> · move <t> … · inspect <t> [depth] · ocr <t> · probe --app qud · raw '{"op":"ping"}'
 ```
 
-The protocol is dependency-free framed JSON (`highvisor/protocol.py`), so any
-language can speak it in a few lines.
+## Visual parity & regression
 
-### Visual parity & regression
+Drive two apps to the same screen, localize where they differ, and catch layout regressions — the
+toolchain built to bring a reconstruction 1:1 with its source (Raves of Qud vs Caves of Qud):
 
-Drive two apps to the same screen, localize where they differ, and catch layout
-regressions — the toolchain built to bring a reconstruction 1:1 with its source
-(Raves of Qud vs Caves of Qud):
-
-```
-hv probe --app qud                     # off / menu / in-game
-hv diff a.png b.png --regions          # match % + WHERE they diverge (+ annotated)
-hv text-diff CavesOfQud "Raves of Qud" # OCR word-level content gaps (rough)
-hv parity-sweep A B --regions          # compare across window sizes
-hv scene mods --parity --text          # drive BOTH + diff live vs the reference
-hv scene --all --bless                 # lock goldens;  hv scene --all  to regress
+```bash
+hv scene mods --parity --text   # drive BOTH apps + diff live vs the reference (match% + WHERE + side-by-side)
+hv scene --all --bless          # lock goldens;  hv scene --all  re-checks for regressions
+hv diff a.png b.png --regions   # ad-hoc screenshot diff: match% + ranked divergence + annotated image
 ```
 
-See [`docs/08-parity-kit.md`](docs/08-parity-kit.md) for the workflows, the scenes
-file format, and the gotchas (the `--hover` click, matched sizes, OCR limits).
+Full workflows, the scenes-file format (incl. the `shell` setup step), and gotchas (the `--hover` click,
+matched sizes, OCR limits) are in [`docs/08-parity-kit.md`](docs/08-parity-kit.md).
 
-## Notepad golem (structural reconstruction demo)
+## Requirements
 
-`tools/gen_notepad_depth.py` turns a captured window into a runnable **golem** —
-a Godot reconstruction that reflows like the source. It reads a UIA tree (`hv
-inspect`) plus a capture (`hv shot`) and emits a small Godot 4.7 project whose
-layout, fills, menus, and flyouts mirror Windows 11 Notepad. Fixtures for the
-demo ship in `tools/fixtures/`, so it regenerates the same golem on macOS or
-Windows with no capture step:
+- **Python ≥ 3.9.**
+- **macOS:** `pyobjc` frameworks (installed by `pip install -e .`); TCC grants for **Accessibility** and
+  **Screen Recording** on the host process (the terminal, not the Python binary).
+- **Windows:** `uiautomation` (installed by `pip install -e .`).
 
-```
-python tools/gen_notepad_depth.py                 # -> ./notepad_golem
-python tools/gen_notepad_depth.py --out /tmp/golem # custom output dir
-```
+## Demo: the Notepad golem
 
-Flags: `--tree`, `--png`, `--out`, `--scale` (physical/logical DPI ratio; the
-bundled capture is 200 % → `2`). Requires `pillow` (already a dependency).
+`tools/gen_notepad_depth.py` turns a captured window into a runnable **golem** — a Godot reconstruction
+that reflows like the source — from a UIA tree (`hv inspect`) + a capture (`hv shot`). Bundled fixtures
+regenerate it with no capture step: `python tools/gen_notepad_depth.py` → `./notepad_golem`, then open in
+Godot 4.7. Because the golem's popups are Controls drawn *inside* the window, `hv shot` captures them, so
+you can verify hover/click states over the same RPC without stealing focus. Details in the script header.
 
-Open the generated project in Godot 4.7:
+## Docs & origin
 
-```
-# macOS
-/Applications/Godot.app/Contents/MacOS/Godot --path notepad_golem
-
-# Windows
-Godot_v4.7.1-stable_win64.exe --path notepad_golem
-```
-
-The golem's popups are Godot Controls drawn *inside* the window, so `hv shot`
-(PrintWindow-backed) captures them — you can verify hover/click states over the
-same RPC, without stealing focus.
+[`docs/`](docs/) has the full design, numbered `00`–`09` (start at [`00-overview.md`](docs/00-overview.md)
+for the task-oriented map). highvisor generalizes the per-project debug loop first built for
+[raves-of-qud](https://github.com/DazzlingDukeOfLazers/raves-of-qud) (a Godot viewer for Caves of Qud) into
+one reusable service.
