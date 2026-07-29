@@ -7,8 +7,11 @@ else. Dated 2026-07-28, verified on macOS against Caves of Qud (Unity, build
 
 ## The tier ladder (recap)
 
-Every act reports which delivery path actually worked (`ActionResult.tier`), so we
-learn each app's real capabilities:
+Every act reports **the path highvisor used** (`ActionResult.tier`), so we learn each app's real
+capabilities. `ok:true` means the backend **completed that delivery attempt without an API-level error** —
+it is *not* proof the target reacted. For semantic AX/UIA actions (tier 1) that's strong evidence; for raw
+mouse/key posting (tiers 2/4) confirm the effect with a screenshot, an AX value, OCR, or a target-specific
+state probe. The tiers:
 
 1. **accessibility action** — UIA pattern / AX `AXPress`/`AXSetValue`. Background,
    semantic, the only *reliable* unfocused path. Requires the app to expose an a11y
@@ -37,7 +40,14 @@ character creation).
 ## Mouse — and the click-state gotcha
 
 `click(target, x, y, button, double)` — `hv click <target> <x> <y>` — coordinates
-are **window-relative** (added to the window's screen origin). It:
+are **window-relative** (added to the window's screen origin).
+
+> **`click` steals focus — it is not a background action.** It calls `activate(target)` first (a click on
+> a background app should focus it), so it is a **tier-4** path. Background *mouse* control would need a
+> semantic AX action or a cooperative target path; coordinate clicking is not that. (Background *keyboard*
+> to some apps works via `key` tier 2; mouse does not.)
+
+It:
 
 1. **Warps the real OS cursor** to the point (`CGWarpMouseCursorPosition`). Unity
    reads the *actual* cursor position for hover, so the warp is what makes the
@@ -88,8 +98,10 @@ a contradiction: bare wins for plain Unity buttons and world cells (a pre-move g
 `--hover` — a real `mouseMoved` before the bare click — is what the legacy popups (and sometimes the title
 menu) need. When unsure, try bare, screenshot, and escalate to `--hover` only if the highlight didn't move.
 
-**Rule of thumb for closed engines: drive them by mouse, not keys.** Position with a
-cursor warp, click with a bare down/up, and never decorate the event.
+**Rule of thumb for closed engines: drive them by mouse, not keys.** Position with a cursor warp and start
+with a **bare** down/up. Add `--hover` (a real mouse-moved) **only** for a surface whose readback proves it
+needs one (legacy popups do; world cells reject it); **never add click-state metadata for Qud.** Posting the
+event is not proof it registered — screenshot and confirm.
 
 ## Recipe: Caves of Qud, title → in-game
 

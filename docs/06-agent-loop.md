@@ -29,8 +29,9 @@ operations are approved or denied; after approval highvisor **drives** the targe
    you approve it (or its lane is pre-approved).
 4. **drive** — type a message into the target's composer + submit (`ask`), or click
    Claude's Approve/Deny buttons (`approve`/`deny`).
-5. the target replies; its reply is read next cycle. **Approved ≠ delivered** — see
-   §Delivery is best-effort.
+5. the target replies; its reply is read next cycle. Three distinct states — **approved** (the gate
+   authorized it) → **posted** (the backend accepted the input events) → **confirmed** (readback showed
+   the target reacted). highvisor establishes at most *posted*; see §Delivery is best-effort.
 
 ## Opcode grammar
 
@@ -62,10 +63,14 @@ operations are approved or denied; after approval highvisor **drives** the targe
   is one key spec, e.g. `return`, `cmd+a`, `esc`. Broader effect than `ask`, so gate
   it carefully. Unknown specs are rejected, not typed literally.
 
-**target** — `<machine>/<agent>`. `mac` is the local machine; the agent maps to a
+**target** — `<machine>/<agent>`. **Only `mac/<agent>` is executable today.** The parser accepts any
+`<machine>` token syntactically, but `Orchestrator.execute()` **rejects** a non-`mac` machine *before*
+gating/execution — it returns `{"ok": false, "error": "remote machine '<x>' not routable"}` and is **never
+silently mapped to a local agent** (`LOCAL_MACHINE = "mac"`; see `orchestrator.py`). The agent maps to a
 window + I/O strategy in the `AGENTS` registry ([`highvisor/orchestrator.py`](../highvisor/orchestrator.py)).
-Remote machines would route over the bridge ([`04-web-and-bridge.md`](./04-web-and-bridge.md));
-only the local `mac/*` route is implemented/tested today.
+Cross-*machine* routing is **planned over SSH** ([`07-ssh-transport.md`](./07-ssh-transport.md)) — the
+tunnel exposes a remote daemon's RPC, which is a separate thing from the orchestrator routing a
+machine-qualified opcode — **not** the plaintext LAN bridge.
 
 ## Reading: AX vs OCR
 
@@ -118,14 +123,19 @@ watcher **primes** on start (marks everything on-screen as already-seen) so
 scrollback isn't replayed. Consequence: two *intentionally identical* asks dedup to
 one within a session — vary the body to repeat.
 
-## Delivery is best-effort
+## Delivery is best-effort — posted ≠ confirmed
 
-An approved operation is not a confirmed delivery. `deliver`/`press` return
-`{ok, error}` and publish an `exec …` line to the log; a missing window, an
-un-found composer, or (for `approve`/`deny`) no on-screen prompt returns `ok:false`.
-There is **no automatic retry**, so a failed op will not silently look like a closed
-loop — but re-issuing an `ask` after a partial failure can duplicate it. Watch the
-log line, not just the approval.
+An approved operation is not a confirmed delivery. `deliver()` now **propagates the actual OS-call
+results** instead of reporting blind success: it returns `{ok, posted, submitted, note: "posted !=
+confirmed (no readback)"}`, where `ok` is true only when text insertion **and** (if submitting) the
+submit-key post each returned `ok:true`. So an `ask` succeeds only when composer location + text insertion
++ submit each post cleanly — but that confirms highvisor **posted** the events, not that the target agent
+**processed** the message. End-to-end confirmation still requires observing the reply next cycle.
+
+Partial failures are visible, not swallowed: if text inserts but submit fails you get
+`{ok:false, posted:true, submitted:false, …}`. There is **no automatic retry** — and because a partial
+`ask` already typed the body, **blindly re-issuing it can duplicate the text**. Watch the `exec …` log
+line (and the structured result), not just the approval.
 
 ## Try it
 

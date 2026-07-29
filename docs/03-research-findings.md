@@ -7,10 +7,10 @@ Sources are listed at the bottom. Dated 2026-07-27.
 
 | decision | choice | why | current status |
 |---|---|---|---|
-| Runtime | **Python** | the only ecosystem with mature native a11y on **both** OSes (Win UIA + macOS AX); matches `control.py` | implemented (both backends) |
+| Runtime | **Python** | best verified coverage for V1 — one runtime reaches Win UIA + macOS AX; matches `control.py` | implemented (both backends) |
 | Transport | **framed JSON / TCP** | dependency-free localhost RPC any language can speak | implemented |
 | Background action | **AX / UIA first**, then message-post → cooperative hook → global input | semantic + target-specific; degrade only when needed | **partial by app** — verify delivery per target |
-| Capture | OS window capture (CGWindowList/ScreenCaptureKit; PrintWindow/DWM) | grabs a specific **unfocused** window | implemented (macOS verified) |
+| Capture | per-window OS capture | grabs a specific **unfocused** window | **implemented:** macOS `CGWindowListCreateImage` (verified); Windows `PrintWindow(PW_RENDERFULLCONTENT)` (window) + `BitBlt` (full screen). ScreenCaptureKit / DWM thumbnails / `Windows.Graphics.Capture` are **researched alternatives, not wired** |
 
 **The evidence below varies in strength** — official API docs, third-party reports, and highvisor's own
 live verification. Treat fast-moving product claims (e.g. Codex / computer-use tooling) as **industry
@@ -27,17 +27,13 @@ signal, not implementation evidence**; the load-bearing conclusions are the ones
   (AccessKit looks like it would, but it's the *provider* side — it helps a UI
   toolkit *expose* accessibility, not drive *other* apps.) We hand-roll one
   `Element` model over two native trees.
-- **Python is the recommended runtime for the V1 daemon** — it is the only
-  ecosystem with mature *native accessibility* bindings on **both** OSes
-  (`pywinauto`/`uiautomation` → Windows UIA; `pyobjc`/`atomacos` → macOS AX),
-  plus it matches the existing `control.py` tooling. Drop to a native helper
-  (Swift / C#) per-OS later only if perf or permissions force it.
-- **The industry just validated this bet.** OpenAI's Codex "computer use" (2026)
-  moved from pixel screenshots to a **window-focused accessibility tree** and
-  jumped 62% → 80% task pass rate while cutting tokens 34%; on **macOS it runs
-  agents in the *background*, in parallel, via the a11y tree** (undocumented
-  Apple APIs) while the human keeps working. On **Windows it's foreground-takeover
-  only.** Lesson: our accessibility-first, background-capable design is the right
+- **Python is the recommended runtime for the V1 daemon** — it gave the best verified coverage here: one
+  runtime reaches *native accessibility* on **both** OSes (`pywinauto`/`uiautomation` → Windows UIA;
+  `pyobjc`/`atomacos` → macOS AX), and it matches the existing `control.py` tooling. Drop to a native
+  helper (Swift / C#) per-OS later only if perf or permissions force it.
+- *(Market signal, not implementation evidence — see the market-notes below.)* Contemporary
+  computer-use agents also moved from pixel screenshots toward window-focused accessibility trees, which
+  is consistent with our accessibility-first, background-capable design being the right
   frontier — and Windows background will be the harder half.
 
 ## Q1 — Background control feasibility (the decider)
@@ -65,11 +61,11 @@ signal, not implementation evidence**; the load-bearing conclusions are the ones
   `pyobjc` / `atomacos`. → **Tier 1, and cleaner than Windows here.**
 - **`CGEventPostToPid`** targets a pid; effectiveness varies and often still
   wants activation. → **Tier 2.**
-- **Caveats:** TCC gates everything — needs **Accessibility** grant (detect via
-  `AXIsProcessTrusted()`), **Screen Recording** for capture, **Input Monitoring**
-  for global events; some app queries fail with `.cannotComplete` even when
-  trusted; `activate` semantics changed in macOS 14 (`activate(options:)`
-  deprecated → yield-activation model).
+- **Caveats:** TCC gates everything — **Accessibility** gates inspection **and** synthetic control (detect
+  via `AXIsProcessTrusted()`); **Screen Recording** gates capture. (Input Monitoring governs *observing*
+  input, which highvisor doesn't do — don't add it as a requirement unless a current backend op proves it
+  necessary.) Some app queries fail with `.cannotComplete` even when trusted; `activate` semantics changed
+  in macOS 14 (`activate(options:)` deprecated → yield-activation model).
 
 **Verdict:** accessibility-first on both OSes; message-posting as a per-app
 tier-2; `activate + global input` as tier-4; **cooperative hook** (tier 3) for
@@ -86,6 +82,10 @@ apps we own the source of.
   as fallback on older OSes.
 - Both can capture unfocused/occluded windows — observation is *easier* than
   action for the background case.
+- **Shipped choice:** highvisor implements the *legacy/simplest* per-window path — macOS
+  `CGWindowListCreateImage`, Windows `PrintWindow(PW_RENDERFULLCONTENT)` (+ `BitBlt` for full screen). The
+  modern options above (ScreenCaptureKit, `Windows.Graphics.Capture`, DWM thumbnails) are researched
+  swap-ins behind the backend seam, not yet wired.
 
 ## Q2/Q3 — Libraries and language
 
@@ -97,9 +97,9 @@ apps we own the source of.
 | Rust / enigo + xcap | ❌ global input only | ✅ | Single binary, but a11y = hand-write UIA+AX FFI now (AccessKit is provider-side). High effort. |
 | Java / SikuliX, Robot Framework | image-based, global | ✅ | Heavy JVM; no semantic background. |
 
-**Recommendation:** **Python** core daemon for V1. It is the only runtime that
-reaches *native accessibility* (the sole reliable background path) on **both**
-Windows and macOS without writing FFI from scratch. Accept the packaging cost;
+**Recommendation:** **Python** core daemon for V1 — the strongest verified fit here: it reaches *native
+accessibility* (the most reliable background path) on **both** Windows and macOS without writing FFI from
+scratch. Accept the packaging cost;
 keep a clean `PlatformBackend` seam so a per-OS native helper (Swift for AX +
 ScreenCaptureKit, C#/FlaUI for UIA) can replace the Python backend later if
 latency or permissions demand it — without touching the RPC vocabulary.
@@ -148,25 +148,23 @@ lanes until there's a real use case.
 | Electron/Chromium a11y off | Detect empty tree; document `--force-renderer-accessibility`; fall back to pixels+global. |
 | Python daemon packaging (native deps, two OSes) | Pin to a venv/PyInstaller build per OS; keep backend behind an interface so a native helper can replace it. |
 
-## Recommended next step — Slice 0 spike
+## Spike result & the next research question
 
-Smallest proof the premise holds, before building the engine:
+The Slice-0 spike ("screenshot one specific window + deliver one input to it while UNFOCUSED, both OSes,
+via the native path") is **complete** — the daemon, backends, and per-app tier matrix were built on it. What
+this doc should now carry is the *evidence of record*, not the plan:
 
-> **Screenshot one specific window + deliver one keystroke to it while it is
-> UNFOCUSED — on both Windows and macOS — using the accessibility/native path.**
+> **Record the actual apps + OS versions and which capture/input tiers were verified.** macOS was verified
+> on this machine (2026-07-28) against Caves of Qud (Unity) and Godot — per-window `CGWindowListCreateImage`
+> capture unfocused, AX actions tier 1, and the bare-click path into Unity. Windows code paths
+> (`PrintWindow`/`BitBlt`, UIA) are **implemented**; mark each capability "verified" only with the tested
+> Windows version + app + date.
 
-- Windows: `uiautomation`/`pywinauto` → find window, `InvokePattern` or
-  `PostMessage(WM_CHAR)`; capture via `PrintWindow`.
-- macOS: `pyobjc`/`atomacos` → `AXUIElement` `AXPress`/`AXSetValue`; capture via
-  ScreenCaptureKit single-window.
-- Success = the target reacts and the capture reflects it **without** the window
-  coming to the foreground. Record which tier worked per app (Godot viewer, a
-  text editor, a browser) to seed the per-app capability matrix.
-
-If Slice 0 passes on both OSes, build the daemon (RPC + backend interface) around
-the tiers. If Windows background proves as hard as Codex's foreground-only
-shipping suggests, lean on the **cooperative hook** for owned targets (Godot) and
-accept activate+global for the rest — and say so explicitly in V1 scope.
+The next research question is therefore **the first still-unverified capability** (e.g. Windows background
+input against a real app, or a GPU-accelerated-window capture that `PrintWindow` returns black for) — not
+rebuilding Slice 0. Where Windows background input proves as hard as the foreground-only prior art suggests,
+lean on the **cooperative hook** for owned targets (Godot) and accept activate+global for the rest — and say
+so explicitly in scope.
 
 ---
 

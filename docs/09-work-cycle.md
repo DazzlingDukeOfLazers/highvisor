@@ -29,8 +29,9 @@ Change the loop by changing this list.
    pattern (Raves settings). Re-bless only on an *intended* visual change.
 
 6. **Document + update memory.** Repo docs (`CLAUDE.md`, `docs/*`, READMEs) and memory files (project state,
-   feedback, non-obvious facts — not what the repo already records). **Commit + push each round once it builds**,
-   after the allspice author guard (`git log … | grep -i allspice` empty).
+   feedback, non-obvious facts — not what the repo already records). **Commit + push each round only after
+   the relevant build, targeted tests, and a visual/readback check pass** (not merely "it builds") — then the
+   allspice author guard (`git log --all --format='%ae' | grep -i allspice` must print nothing).
 
 7. **Hand off to ChatGPT for a documentation review.** Emit the [opcode](#step-7-the-chatgpt-doc-review-handoff)
    so highvisor delivers the review request to ChatGPT. ChatGPT reviews the active projects' docs, returns
@@ -64,9 +65,11 @@ propose improvements. Assume editorial control; I'll read everything and split t
 hv: END
 ```
 
-(Remote ChatGPT would be `floorputer/chatgpt` instead of `mac/chatgpt`. ChatGPT-web can't write disk directly,
-so its output comes back as labeled blocks — Claude saves them to the paths above; the bridge context-handoff
-automates the copy where available.)
+(Only `mac/*` is executable today — the orchestrator rejects a non-`mac` machine token. A remote
+`floorputer/chatgpt` is a *planned* routing target, not a working one; cross-machine use currently means a
+direct RPC/CLI call over an SSH tunnel, not machine-qualified opcode routing. ChatGPT-web can't write disk
+directly, so its output comes back as labeled blocks — Claude saves them to the paths above; the bridge
+context-handoff automates the copy where available.)
 
 ## Per-cycle log (copy per goal)
 

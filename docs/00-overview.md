@@ -1,4 +1,4 @@
-# highvisor — overview
+# highvisor overview: background desktop automation, visual parity, and agent coordination
 
 > A local **supervisor for the desktop UI layer**: one service that can *observe*
 > and *control* native applications on Windows and macOS, driven by a swappable
@@ -23,13 +23,26 @@ Every project rebuilds this. **highvisor is the reusable version.**
 
 ## What it is
 
-A single-machine, localhost-only service that exposes a small, stable vocabulary
-of **observe** and **act** primitives over a CLI + local RPC, plus a **backend
-abstraction** so the same primitives work on Windows and macOS, plus **brain
-adapters** so the caller can be an AI or a script.
+A service whose **control daemon is localhost-only**, exposing a small, stable vocabulary of **observe**
+and **act** primitives over a CLI + local RPC, plus a **backend abstraction** so the same primitives work
+on Windows and macOS. Cross-machine use is **optional and explicit**: an SSH tunnel exposes a remote
+machine's *local* daemon securely, and a **disabled-by-default** LAN bridge carries token-gated
+context/log/screenshot *data* — never control (see [`04`](04-web-and-bridge.md), [`07`](07-ssh-transport.md)).
+
+**Runtime today** — the working path is a watched desktop **orchestrator**, not the API/web brain adapters
+below:
 
 ```
-  brain (swappable)                highvisor                     targets
+  watched desktop agent  ──▶  parser / gate (cockpit)  ──▶  local Engine  ──▶  target window
+  (Claude via AX tree,        human approves each          observe + act        (focused OR
+   ChatGPT via OCR)           opcode / lane                 primitives            background)
+```
+
+The swappable **brain-adapter** architecture (Claude API, OpenAI API, ChatGPT web, sessions) is the
+**planned** design — see [`01-architecture.md`](01-architecture.md):
+
+```
+  brain (PLANNED)                  highvisor                     targets
   ┌───────────────┐   RPC     ┌───────────────────────┐      ┌────────────┐
   │ Claude (API)  │──────────▶│  core engine          │─────▶│ any native │
   │ OpenAI (API)  │           │  - targets/sessions   │ obs  │   app      │
@@ -43,10 +56,11 @@ adapters** so the caller can be an AI or a script.
 - **Interface:** CLI + a local RPC daemon (same spirit as the raves bridge —
   language-agnostic, scriptable, no hard MCP dependency). MCP can wrap the RPC
   later as one more caller.
-- **Driver = pluggable brain.** Control can be switched to Claude, OpenAI, both,
-  or scripted. The first OpenAI hookup may drive the **ChatGPT web interface**
-  rather than the API — so a browser-automation adapter is in scope as a *brain
-  transport*, distinct from controlling desktop *targets*.
+- **Driver = pluggable brain (planned).** The design allows switching control to Claude, OpenAI, both, or
+  scripted. *Historical note (2026-07-27):* the first OpenAI hookup was expected to drive the ChatGPT **web**
+  interface as a *brain transport*. The path that actually shipped is different: the desktop
+  **orchestrator** reads ChatGPT through **OCR** and Claude through the **AX tree** (see
+  [`06-agent-loop.md`](06-agent-loop.md)); the API/web adapters remain unbuilt.
 - **Background / unfocused control is a first-class, must-have requirement**, not
   a stretch goal. This is the single hardest constraint and it drives most of the
   architecture (see `01-architecture.md`). It rules out "just synthesize global
@@ -67,7 +81,8 @@ adapters** so the caller can be an AI or a script.
 ## Non-goals (for now)
 
 - Not a general-purpose RPA / macro product for end users.
-- Not a cloud or multi-machine service — localhost, single box.
+- Not a **cloud-hosted** service — the control daemon is localhost. (Cross-machine use *is* supported, but
+  only via an explicit SSH tunnel or the opt-in data bridge — see "What it is".)
 - Not tied to one target app (the raves bridge was; highvisor is the opposite).
 - Not trying to defeat anti-automation (games with DirectInput, DRM, CAPTCHAs).
   When a target refuses injected input, we fall back to a **cooperative hook**
@@ -102,9 +117,10 @@ started `python -m highvisor.server` first). Everyday commands:
 - `activate win:ID`, `shot win:ID <out.png>`, `click [--hover] win:ID x y`.
 - `probe --app qud` — is a known app off / at its menu / in-game.
 
-If a call throws `OSError: [Errno 49] Can't assign requested address`, that's a
-transient ephemeral-port blip under socket churn — **retry; it is not a config error**
-(the default host is already loopback).
+If a call throws `OSError: [Errno 49] Can't assign requested address`: the default host is already
+loopback, so it is **not** a `--host` config error. `Errno 49` (`EADDRNOTAVAIL`) has several possible
+causes (ephemeral-port exhaustion under churn, a stale bind, a bad address) — **retry first**, and if it
+persists, check that the daemon is up and bound to `127.0.0.1:48720` rather than assuming a single cause.
 
 ## Where to go next — by what you want to do
 

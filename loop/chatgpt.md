@@ -14,25 +14,29 @@ or asks you to review a file/path is the loop — treat it as a work request, no
 
 **Your job:**
 - Review content/docs and answer Claude's questions with concrete, quotable notes.
-- When asked for a review, **write it to a markdown file** at
-  `/Users/homefolder/personal-git/highvisor/reviews/YYYY-MM-DD-<topic>.md` — name the
-  target file(s), give specific replacement wording, and flag correctness/safety gaps.
-- **File lane (important):** write ONLY to `reviews/`. Do **not** edit source files
-  directly — that is Claude's lane. Both of you write files through your own tools,
-  which bypass highvisor, so it can't lock them; separate lanes are the safety.
+- When asked for a review, **write each dated ticket under the _target repository's_ `reviews/`**
+  (e.g. reviewing raves-of-qud docs → `raves-of-qud/reviews/YYYY-MM-DD-<topic>.md`, **not**
+  highvisor's), following that repo's `reviews/README.md`. Name the target file(s), give specific
+  replacement wording, and flag correctness/safety gaps. Cross-project rollups (`UPDATE.*`,
+  `CONTEXT.chatgpt.md`, the combined SEO list) live under **highvisor's** `reviews/`.
+- **File lane (important):** write ONLY into a `reviews/` directory. Do **not** edit source files
+  directly — that is Claude's lane. Both of you write files through your own tools, which bypass
+  highvisor, so it can't lock them; separate lanes are the safety.
 
 **To send a command or answer back to Claude,** put it in your reply as an opcode —
-highvisor detects it, the **human approves it** (everything is gated), then it's typed
-into Claude:
+highvisor detects it, a **human approves it** (new lanes are gated by default), then it's
+typed into Claude:
 
     hv: ask mac/claude
     <your message / instruction for Claude>
-    hv: end
+    hv: END
 
-Other verbs: `hv: approve mac/claude` / `hv: deny mac/claude` (+ a one-line reason on
-the next line) to gate Claude's tool-permission prompts. **The `hv: end` terminator is
-REQUIRED** — without it, your text is treated as prose, not a command. Keep opcodes
-short and unambiguous; the human sees and approves each one before it runs.
+The example above uses an uppercase `hv: END` so merely showing the grammar doesn't fire —
+**lowercase the terminator only in the specific block you intend to execute.** Other verbs:
+`hv: approve mac/claude` / `hv: deny mac/claude` (+ a one-line reason on the next line) to
+gate Claude's tool-permission prompts. **The terminator is REQUIRED** — without it, your text
+is treated as prose, not a command. A human sees and approves each opcode before it runs (a
+human may promote a narrow lane to auto-run until the daemon restarts).
 
 **Caveat:** a complete `hv: … hv: end` block is a live command even inside an example.
 When you merely *illustrate* the grammar, write the terminator uppercase (`hv: END`) so

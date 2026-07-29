@@ -11,7 +11,8 @@ Named after "hypervisor": it sits above the desktop and coordinates what runs on
 
 Requires **Python ≥ 3.9**. On **macOS**, grant the terminal running highvisor two permissions in
 *System Settings → Privacy & Security*: **Accessibility** (for inspection/input) and **Screen Recording**
-(for capture) — highvisor raises a precise error telling you which is missing.
+(for capture). When a call fails for lack of a grant, the failing operation tells you which permission is
+likely missing (capture → Screen Recording; inspect/input → Accessibility).
 
 ```bash
 pip install -e .        # installs Pillow + the per-OS backends (pyobjc on macOS, uiautomation on Windows)
@@ -25,19 +26,25 @@ hv activate '<title>'          # or drive it: click / text / key (see below)
 
 ## What works now
 
-Verified on macOS (this machine, 2026-07-28); the Windows backend is implemented and exercised end-to-end.
+Provenance: **✅ = verified in the named environment** (macOS, this machine, 2026-07-28) · **◐ =
+implemented but not re-verified this pass** (app-dependent) · **— = unavailable**. The Windows code paths
+are implemented; mark an individual Windows capability ✅ only with the tested Windows version + app + date.
+This matters most for unfocused capture and synthetic input, where the app class changes the result.
 
 | Capability | Command | macOS | Windows |
 |---|---|---|---|
-| List / find windows | `hv ls` | ✅ | ✅ |
-| Capture an **unfocused** window | `hv shot` | ✅ (CoreGraphics `CGWindowListCreateImage`) | ✅ (PrintWindow) |
-| Accessibility inspect | `hv inspect` | ✅ AX | ✅ UI Automation |
-| Move / resize / dock / stack | `hv move` `dock` `stack` | ✅ | ✅ |
-| Synthetic input | `hv click` `text` `key` | ✅ (incl. Unity/Qud `--hover` click) | ✅ |
+| List / find windows | `hv ls` | ✅ | ◐ |
+| Capture an **unfocused** window | `hv shot` | ✅ (CoreGraphics `CGWindowListCreateImage`) | ◐ (`PrintWindow(PW_RENDERFULLCONTENT)`; full screen `BitBlt`) |
+| Accessibility inspect | `hv inspect` | ✅ AX | ◐ UI Automation |
+| Move / resize / dock / stack | `hv move` `dock` `stack` | ✅ | ◐ |
+| Synthetic input | `hv click` `text` `key` | ✅ (incl. Unity/Qud `--hover` click) | ◐ |
 | OCR a window | `hv ocr` | ✅ (Vision) | — (macOS only) |
-| Visual parity / golden regression | `hv scene` `diff` `parity` | ✅ | ✅ |
+| Visual parity / golden regression | `hv scene` `diff` `parity` | ✅ | ◐ |
 
-**Background control is the hard part**, and it's tiered — highvisor reports which tier actually delivered:
+**Background control is the hard part**, and it's tiered — highvisor reports **the delivery path it used**
+(below). For semantic AX/UIA actions that's strong evidence; raw `key`/`click` posting is **best-effort**
+until a screenshot or state readback confirms the app actually reacted (posting an event ≠ the app consumed
+it):
 
 | tier | mechanism | focus? |
 |------|-----------|--------|
