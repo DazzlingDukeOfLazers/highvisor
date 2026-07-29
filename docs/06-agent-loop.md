@@ -9,6 +9,11 @@ app. Built on the input/read primitives in [`05-driving-input.md`](./05-driving-
 so they are **not** live opcodes if this doc is ever read inside a watched window —
 see §Try it.)*
 
+> **Use this when** you want to relay short, **human-approved** tasks between two visible desktop agents
+> (e.g. Claude ↔ ChatGPT on one screen). It is **not** a secure message bus or a delivery guarantee.
+> Cross-*machine* agent routing is **planned over SSH** ([`07-ssh-transport.md`](./07-ssh-transport.md)),
+> not the plaintext LAN bridge.
+
 ## The loop
 
     read → parse → gate → drive → reply → repeat

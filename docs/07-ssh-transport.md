@@ -6,9 +6,13 @@ unchanged — only the wire becomes SSH. This supersedes the plaintext LAN bridg
 anything sensitive or off-LAN. (The bridge — [`04-web-and-bridge.md`](./04-web-and-bridge.md)
 — still works for zeroconf LAN peer ops; SSH is the encrypted / cross-network path.)
 
-Real-time **game streaming** is intentionally out of scope here — SSH is TCP and
-stutters on live video. Use Moonlight/Sunshine, Parsec, or Steam Remote Play for
-that (ideally over a Tailscale/WireGuard mesh). SSH is for the control plane.
+> **Quickstart.** If SSH to the host already works (`ssh <host> echo ok`), run `hv tunnel <host>` and
+> point `hv` at the printed local port — done. If SSH is **not** set up, stop and complete the one-time,
+> human-run host setup below first (it needs the host's admin).
+
+Real-time **game streaming** is intentionally out of scope — SSH is TCP and stutters on live video. Use a
+purpose-built low-latency streaming tool for that (ideally over a private WireGuard/Tailscale-style mesh).
+SSH here is only the **control plane**.
 
 ## What it does
 

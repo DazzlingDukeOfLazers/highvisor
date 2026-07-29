@@ -8,6 +8,21 @@ capture → localize where they differ → lock a golden → catch regressions.*
 stays with the human/brain. Dated 2026-07-28, verified on macOS (Qud Unity build
 2.0.211.59, Raves in Godot 4.7).
 
+## Fast path (5 minutes)
+
+Put both apps at a known state, run one parity scene, open the two artifacts it writes, and only
+**bless** once the result is intentionally correct:
+
+```bash
+hv scene mods --parity --config tools/regression/scenes.json    # drives both apps to the "mods" screen
+# writes to tools/regression/_regress/:  mods_sbs.png (side-by-side) + mods_parity.png (annotated diff)
+open tools/regression/_regress/mods_sbs.png                     # eyeball it
+hv scene mods --bless --config tools/regression/scenes.json      # lock the golden — ONLY when it's right
+hv scene --all --config tools/regression/scenes.json             # thereafter: regression-check every scene
+```
+
+Everything below is the reference for each command, the scenes-file format, and the gotchas.
+
 ## The commands
 
 | command | does | side |
