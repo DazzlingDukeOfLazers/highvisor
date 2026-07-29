@@ -343,10 +343,23 @@ def _cmd_text_diff(a):
     _print_json(d)
 
 
-def _run_steps(window, steps):
+def _run_steps(window, steps, cwd=None):
     import time
+    import subprocess
     for st in steps or []:
-        if "move" in st:
+        if "shell" in st:
+            # Run a command before capturing — the hook for data setup (e.g. loading an option preset
+            # so a scene captures a deterministic config). argv list (no shell=True) or a string to split;
+            # cwd defaults to the scene config's directory so relative tool paths resolve.
+            cmd = st["shell"]
+            if isinstance(cmd, str):
+                import shlex
+                cmd = shlex.split(cmd)
+            r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True,
+                               timeout=float(st.get("timeout", 60)))
+            if r.returncode != 0:
+                raise SystemExit("scene shell step failed (%s): %s" % (cmd, (r.stderr or r.stdout).strip()))
+        elif "move" in st:
             x, y, w, h = st["move"]
             _call({"op": P.OP_MOVE, "target": window, "x": int(x), "y": int(y),
                    "w": int(w), "h": int(h), "topmost": False})
@@ -363,15 +376,16 @@ def _run_steps(window, steps):
             time.sleep(float(st["wait"]))
 
 
-def _drive_capture(spec, out_path, settle):
-    """Resize (if `size`), run `reset` then `steps`, settle, and capture the window."""
+def _drive_capture(spec, out_path, settle, cwd=None):
+    """Resize (if `size`), run `reset` then `steps`, settle, and capture the window.
+    `cwd` is the working dir for any `shell` steps (the scene config's directory)."""
     import time
     win = spec["window"]
     if spec.get("size"):
         sw, sh = (int(v) for v in str(spec["size"]).lower().split("x"))
         _resize_local(win, sw, sh)
-    _run_steps(win, spec.get("reset"))
-    _run_steps(win, spec.get("steps"))
+    _run_steps(win, spec.get("reset"), cwd=cwd)
+    _run_steps(win, spec.get("steps"), cwd=cwd)
     time.sleep(settle)
     _capture(win, None, out_path)
 
@@ -392,7 +406,8 @@ def _cmd_scene(a):
              else ([a.name] if a.name else []))
     if not names:
         raise SystemExit("give a scene name or --all")
-    out_dir = a.out or os.path.join(os.path.dirname(os.path.abspath(a.config)), "_regress")
+    cfg_dir = os.path.dirname(os.path.abspath(a.config))   # working dir for scenes' `shell` steps
+    out_dir = a.out or os.path.join(cfg_dir, "_regress")
     os.makedirs(out_dir, exist_ok=True)
     results = []
     for nm in names:
@@ -401,7 +416,7 @@ def _cmd_scene(a):
             results.append({"scene": nm, "error": "not in config"})
             continue
         cur = os.path.join(out_dir, nm + ".png")
-        _drive_capture(sc, cur, a.settle)
+        _drive_capture(sc, cur, a.settle, cwd=cfg_dir)
 
         if a.parity:                                   # diff vs a LIVE reference window (Qud)
             ref_spec = sc.get("reference")
@@ -409,7 +424,7 @@ def _cmd_scene(a):
                 results.append({"scene": nm, "error": "no `reference` block for --parity", "current": cur})
                 continue
             ref = os.path.join(out_dir, nm + "_ref.png")
-            _drive_capture(ref_spec, ref, a.settle)
+            _drive_capture(ref_spec, ref, a.settle, cwd=cfg_dir)
             ct = int(ref_spec.get("crop_top", sc.get("crop_top", 58)))
             d = imageops.diff(ref, cur, crop_top=ct)
             ann = os.path.join(out_dir, nm + "_parity.png")
