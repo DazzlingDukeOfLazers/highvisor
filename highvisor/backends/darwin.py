@@ -397,8 +397,17 @@ class MacBackend(PlatformBackend):
             return ActionResult.fail("no AX window to move")
         pt = AXValueCreate(kAXValueCGPointType, Quartz.CGPoint(x, y))
         sz = AXValueCreate(kAXValueCGSizeType, Quartz.CGSize(w, h))
+        # Apply position→size twice. A cross-display move-and-grow otherwise clamps
+        # the SIZE to the SOURCE display: the AXPosition change is async, so the
+        # AXSize that follows lands while macOS still homes the window on the old
+        # (smaller) monitor and shrinks it to fit. The first pass re-homes the
+        # window on the target display; the second pass sets the real size there.
+        # A final AXPosition re-asserts the corner, since a resize can nudge it.
         e1 = AXUIElementSetAttributeValue(ax, _POS, pt)
         e2 = AXUIElementSetAttributeValue(ax, _SIZE, sz)
+        AXUIElementSetAttributeValue(ax, _POS, pt)
+        e2 = AXUIElementSetAttributeValue(ax, _SIZE, sz)
+        e1 = AXUIElementSetAttributeValue(ax, _POS, pt)
         # topmost: AX has no persistent always-on-top for another app's window.
         # True -> raise it now (best-effort, NOT sticky); False/None -> leave z-order.
         if topmost is True:
