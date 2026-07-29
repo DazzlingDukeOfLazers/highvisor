@@ -106,9 +106,11 @@ def make_web_server(engine, bus, bridge=None, orchestrator=None,
                     agent = (str(req.get("src", "") or "").split("/")[-1]) or "claude"
                     summary = str(req.get("summary", "")) or ("%s=(%s)" % (req.get("q", ""), req.get("opt", "")))
                     try:
-                        res = orchestrator.deliver(agent, summary, submit=False)
+                        # focus=False: tier-1 AXSetValue is focus-free, so clicking a pick in the
+                        # cockpit doesn't bounce focus to the agent window.
+                        res = orchestrator.deliver(agent, summary, submit=False, focus=False)
                         if not res.get("ok") and agent != "claude":     # fall back to the primary asker
-                            res = orchestrator.deliver("claude", summary, submit=False)
+                            res = orchestrator.deliver("claude", summary, submit=False, focus=False)
                         pasted = res.get("ok")
                     except Exception as e:
                         bus.publish("orch", msg="pick paste failed: %s" % e)

@@ -297,16 +297,22 @@ class Orchestrator:
                             a["composer_fallback"][1] * info["h"])
         return True
 
-    def deliver(self, agent, body, submit=True):
-        """`ask`: focus the agent's composer, replace its contents with ``body``,
-        and (optionally) submit."""
+    def deliver(self, agent, body, submit=True, focus=True):
+        """`ask`: put ``body`` into the agent's composer, and (optionally) submit.
+
+        ``focus=True`` clicks the composer first (needed when submitting, or when the
+        tier-4 typing fallback is required). ``focus=False`` skips that click and relies
+        on the tier-1 focus-free ``AXSetValue`` path (used by the pasted-pick relay so a
+        cockpit click doesn't bounce focus to the agent window). Best-effort: if the
+        editable can't be set focus-free, backend.text still falls back to tier-4."""
         a = AGENTS.get(agent)
         if a is None:
             return {"ok": False, "error": "unknown agent: %s" % agent}
         win = a["window"]
-        if not self._focus_composer(win, a):
-            return {"ok": False, "error": "composer not found for %s" % agent}
-        time.sleep(0.15)
+        if focus:
+            if not self._focus_composer(win, a):
+                return {"ok": False, "error": "composer not found for %s" % agent}
+            time.sleep(0.15)
         # NB: no cmd+a clear — its tier-4 activate disrupts composer focus so the
         # following type doesn't land. The composer is empty after every submit, so
         # in the normal loop there's nothing to clear.
