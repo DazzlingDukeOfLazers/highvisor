@@ -189,6 +189,29 @@ function _dupMessage(raves, qud) {
     + lines.join("\n") + "\n\nClose the extra window(s) and try again.";
 }
 
+// Toggle Raves between user mode and 1:1 (parity) mode by injecting its Ctrl+M hotkey into the
+// Raves window. Raves-only (Qud not required); refuses on zero/duplicate Raves windows.
+async function toggleRaves1to1() {
+  const wins = await rpc("list_targets");
+  if (!wins.ok) { alert("list_targets failed: " + (wins.error || "?")); return; }
+  const { raves } = classifyRavesQud(wins.targets);
+  if (raves.length === 0) { alert("No Raves window found."); return; }
+  if (raves.length > 1) {
+    alert(`${raves.length} Raves windows open:\n  - ` + raves.map(_label).join("\n  - ")
+      + "\n\nClose the extras so the toggle isn't ambiguous.");
+    return;
+  }
+  const btn = $("raves-1to1");
+  btn.disabled = true;
+  try {
+    await rpc("key", { target: raves[0].id, keys: "ctrl+m" });   // Raves' user⇄1:1 hotkey
+  } catch (e) {
+    alert("toggle failed: " + (e.message || e));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // One-click user-testing setup at a chosen resolution: Raves in the UPPER-RIGHT
 // quadrant, Caves of Qud in the LOWER-RIGHT, W×H each (right-edge aligned in the
 // right half — the same placement the responsive parity test uses). Refuses to
@@ -438,6 +461,7 @@ async function init() {
   $("savelayout").onclick = saveLayout;
   document.querySelectorAll(".ut").forEach(b =>
     (b.onclick = () => userTestLayout(+b.dataset.w, +b.dataset.h)));
+  $("raves-1to1").onclick = toggleRaves1to1;
   $("layoutsel").onchange = showLayoutDesc;
   $("clearlog").onclick = () => (logEl().innerHTML = "");
   $("off").onclick = async () => {
