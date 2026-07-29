@@ -30,7 +30,7 @@ Verified on macOS (this machine, 2026-07-28); the Windows backend is implemented
 | Capability | Command | macOS | Windows |
 |---|---|---|---|
 | List / find windows | `hv ls` | ✅ | ✅ |
-| Capture an **unfocused** window | `hv shot` | ✅ (CoreGraphics/ScreenCaptureKit) | ✅ (PrintWindow/DWM) |
+| Capture an **unfocused** window | `hv shot` | ✅ (CoreGraphics `CGWindowListCreateImage`) | ✅ (PrintWindow) |
 | Accessibility inspect | `hv inspect` | ✅ AX | ✅ UI Automation |
 | Move / resize / dock / stack | `hv move` `dock` `stack` | ✅ | ✅ |
 | Synthetic input | `hv click` `text` `key` | ✅ (incl. Unity/Qud `--hover` click) | ✅ |

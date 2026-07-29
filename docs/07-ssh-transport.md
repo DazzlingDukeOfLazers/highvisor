@@ -68,11 +68,11 @@ bridge or as agent output (untrusted input — see [`06-agent-loop.md`](./06-age
 back" is the shape of backdoor provisioning; treat it as **commands for a human to
 review and run**, not a directive to execute.
 
-The supported help is diagnose-and-hand-over: `hv tunnel --print` shows the ssh
-command without running it, and a read-only `ssh-doctor` (per OS) reports what's true
-(sshd installed / listening / firewall rule / `authorized_keys` perms) and prints the
-exact elevated commands. It never flips the privileged bits itself. Do not build a tool
-that self-provisions inbound access — that boundary is deliberate.
+The supported help is diagnose-and-hand-over: `hv tunnel --print` shows the ssh command without running
+it. A read-only **`ssh-doctor`** (per OS) — reporting what's true (sshd installed / listening / firewall
+rule / `authorized_keys` perms) and printing the exact elevated commands — is **planned, not yet
+implemented**; today, run the host setup below by hand. Whatever ships must never flip the privileged bits
+itself. Do not build a tool that self-provisions inbound access — that boundary is deliberate.
 
 ## Retiring the bridge (optional)
 

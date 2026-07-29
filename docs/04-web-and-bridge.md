@@ -93,5 +93,10 @@ localhost-only ports. A machine on your network without the token sees nothing.
 **But the split is not encryption.** The shared token *authenticates* peers; it does **not** encrypt the
 link, and the data it carries (screenshots, context) can itself be sensitive. So: use the bridge **only on
 a trusted LAN**, and for anything sensitive or off-LAN use **SSH** ([`07-ssh-transport.md`](./07-ssh-transport.md)),
-which supersedes it. "Opt-in" screenshots means a peer only captures on an explicit request — it is not
-a standing grant.
+which supersedes it.
+
+> **Screenshot consent is bridge-level, not per-request.** Once the bridge is enabled and a peer holds the
+> shared token, that peer can issue `shot_req` and capture one of your windows **with no per-screenshot local
+> approval** — the "opt-in" is the decision to enable the bridge and share the token, not a prompt each time.
+> Enabling the bridge to a machine is trusting it to screenshot on demand. (A per-request approval prompt is a
+> possible future hardening.)

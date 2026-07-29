@@ -119,6 +119,10 @@ def flatten_ax_text(tree):
 # Per-agent I/O: which window, how to read it, how to find its composer, and (for
 # Claude) how to recognize its permission buttons. Composer hint is matched against
 # OCR/AX text; the fallback is a window fraction if the hint isn't found.
+# The local machine's id in a `<machine>/<agent>` opcode target. Only this machine's agents are
+# reachable; a non-local machine is rejected in execute() (remote routing is not implemented).
+LOCAL_MACHINE = "mac"
+
 AGENTS = {
     "chatgpt": {
         "window": "ChatGPT", "read": "ocr", "submit": "return",
@@ -316,11 +320,18 @@ class Orchestrator:
         # NB: no cmd+a clear — its tier-4 activate disrupts composer focus so the
         # following type doesn't land. The composer is empty after every submit, so
         # in the normal loop there's nothing to clear.
-        self.engine.submit({"op": P.OP_TEXT, "target": win, "text": body})
-        time.sleep(0.1)
+        # Propagate the actual OS-call results rather than reporting blind success. NOTE: `posted`
+        # means the text/key OS call succeeded — NOT that the agent received or acted on it (no
+        # readback confirmation). "posted != confirmed."
+        tres = self.engine.submit({"op": P.OP_TEXT, "target": win, "text": body})
+        posted = bool(tres.get("ok"))
+        submitted = False
         if submit:
-            self.engine.submit({"op": P.OP_KEY, "target": win, "keys": a["submit"], "focus": True})
-        return {"ok": True, "agent": agent, "submitted": submit}
+            time.sleep(0.1)
+            sres = self.engine.submit({"op": P.OP_KEY, "target": win, "keys": a["submit"], "focus": True})
+            submitted = bool(sres.get("ok"))
+        return {"ok": posted and (submitted or not submit), "agent": agent,
+                "posted": posted, "submitted": submitted, "note": "posted != confirmed (no readback)"}
 
     def press_submit(self, agent):
         """Press the agent's submit key (Return) in its composer — used to SEND text that was
@@ -352,6 +363,15 @@ class Orchestrator:
 
     def execute(self, op: "Opcode"):
         """Run a (gated-approved) opcode against its target agent."""
+        # Machine boundary: opcodes name a `<machine>/<agent>` target, but only the LOCAL machine's
+        # agents are reachable — there is no remote opcode routing yet (the LAN bridge is data-only;
+        # cross-machine would go over SSH, see docs/07). Reject a non-local machine so an approved
+        # `floorputer/claude` can never silently resolve to the LOCAL claude.
+        if op.machine != LOCAL_MACHINE:
+            self.bus.publish("orch", msg="rejected %s %s: '%s' is not this machine (%s); remote "
+                             "routing not implemented" % (op.verb, op.target, op.machine, LOCAL_MACHINE))
+            return {"ok": False, "error": "remote machine '%s' not routable (local is '%s')"
+                    % (op.machine, LOCAL_MACHINE)}
         agent = op.agent
         if op.verb == "ask":
             res = self.deliver(agent, op.body, submit=True)

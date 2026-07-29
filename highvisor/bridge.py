@@ -6,8 +6,9 @@ carries *data*, never remote control of your apps:
 
   - context   handoff text/blobs between sessions (the automated copy/paste)
   - log       mirror this machine's op log onto the peer's onscreen log
-  - shot_req  a peer may request a screenshot of one of your windows (opt-in,
-              token-gated) and gets shot_resp back on the same connection
+  - shot_req  a token-holding peer may request a screenshot of one of your windows
+              and gets shot_resp back — NO per-request local approval; enabling the
+              bridge + sharing the token IS the consent (see docs/04)
 
 Discovery is zero-config: each instance advertises ``_highvisor._tcp.local.`` over
 mDNS and browses for the others, so the Mac and PC find each other automatically
