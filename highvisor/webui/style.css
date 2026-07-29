@@ -23,6 +23,8 @@ header {
 }
 .dot { color: var(--err); font-size: 15px; transition: color .3s; }
 .dot.on { color: var(--ok); }
+.dot.stale { color: var(--warn); }   /* connected but running older code — restart the daemon */
+.stalemsg { color: var(--warn); font-size: 12px; font-weight: 600; }
 .off { background: var(--panel2); color: var(--muted); border: 1px solid var(--line);
   border-radius: 4px; cursor: pointer; font-size: 13px; line-height: 1; padding: 3px 8px; }
 .off:hover { color: var(--err); border-color: var(--err); }

@@ -305,6 +305,25 @@ function connectEvents() {
   };
 }
 
+// "restart needed" indicator: the daemon reports whether its .py sources are newer on disk than
+// when it booted. Newer → it's running stale code → tint the running light amber + show the label.
+async function checkStale() {
+  let stale = true, why = "daemon predates the restart indicator — restart it to enable this";
+  try {
+    const r = await fetch("/status");
+    if (r.ok) {
+      const j = await r.json();
+      stale = !!j.stale;
+      why = stale ? "daemon is running OLDER code than what's on disk — restart it to pick up changes"
+                  : "daemon is up to date";
+    }
+  } catch { return; }   // daemon down is shown by the connection dot itself
+  const dot = $("conn");
+  if (dot) { dot.classList.toggle("stale", stale); dot.title = "event stream — " + why; }
+  const msg = $("stalemsg");
+  if (msg) msg.hidden = !stale;
+}
+
 async function init() {
   const p = await rpc("ping");
   if (p.ok) $("backend").textContent = "backend: " + p.backend;
@@ -329,7 +348,9 @@ async function init() {
   await refreshPeers();
   await refreshPending();
   connectEvents();
+  checkStale();
   setInterval(refreshPeers, 4000);
   setInterval(refreshPending, 3000);
+  setInterval(checkStale, 5000);
 }
 init();

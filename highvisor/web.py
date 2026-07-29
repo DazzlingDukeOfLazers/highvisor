@@ -21,6 +21,23 @@ from . import protocol as P
 
 WEB_PORT = 48721
 _WEBUI = os.path.join(os.path.dirname(__file__), "webui")
+
+
+def _max_py_mtime():
+    """Newest mtime among the daemon's own .py sources — to detect edits made after boot."""
+    root = os.path.dirname(os.path.abspath(__file__))
+    latest = 0.0
+    for dp, _dn, files in os.walk(root):
+        for fn in files:
+            if fn.endswith(".py"):
+                try:
+                    latest = max(latest, os.path.getmtime(os.path.join(dp, fn)))
+                except OSError:
+                    pass
+    return latest
+
+
+_BOOT_MTIME = _max_py_mtime()   # captured when this module is imported (= daemon process start)
 _CTYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript",
            ".css": "text/css", ".png": "image/png", ".svg": "image/svg+xml",
            ".ico": "image/x-icon"}
@@ -67,6 +84,10 @@ def make_web_server(engine, bus, bridge=None, orchestrator=None,
                 return self._send(200, json.dumps({
                     "ok": True, "pending": orchestrator.pending_list(),
                     "lanes": sorted(orchestrator.auto_lanes)}))
+            if path == "/status":
+                # "restart needed" signal: the running process is the code as of _BOOT_MTIME; if any .py
+                # source is newer on disk, the daemon is stale and should be restarted to pick it up.
+                return self._send(200, json.dumps({"ok": True, "stale": _max_py_mtime() > _BOOT_MTIME + 0.5}))
             fp = os.path.normpath(os.path.join(_WEBUI, path.lstrip("/")))
             if not fp.startswith(_WEBUI) or not os.path.isfile(fp):
                 return self._send(404, "not found", "text/plain")
