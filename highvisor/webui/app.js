@@ -130,15 +130,18 @@ async function refreshPending() {
   for (const p of res.pending) {
     const d = document.createElement("div");
     d.className = "pend";
+    const tgt = escapeHtml((p.target || "").split("/").pop() || "target");
     d.innerHTML =
       `<div class="pend-hd"><b>${escapeHtml(p.verb)}</b> → ${escapeHtml(p.target)} `
       + `<span class="muted">from ${escapeHtml(p.src || "")}</span></div>`
       + `<div class="pend-body">${escapeHtml(p.body || "(no body)")}</div>`
       + optsHtml(p)
+      // approve/deny act on the ASK itself — they forward it to its TARGET (or drop it).
+      // Labeled with the destination so it's not confused with the option buttons (which answer the ASKER).
       + `<div class="pend-btns">`
-      + `<button class="ok" data-fp="${p.fp}" data-a="approve">approve</button>`
-      + `<button data-fp="${p.fp}" data-a="approve-all">approve lane</button>`
-      + `<button class="no" data-fp="${p.fp}" data-a="deny">deny</button></div>`;
+      + `<button class="ok" data-fp="${p.fp}" data-a="approve" title="deliver this ask to ${tgt}">send to ${tgt}</button>`
+      + `<button data-fp="${p.fp}" data-a="approve-all" title="auto-deliver this lane to ${tgt} from now on">auto-send to ${tgt}</button>`
+      + `<button class="no" data-fp="${p.fp}" data-a="deny" title="drop this ask without sending it anywhere">dismiss</button></div>`;
     el.appendChild(d);
   }
   el.querySelectorAll(".pend-btns button").forEach(b =>
@@ -171,7 +174,8 @@ function parseAsk(body) {
 function optsHtml(p) {
   const groups = parseAsk(p.body);
   if (!groups.length) return "";
-  let h = `<div class="pend-opts">`;
+  const src = escapeHtml((p.src || "asker").split("/").pop() || "asker");
+  let h = `<div class="pend-opts"><div class="pend-answerhint">↳ click a choice to answer → ${src} (not the send button)</div>`;
   for (const g of groups) {
     h += `<div class="pend-q">` + (g.qn ? `<div class="qn">${escapeHtml(g.qn)}</div>` : "");
     for (const o of g.opts)

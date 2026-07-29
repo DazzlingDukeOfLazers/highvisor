@@ -108,6 +108,7 @@ main {
 .hgutter:hover, .hgutter.dragging { background: var(--accent); }
 /* option buttons parsed from an ask body: each shows its FULL choice text, stacked per question */
 .pend-opts { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 6px; }
+.pend-answerhint { color: var(--ok); font-size: 11px; }
 .pend-q { display: flex; flex-direction: column; gap: 3px; }
 .pend-q .qn { color: var(--muted); font-size: 11px; }
 .pend-opt { display: block; width: 100%; text-align: left; font: inherit; font-size: 11px;
