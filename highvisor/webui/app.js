@@ -119,6 +119,53 @@ async function saveLayout() {
   if (res.ok) { $("savename").value = ""; await refreshLayouts(); $("layoutsel").value = name; showLayoutDesc(); }
 }
 
+// One-click user-testing setup: put the Raves window and the Caves of Qud window
+// at 1920×1080 each, side by side, on the roomiest monitor (so a tester sees a
+// standard, non-overlapping pair). Falls back to stacked, then best-effort, when
+// no single display fits two 1080p windows across.
+async function userTestLayout() {
+  const btn = $("usertest");
+  btn.disabled = true;
+  try {
+    const [wins, disps] = await Promise.all([rpc("list_targets"), rpc("displays")]);
+    if (!wins.ok) throw new Error(wins.error || "list_targets failed");
+    const hay = (t) => ((t.title || "") + " " + (t.class_name || "")).toLowerCase();
+    // Qud first (matches "caves"); Raves is any raves window that ISN'T the Qud one.
+    const qud = wins.targets.find(t => /caves|cavesofqud|\bcoq\b/.test(hay(t)));
+    const raves = wins.targets.find(t => /raves/.test(hay(t)) && (!qud || t.id !== qud.id));
+    if (!raves || !qud) {
+      alert("Need both a Raves window and a Caves of Qud window open to arrange them.");
+      return;
+    }
+    const W = 1920, H = 1080;
+    const displays = (disps.ok && disps.displays && disps.displays.length)
+      ? disps.displays : [{ x: 0, y: 0, w: 2 * W, h: H }];
+    const byArea = displays.slice().sort((a, b) => b.w * b.h - a.w * a.h);
+    const across = byArea.find(d => d.w >= 2 * W && d.h >= H);
+    const stack = byArea.find(d => d.w >= W && d.h >= 2 * H);
+    let r, q;
+    if (across) {
+      const x0 = across.x + Math.floor((across.w - 2 * W) / 2);
+      const y0 = across.y + Math.floor((across.h - H) / 2);
+      r = [x0, y0]; q = [x0 + W, y0];
+    } else if (stack) {
+      const x0 = stack.x + Math.floor((stack.w - W) / 2);
+      const y0 = stack.y + Math.floor((stack.h - 2 * H) / 2);
+      r = [x0, y0]; q = [x0, y0 + H];
+    } else {                                   // best effort: both at the biggest display's origin
+      const d = byArea[0];
+      r = [d.x, d.y]; q = [d.x, d.y];
+    }
+    await rpc("move", { target: raves.id, x: r[0], y: r[1], w: W, h: H, topmost: false });
+    await rpc("move", { target: qud.id, x: q[0], y: q[1], w: W, h: H, topmost: false });
+    await refreshWindows();
+  } catch (e) {
+    alert("user-test layout failed: " + (e.message || e));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // ------------------------------------------------------ pending (agent loop)
 async function refreshPending() {
   let res;
@@ -331,6 +378,7 @@ async function init() {
   $("send").onclick = sendContext;
   $("applylayout").onclick = applyLayout;
   $("savelayout").onclick = saveLayout;
+  $("usertest").onclick = userTestLayout;
   $("layoutsel").onchange = showLayoutDesc;
   $("clearlog").onclick = () => (logEl().innerHTML = "");
   $("off").onclick = async () => {
