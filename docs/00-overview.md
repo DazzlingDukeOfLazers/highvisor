@@ -118,3 +118,4 @@ transient ephemeral-port blip under socket churn — **retry; it is not a config
 7. `06-agent-loop.md` — the human-gated Claude↔ChatGPT opcode loop.
 8. `07-ssh-transport.md` — tunnelling a remote highvisor over SSH.
 9. `08-parity-kit.md` — visual parity & regression tooling (drive both, diff, golden).
+10. `09-work-cycle.md` — **the work-cycle loop** (goal → prototype → tools → test → goldens → docs → review → integrate); the editable checklist any session follows.
