@@ -34,10 +34,14 @@
             <input id="savename" placeholder="save current as…">
             <button id="savelayout" title="snapshot current window positions">save</button>
           </div>
-          <div class="layout-row">
-            <button id="usertest" class="full"
-                    title="reposition + resize for user testing: Raves → upper-right, Caves of Qud → lower-right, 1920×1080 each">
-              ⊞ user test · Raves ▲ / Qud ▼ @ 1920×1080</button>
+          <div class="uttest-hd muted">⊞ user test · Raves ▲ / Qud ▼</div>
+          <div class="layout-row uttest-btns">
+            <button class="ut" data-w="1920" data-h="1080"
+                    title="1920×1080 — Raves upper-right, Caves of Qud lower-right">1920×1080</button>
+            <button class="ut" data-w="1600" data-h="900"
+                    title="1600×900 — Raves upper-right, Caves of Qud lower-right">1600×900</button>
+            <button class="ut" data-w="1280" data-h="720"
+                    title="1280×720 — Raves upper-right, Caves of Qud lower-right">1280×720</button>
           </div>
           <div id="uttest-status" class="uttest-status muted"></div>
           <div id="layoutdesc" class="muted"></div>

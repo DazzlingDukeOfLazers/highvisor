@@ -189,11 +189,11 @@ function _dupMessage(raves, qud) {
     + lines.join("\n") + "\n\nClose the extra window(s) and try again.";
 }
 
-// One-click user-testing setup: Raves in the UPPER-RIGHT quadrant, Caves of Qud
-// in the LOWER-RIGHT, 1920×1080 each (right-edge aligned in the right half — the
-// same placement the responsive parity test uses). Refuses to run on duplicates.
-async function userTestLayout() {
-  const btn = $("usertest");
+// One-click user-testing setup at a chosen resolution: Raves in the UPPER-RIGHT
+// quadrant, Caves of Qud in the LOWER-RIGHT, W×H each (right-edge aligned in the
+// right half — the same placement the responsive parity test uses). Refuses to
+// run on duplicates.
+async function userTestLayout(W, H) {
   const [wins, disps] = await Promise.all([rpc("list_targets"), rpc("displays")]);
   if (!wins.ok) { alert("list_targets failed: " + (wins.error || "?")); return; }
   const { raves, qud } = classifyRavesQud(wins.targets);
@@ -202,9 +202,9 @@ async function userTestLayout() {
     alert(_dupMessage(raves, qud));
     return;
   }
-  btn.disabled = true;
+  const btns = document.querySelectorAll(".ut");
+  btns.forEach(b => (b.disabled = true));
   try {
-    const W = 1920, H = 1080;
     const displays = (disps.ok && disps.displays && disps.displays.length)
       ? disps.displays : [{ x: 0, y: 0, w: 2 * W, h: 2 * H }];
     // A stacked right-half pair needs a full-height column: width >= W and
@@ -220,7 +220,7 @@ async function userTestLayout() {
   } catch (e) {
     alert("user-test layout failed: " + (e.message || e));
   } finally {
-    btn.disabled = false;
+    btns.forEach(b => (b.disabled = false));
   }
 }
 
@@ -436,7 +436,8 @@ async function init() {
   $("send").onclick = sendContext;
   $("applylayout").onclick = applyLayout;
   $("savelayout").onclick = saveLayout;
-  $("usertest").onclick = userTestLayout;
+  document.querySelectorAll(".ut").forEach(b =>
+    (b.onclick = () => userTestLayout(+b.dataset.w, +b.dataset.h)));
   $("layoutsel").onchange = showLayoutDesc;
   $("clearlog").onclick = () => (logEl().innerHTML = "");
   $("off").onclick = async () => {
