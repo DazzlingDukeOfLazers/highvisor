@@ -120,16 +120,32 @@ async function saveLayout() {
   if (res.ok) { $("savename").value = ""; await refreshLayouts(); $("layoutsel").value = name; showLayoutDesc(); }
 }
 
-// Split the open windows into the Raves side and the Caves-of-Qud side. Qud is
-// matched first (owns "caves"); Raves is any "raves" window that isn't the Qud
-// one — so it works for both the dev-run ("Raves of Qud (DEBUG)") and the
-// exported build ("raves-of-qud"). Returns arrays so callers can spot duplicates.
+// Identify the Raves / Caves-of-Qud game windows by their OWNING APP (owner name
+// + bundle path), NOT the window title. Title-matching mis-fires on a Finder
+// window showing the "raves-of-qud" folder, a Terminal cd'd there, an editor with
+// the project open, etc. — all of which carry "raves" in the title but are not
+// the game. Owner/path pins it to the actual app.
+function _isRaves(t) {
+  const owner = (t.class_name || "").toLowerCase();
+  const path = (t.path || "").toLowerCase();
+  const title = (t.title || "").toLowerCase();
+  // exported build: the owning app itself is RavesOfQud (by process name or bundle).
+  if (/raves.?of.?qud|ravesofqud/.test(owner) || /raves.?of.?qud|ravesofqud/.test(path)) return true;
+  // dev-run: a Godot process whose game window names Raves — but not the Godot
+  // editor ("<project> - Godot Engine").
+  if (owner === "godot" && /raves/.test(title) && !/godot engine/.test(title)) return true;
+  return false;
+}
+function _isQud(t) {
+  const owner = (t.class_name || "").toLowerCase();
+  const path = (t.path || "").toLowerCase();
+  return /caves ?of ?qud|cavesofqud/.test(owner) || /caves of qud|coq\.app/.test(path);
+}
+// Split the open windows into the Raves side and the Qud side (arrays, so callers
+// can spot duplicates).
 function classifyRavesQud(targets) {
-  const hay = (t) => ((t.title || "") + " " + (t.class_name || "")).toLowerCase();
   const list = targets || [];
-  const qud = list.filter(t => /caves|cavesofqud|\bcoq\b/.test(hay(t)));
-  const raves = list.filter(t => /raves/.test(hay(t)) && !qud.includes(t));
-  return { raves, qud };
+  return { raves: list.filter(_isRaves), qud: list.filter(_isQud) };
 }
 
 function _label(t) { return t.title || t.class_name || t.id; }
