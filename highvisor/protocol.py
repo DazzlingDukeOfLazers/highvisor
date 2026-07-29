@@ -32,6 +32,7 @@ OP_STACK = "stack"          # top, bottom, [gap] -> stack `top` directly above `
 OP_DOCK = "dock"            # target -> apply the standing dock rule for this window
 OP_PROBE = "probe"          # app (profile) | window,[port] -> {running, state, window, port_open}
 OP_SCREEN = "screen_size"   # -> {ok, w, h}  (physical pixels of primary display)
+OP_DISPLAYS = "displays"    # -> {ok, displays:[{id, x, y, w, h, main}]}  (all displays, points)
 OP_LAYOUT_LIST = "layout_list"    # -> {ok, layouts:[{name, description, placements}]}
 OP_LAYOUT_APPLY = "layout_apply"  # name -> {ok, applied, results:[...]}
 OP_LAYOUT_SAVE = "layout_save"    # name, [description] -> {ok, saved, path, windows}

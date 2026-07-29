@@ -151,6 +151,9 @@ class Engine:
             w, h = b.screen_size()
             return {"ok": True, "w": w, "h": h}
 
+        if op == P.OP_DISPLAYS:
+            return {"ok": True, "displays": b.displays()}
+
         if op == P.OP_MOVE:
             topmost = req.get("topmost")  # tri-state: True/False/None
             zone = req.get("zone")

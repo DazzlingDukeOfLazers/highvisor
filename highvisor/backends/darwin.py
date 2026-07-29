@@ -221,6 +221,24 @@ class MacBackend(PlatformBackend):
         d = Quartz.CGMainDisplayID()
         return (int(Quartz.CGDisplayPixelsWide(d)), int(Quartz.CGDisplayPixelsHigh(d)))
 
+    def displays(self):
+        """Every active display, in the global point coordinate space that
+        ``move``/window bounds use (CGDisplayBounds), so a secondary monitor
+        reports its real origin — e.g. a 4K stacked above the built-in comes back
+        at a negative y. ``main`` marks CGMainDisplayID."""
+        main = Quartz.CGMainDisplayID()
+        err, ids, n = Quartz.CGGetActiveDisplayList(16, None, None)
+        out = []
+        for d in (ids or []):
+            b = Quartz.CGDisplayBounds(d)
+            out.append({
+                "id": int(d),
+                "x": int(b.origin.x), "y": int(b.origin.y),
+                "w": int(b.size.width), "h": int(b.size.height),
+                "main": bool(int(d) == int(main)),
+            })
+        return out
+
     def screenshot(self, target: Optional[str]) -> bytes:
         w = self._resolve(target)
         if w is None:

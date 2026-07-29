@@ -164,7 +164,8 @@ def _cmd_responsive(a):
     # Orchestrates the daemon (screen/move/shot) + local diff; see responsive.py.
     from . import responsive
     report = responsive.run(_call, a.golem, a.source,
-                            threshold=a.threshold, out_dir=a.out_dir)
+                            threshold=a.threshold, out_dir=a.out_dir,
+                            display=a.display)
     _print_json(report)
     return 0 if report["verdict"] == "PASS" else 1
 
@@ -684,6 +685,10 @@ def build_parser():
                    help="min content-match %% to pass a frame (default 99.0)")
     s.add_argument("--out-dir", default=None, dest="out_dir",
                    help="where to write per-frame captures + heatmaps")
+    s.add_argument("--display", default="auto",
+                   help="which monitor to sweep on: 'auto' (the display the golem "
+                        "window is on — no need to make it the OS main display), "
+                        "'main', or a display index (0,1,...). Default: auto")
     s.set_defaults(fn=_cmd_responsive)
 
     sub.add_parser("layouts", help="list known window layouts").set_defaults(fn=_cmd_layouts)

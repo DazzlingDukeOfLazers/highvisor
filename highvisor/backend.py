@@ -170,6 +170,14 @@ class PlatformBackend:
         """Return (width, height) of the primary display in physical pixels."""
         raise NotImplementedError
 
+    def displays(self):
+        """List every display as ``{id, x, y, w, h, main}`` in the same point
+        coordinate space that ``move`` uses (so a secondary monitor reports its
+        real origin offset). Default: a single display at the origin derived from
+        ``screen_size()`` — backends with multi-display awareness override this."""
+        w, h = self.screen_size()
+        return [{"id": 0, "x": 0, "y": 0, "w": w, "h": h, "main": True}]
+
     def move(self, target: str, x: int, y: int, w: int, h: int,
              topmost: Optional[bool] = None) -> ActionResult:
         """Position + size ``target`` to a physical-pixel rect. ``topmost`` is
