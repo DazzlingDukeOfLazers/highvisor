@@ -83,6 +83,29 @@ for the target, and expose a **cooperative-target** path for apps we control the
 source of (like the Godot viewer) so they can poll a highvisor command channel —
 generalizing the `godot_cmd` trick instead of leaving it per-project.
 
+## Operating it (quickstart)
+
+The daemon runs on localhost; the CLI is the front door. From the repo:
+
+```
+python3 -m highvisor.cli <cmd>      # or: hv <cmd> if installed on PATH
+```
+
+Host/port default to **127.0.0.1:48720** — you never need `--host`/`--port` on this
+machine. Confirm the daemon is up with `nc -z 127.0.0.1 48720` (someone has to have
+started `python -m highvisor.server` first). Everyday commands:
+
+- `ls` — list windows; each row is `win:<ID>  pid=…  W×H  <title>`. Target the other
+  commands by `win:<ID>`.
+- `launch <name>` — start a registered app (`launchers` lists them); prefer this over
+  the OS launcher so highvisor owns the process.
+- `activate win:ID`, `shot win:ID <out.png>`, `click [--hover] win:ID x y`.
+- `probe --app qud` — is a known app off / at its menu / in-game.
+
+If a call throws `OSError: [Errno 49] Can't assign requested address`, that's a
+transient ephemeral-port blip under socket churn — **retry; it is not a config error**
+(the default host is already loopback).
+
 ## Reading order
 
 1. `00-overview.md` — this file.

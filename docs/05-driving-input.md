@@ -63,6 +63,16 @@ Options screen** — a genuine activation.
 
 Windows equivalent: `SetCursorPos` + `mouse_event(down|up)` after `activate`.
 
+### Coordinates are points — but a screenshot may not be
+
+`click` x/y are window **points** (logical), added to the window origin. A `shot` PNG,
+though, comes back at the window's **backing scale**, which is not always 1×: a full-size
+Raves/Qud window returned pixel-for-point (1:1) this session, but a *smaller* window came
+back at **2×** (shot px = 2× points). So don't read coordinates straight off a screenshot
+assuming px == points — compare the `shot` dimensions to the window's `ls` W×H and divide
+by the ratio before clicking. Driving targets at **full window size** kept it 1:1 and clicks
+landed first try; a mis-scaled coordinate silently hits the wrong control.
+
 ## Practical guidance (which tier for which target)
 
 | target | keyboard | mouse | notes |
@@ -74,3 +84,20 @@ Windows equivalent: `SetCursorPos` + `mouse_event(down|up)` after `activate`.
 
 **Rule of thumb for closed engines: drive them by mouse, not keys.** Position with a
 cursor warp, click with a bare down/up, and never decorate the event.
+
+## Recipe: Caves of Qud, title → in-game
+
+Qud's bridge (the mod socket on **48710**) only opens once a save is loaded, so an
+automated loop has to walk the pre-game menus by mouse first:
+
+1. `shot` the Qud window and confirm the title menu is up.
+2. `click --hover` **Continue**. Bare clicks drive Unity *buttons*, but the title-menu
+   *items* did not reliably select on a bare click this session (the highlight never moved
+   to the clicked item) — so **escalate to `--hover`** if a bare click leaves the selection
+   unchanged.
+3. The **Load Game** picker (a legacy console popup) appears — `click --hover` the save row.
+4. Poll `nc -z 127.0.0.1 48710` until it opens = in-game. From here, prefer the mod's
+   command channel (tier 3) over more clicking.
+
+Verified end-to-end this session: title → Continue → Load picker → save row → bridge up,
+entirely via `hv click --hover`.
