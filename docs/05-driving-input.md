@@ -78,9 +78,15 @@ landed first try; a mis-scaled coordinate silently hits the wrong control.
 | target | keyboard | mouse | notes |
 |---|---|---|---|
 | Native AppKit / standard apps | tier 1–2, or `--focus` | click works | a11y usually present |
-| **Unity (Caves of Qud) menus** | **none works** | **bare click (this doc)** | no AX tree; keys dropped |
+| Qud **Unity UI / title menu** | **none works** | **bare first, escalate to `--hover`** | no AX tree; keys dropped. Bare has worked, but the title-menu items have also needed `--hover` when a bare click didn't move the highlight — verify per session |
+| Qud **legacy console popup** (Load-game picker, in-game ☰, "[Space]" prompt) | none works | **`--hover`** | reads `Input.mousePosition`; needs the pre-move a bare warp doesn't provide |
+| Qud **in-game world cell** | none works | **bare click, NEVER `--hover`** | a pre-move makes Qud hover-but-never-*select* the tile |
 | Godot apps (our own) | prefer the mod/command channel (tier 3) | click works | cooperative hook is cleanest |
-| In-game Qud | the mod's `PushCommand` (tier 3) | — | menus/char-creation are pre-game, mouse-only |
+
+The tension between "no pre-move" (above) and "`--hover` was required" is real and **surface-specific**, not
+a contradiction: bare wins for plain Unity buttons and world cells (a pre-move gets rejected), while
+`--hover` — a real `mouseMoved` before the bare click — is what the legacy popups (and sometimes the title
+menu) need. When unsure, try bare, screenshot, and escalate to `--hover` only if the highlight didn't move.
 
 **Rule of thumb for closed engines: drive them by mouse, not keys.** Position with a
 cursor warp, click with a bare down/up, and never decorate the event.

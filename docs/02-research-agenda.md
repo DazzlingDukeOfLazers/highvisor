@@ -1,5 +1,9 @@
 # highvisor — research agenda
 
+> **Historical design record (2026-07-27).** These questions guided the initial build; the stack was
+> chosen and both backends shipped. See [`03-research-findings.md`](./03-research-findings.md) for the
+> conclusions and the README capability table for current behavior. Kept for the reasoning trail.
+
 These are the questions research must answer *before* we commit to a stack. The
 architecture (`01`) is deliberately tooling-agnostic; the hardest requirement
 (**background/unfocused control**) should decide the tooling. Findings land in

@@ -76,6 +76,9 @@ setup**. Its cwd is the scene config's directory (so `../capture/presets.py` res
 `tools/regression/`); a non-zero exit aborts the scene with the captured stderr. The canonical use is
 loading a Raves option preset so a scene captures a **known configuration**:
 
+> **Treat scene files as executable code.** A `shell` step runs an arbitrary command from the config.
+> Review the `shell` steps in any scenes file before running it — never run an untrusted configuration.
+
 ```json
 "reset": [
   { "shell": ["python3", "../capture/presets.py", "load", "some-qud-preset"] },

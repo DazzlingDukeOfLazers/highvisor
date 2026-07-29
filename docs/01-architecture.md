@@ -67,7 +67,9 @@ For a given target+action, try in order and record which tier succeeded:
    highvisor command channel (file/socket) and executes actions itself. This is
    the generalized `godot_cmd` pattern; 100% reliable but requires target buy-in.
 4. **Activate + global input** — last resort: `activate(target)` then `SendInput`
-   / `CGEventPost`. Steals focus, serializes the loop, but always works.
+   / `CGEventPost`. Steals focus and serializes the loop; **broadest compatibility but
+   still target-dependent** (e.g. Unity/Qud ignores synthetic *keyboard* even after focus —
+   see [`05-driving-input.md`](./05-driving-input.md)), so verify delivery, don't assume it.
 
 Screenshots have their own background story: Win `PrintWindow`/DWM thumbnail or
 Graphics.Capture; Mac `CGWindowListCreateImage` / ScreenCaptureKit can grab an
@@ -76,9 +78,13 @@ while unfocused — that's tier-3 for observation.)
 
 ## 2. Core engine (the daemon)
 
-- **Transport:** localhost RPC. Leaning framed JSON over TCP (exactly the raves
-  bridge frame: `[4-byte BE len][UTF-8 JSON]`) or local HTTP+JSON. Pick in
-  research; the vocabulary below is transport-agnostic.
+> **Status:** this page began as a design sketch. **Framed JSON over TCP is implemented** (control
+> daemon on `127.0.0.1:48720`), as is the core CLI vocabulary below. Items still described as design
+> (sessions/replay, policy/limits, brain adapters, automatic tier fallback) are **planned** unless a
+> later doc or the README capability table says otherwise.
+
+- **Transport:** localhost RPC — **framed JSON over TCP, implemented** (exactly the raves bridge frame:
+  `[4-byte BE len][UTF-8 JSON]`). The vocabulary below is transport-agnostic.
 - **Target registry:** resolve stable target ids from `list_targets()`; cache
   handles; detect when a window dies.
 - **Action queue:** serialize actions per target; timestamp; return an
@@ -89,7 +95,7 @@ while unfocused — that's tier-3 for observation.)
 - **Policy/limits:** rate limits, an allow-list of target apps, a dry-run mode.
   Safety rail so a runaway brain can't thrash the whole desktop.
 
-### RPC vocabulary (draft)
+### RPC vocabulary (the implemented `hv` verbs; abstract names map to the CLI, e.g. `screenshot`→`shot`, `list_targets`→`ls`, `mouse`→`click`)
 
 ```jsonc
 // request:  {"op":"screenshot","target":{"window":"godot#1"},"region":null}
