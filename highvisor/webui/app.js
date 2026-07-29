@@ -187,14 +187,20 @@ function optsHtml(p) {
   return h + `</div>`;
 }
 const pickState = {};   // fp -> { qn -> {opt, label} } — accumulates so the composer shows all picks
+let pickSubmitTimer = null;
 async function pickOption(btn) {
   const { fp, src, q, opt, label } = btn.dataset;
   (pickState[fp] || (pickState[fp] = {}))[q || "?"] = { opt, label };
   const summary = "Cockpit picks — " + Object.entries(pickState[fp])
     .map(([qn, v]) => `${qn}=(${v.opt}) ${v.label}`).join("; ");
+  // highlight only within THIS question (leave other questions' picks intact)
   btn.parentElement.querySelectorAll(".pend-opt").forEach(x => x.classList.remove("picked"));
   btn.classList.add("picked");
   await post("/pick", { fp, src, q, opt, label, summary });
+  // debounced auto-submit: press Return ~1.8s after the LAST pick, so multi-question asks
+  // accumulate all answers before one send.
+  clearTimeout(pickSubmitTimer);
+  pickSubmitTimer = setTimeout(() => post("/pick_submit", { src }), 1800);
 }
 
 // Draggable column splitters: dragging a gutter sets --cw-left / --cw-mid (px); right col is 1fr.

@@ -322,6 +322,18 @@ class Orchestrator:
             self.engine.submit({"op": P.OP_KEY, "target": win, "keys": a["submit"], "focus": True})
         return {"ok": True, "agent": agent, "submitted": submit}
 
+    def press_submit(self, agent):
+        """Press the agent's submit key (Return) in its composer — used to SEND text that was
+        pasted earlier focus-free. Focuses the composer first so the key lands (a one-time focus
+        steal at send time, unlike the focus-free paste)."""
+        a = AGENTS.get(agent)
+        if a is None:
+            return {"ok": False, "error": "unknown agent: %s" % agent}
+        win = a["window"]
+        self._focus_composer(win, a)
+        time.sleep(0.1)
+        return self.engine.submit({"op": P.OP_KEY, "target": win, "keys": a["submit"], "focus": True})
+
     def press(self, agent, which):
         """`approve` / `approve-all` / `deny`: find the target's matching button in
         the AX tree and click it. Only meaningful for AX agents (Claude)."""

@@ -115,6 +115,21 @@ def make_web_server(engine, bus, bridge=None, orchestrator=None,
                     except Exception as e:
                         bus.publish("orch", msg="pick paste failed: %s" % e)
                 return self._send(200, json.dumps({"ok": True, "pasted": pasted}))
+            if self.path == "/pick_submit":
+                # Debounced: the cockpit calls this ~1.8s after the last pick to SEND the pasted
+                # summary (press Return in the asker's composer). Separate from /pick so multi-question
+                # asks accumulate all picks before one submit.
+                submitted = None
+                if orchestrator is not None:
+                    agent = (str(req.get("src", "") or "").split("/")[-1]) or "claude"
+                    try:
+                        res = orchestrator.press_submit(agent)
+                        if not res.get("ok") and agent != "claude":
+                            res = orchestrator.press_submit("claude")
+                        submitted = res.get("ok")
+                    except Exception as e:
+                        bus.publish("orch", msg="pick submit failed: %s" % e)
+                return self._send(200, json.dumps({"ok": True, "submitted": submitted}))
             if self.path == "/shutdown":
                 # localhost-only cockpit -> local off switch. Reply first, then exit
                 # after a beat so the response reaches the browser.
