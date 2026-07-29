@@ -3,6 +3,19 @@
 Two surfaces added on top of the localhost daemon (docs/01). Both share the one
 `Engine` + one `EventBus`; neither widens the control surface.
 
+## What becomes reachable (read first)
+
+| surface | bind | port | auth | data it carries | default |
+|---|---|---|---|---|---|
+| control daemon | `127.0.0.1` | 48720 | none (localhost trust) | **full control + observe** | on |
+| web cockpit | `127.0.0.1` | 48721 | none (localhost trust) | drives the daemon (control + observe) | on |
+| LAN bridge | LAN iface | 48722 | shared **token** (authenticates, **not** encrypted) | context / log / opt-in screenshots — **DATA only, never control** | **off** |
+
+So: **control never leaves localhost.** The LAN bridge is the only thing another machine can reach, it is
+**off by default**, and it moves data — not control. It is not an encrypted channel; use it only on a
+trusted LAN, and use **SSH** ([`07-ssh-transport.md`](./07-ssh-transport.md)) for anything sensitive or
+off-LAN.
+
 ## Web cockpit (localhost only)
 
 `highvisor/web.py` serves a static vanilla-JS SPA (`highvisor/webui/`) over

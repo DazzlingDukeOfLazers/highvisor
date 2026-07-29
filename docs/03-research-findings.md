@@ -3,6 +3,19 @@
 Answers to `02-research-agenda.md`, with the reasoning that leads to a stack.
 Sources are listed at the bottom. Dated 2026-07-27.
 
+## Decisions (conclusion)
+
+| decision | choice | why | current status |
+|---|---|---|---|
+| Runtime | **Python** | the only ecosystem with mature native a11y on **both** OSes (Win UIA + macOS AX); matches `control.py` | implemented (both backends) |
+| Transport | **framed JSON / TCP** | dependency-free localhost RPC any language can speak | implemented |
+| Background action | **AX / UIA first**, then message-post → cooperative hook → global input | semantic + target-specific; degrade only when needed | **partial by app** — verify delivery per target |
+| Capture | OS window capture (CGWindowList/ScreenCaptureKit; PrintWindow/DWM) | grabs a specific **unfocused** window | implemented (macOS verified) |
+
+**The evidence below varies in strength** — official API docs, third-party reports, and highvisor's own
+live verification. Treat fast-moving product claims (e.g. Codex / computer-use tooling) as **industry
+signal, not implementation evidence**; the load-bearing conclusions are the ones we verified.
+
 ## TL;DR
 
 - **Background/unfocused control is only reliable through the OS *accessibility*
