@@ -94,6 +94,12 @@ def make_web_server(engine, bus, bridge=None, orchestrator=None,
             if self.path == "/orch/act" and orchestrator is not None:
                 return self._send(200, json.dumps(orchestrator.act(
                     req.get("fp"), req.get("action"))))
+            if self.path == "/pick":
+                # A human clicked a choice button the cockpit rendered from an ask's `(x)` options.
+                # Record it on the bus (visible in the log + SSE) so the decision is captured.
+                bus.publish("pick", q=str(req.get("q", "")), opt=str(req.get("opt", "")),
+                            label=str(req.get("label", "")), fp=req.get("fp"))
+                return self._send(200, json.dumps({"ok": True}))
             if self.path == "/shutdown":
                 # localhost-only cockpit -> local off switch. Reply first, then exit
                 # after a beat so the response reaches the browser.

@@ -57,8 +57,10 @@ class Opcode:
         return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
 
     def as_event(self):
+        # Send enough body for the cockpit to render choice buttons from `(x)` option lines
+        # (the pending panel scrolls, so a long body is fine); bounded to stay lightweight.
         return {"verb": self.verb, "target": self.target,
-                "body": self.body[:400], "src": self.source, "fp": self.fp}
+                "body": self.body[:2000], "src": self.source, "fp": self.fp}
 
 
 def parse_opcodes(text, source=""):

@@ -33,9 +33,14 @@ body.down #downmsg { display: flex; }
 
 main {
   flex: 1; min-height: 0; display: grid;
-  grid-template-columns: 260px 1fr 1fr; gap: 10px; padding: 10px;
+  grid-template-columns: var(--cw-left, 260px) 4px var(--cw-mid, 38vw) 4px 1fr;
+  gap: 8px; padding: 10px;
 }
 .col { display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; }
+/* draggable column splitters (app.js updates --cw-left / --cw-mid) */
+.gutter { align-self: stretch; width: 4px; border-radius: 3px; background: var(--line);
+  cursor: col-resize; transition: background .1s; }
+.gutter:hover, .gutter.dragging { background: var(--accent); }
 .panel {
   background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
   display: flex; flex-direction: column; min-height: 0; overflow: hidden;
@@ -94,7 +99,17 @@ main {
 #applylayout { background: var(--accent); color: #071019; border: none; font-weight: 700; }
 #layoutdesc { font-size: 11px; min-height: 1em; }
 
-.pending { max-height: 40vh; overflow: auto; padding: 6px; display: flex; flex-direction: column; gap: 6px; }
+/* a panel the user can drag taller/shorter by its bottom-right corner */
+.panel.resizable { flex: none; resize: vertical; height: 230px; min-height: 90px; }
+.pending { flex: 1; min-height: 0; overflow: auto; padding: 6px; display: flex; flex-direction: column; gap: 6px; }
+/* option buttons parsed from an ask body: one row per question, a button per (x) choice */
+.pend-opts { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 6px; }
+.pend-q { display: flex; flex-wrap: wrap; gap: 5px; align-items: baseline; }
+.pend-q .qn { color: var(--muted); font-size: 11px; min-width: 22px; }
+.pend-opt { font: inherit; font-size: 11px; padding: 2px 8px; cursor: pointer;
+  background: var(--panel2); color: var(--fg); border: 1px solid var(--line); border-radius: 4px; }
+.pend-opt:hover { border-color: var(--accent); }
+.pend-opt.picked { background: var(--peer); color: #120c1e; border-color: var(--peer); font-weight: 700; }
 .pend { border: 1px solid var(--line); border-left: 2px solid var(--peer);
   border-radius: 5px; background: var(--panel2); padding: 6px 8px; }
 .pend-hd { font-size: 12px; }

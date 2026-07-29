@@ -134,18 +134,83 @@ async function refreshPending() {
       `<div class="pend-hd"><b>${escapeHtml(p.verb)}</b> → ${escapeHtml(p.target)} `
       + `<span class="muted">from ${escapeHtml(p.src || "")}</span></div>`
       + `<div class="pend-body">${escapeHtml(p.body || "(no body)")}</div>`
+      + optsHtml(p)
       + `<div class="pend-btns">`
       + `<button class="ok" data-fp="${p.fp}" data-a="approve">approve</button>`
       + `<button data-fp="${p.fp}" data-a="approve-all">approve lane</button>`
       + `<button class="no" data-fp="${p.fp}" data-a="deny">deny</button></div>`;
     el.appendChild(d);
   }
-  el.querySelectorAll("button[data-fp]").forEach(b =>
+  el.querySelectorAll(".pend-btns button").forEach(b =>
     b.onclick = () => actOpcode(b.dataset.fp, b.dataset.a));
+  el.querySelectorAll(".pend-opt").forEach(b =>
+    b.onclick = () => pickOption(b));
 }
 async function actOpcode(fp, action) {
   await post("/orch/act", { fp, action });
   refreshPending();
+}
+
+// Turn an ask body into clickable choice buttons: lines like "(a) label" become a button,
+// grouped under a preceding "Qn." header. This is the "dynamic buttons from an ask" feature —
+// author options as `(x) …` lines and the cockpit renders them.
+function parseAsk(body) {
+  const groups = [];
+  let cur = null;
+  for (const line of (body || "").split("\n")) {
+    const qm = line.match(/^\s*(Q\d+)\b/);
+    if (qm) { cur = { qn: qm[1], opts: [] }; groups.push(cur); continue; }
+    const om = line.match(/^\s*\(([A-Za-z0-9])\)\s*(.+)/);
+    if (om) {
+      if (!cur) { cur = { qn: "", opts: [] }; groups.push(cur); }
+      cur.opts.push({ letter: om[1], label: om[2].trim() });
+    }
+  }
+  return groups.filter(g => g.opts.length);
+}
+function optsHtml(p) {
+  const groups = parseAsk(p.body);
+  if (!groups.length) return "";
+  let h = `<div class="pend-opts">`;
+  for (const g of groups) {
+    h += `<div class="pend-q">` + (g.qn ? `<span class="qn">${escapeHtml(g.qn)}</span>` : "");
+    for (const o of g.opts)
+      h += `<button class="pend-opt" data-fp="${p.fp}" data-q="${escapeHtml(g.qn)}" `
+        + `data-opt="${escapeHtml(o.letter)}" data-label="${escapeHtml(o.label)}" `
+        + `title="${escapeHtml(o.label)}">(${escapeHtml(o.letter)})</button>`;
+    h += `</div>`;
+  }
+  return h + `</div>`;
+}
+async function pickOption(btn) {
+  const { fp, q, opt, label } = btn.dataset;
+  await post("/pick", { fp, q, opt, label });
+  btn.parentElement.querySelectorAll(".pend-opt").forEach(x => x.classList.remove("picked"));
+  btn.classList.add("picked");
+}
+
+// Draggable column splitters: dragging a gutter sets --cw-left / --cw-mid (px); right col is 1fr.
+function initGutters() {
+  const root = document.documentElement;
+  document.querySelectorAll(".gutter").forEach(g => {
+    g.addEventListener("pointerdown", e => {
+      e.preventDefault();
+      g.classList.add("dragging");
+      const which = g.dataset.resize;
+      const col = document.querySelector(which === "left" ? ".col.left" : ".col.mid");
+      const varName = which === "left" ? "--cw-left" : "--cw-mid";
+      const startX = e.clientX;
+      const startPx = col.getBoundingClientRect().width;
+      const move = ev => root.style.setProperty(varName, Math.max(140, startPx + ev.clientX - startX) + "px");
+      const up = () => {
+        g.classList.remove("dragging");
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+    });
+  });
 }
 
 // ----------------------------------------------------------------- log
@@ -192,6 +257,7 @@ function renderEvent(ev) {
       + `${escapeHtml(ev.target || "")} <span class="muted">${escapeHtml((ev.body || "").slice(0, 60))}</span>`;
   }
   if (ev.kind === "peer") return `${escapeHtml(ev.event || "")} <b>${escapeHtml(ev.name || "")}</b> <span class="muted">${escapeHtml(ev.host || "")}</span>`;
+  if (ev.kind === "pick") return `<span class="k-peer">picked</span> <b>${escapeHtml(ev.q || "")}</b> = (${escapeHtml(ev.opt || "")}) <span class="muted">${escapeHtml((ev.label || "").slice(0, 70))}</span>`;
   if (ev.msg) return escapeHtml(ev.msg);
   return escapeHtml(JSON.stringify(ev));
 }
@@ -234,6 +300,7 @@ async function init() {
   $("ctx").addEventListener("keydown", (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") sendContext();
   });
+  initGutters();
   await refreshWindows();
   await refreshLayouts();
   await refreshPeers();
