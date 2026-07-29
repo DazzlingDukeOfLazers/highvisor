@@ -175,18 +175,22 @@ function optsHtml(p) {
   for (const g of groups) {
     h += `<div class="pend-q">` + (g.qn ? `<span class="qn">${escapeHtml(g.qn)}</span>` : "");
     for (const o of g.opts)
-      h += `<button class="pend-opt" data-fp="${p.fp}" data-q="${escapeHtml(g.qn)}" `
-        + `data-opt="${escapeHtml(o.letter)}" data-label="${escapeHtml(o.label)}" `
+      h += `<button class="pend-opt" data-fp="${p.fp}" data-src="${escapeHtml(p.src || "")}" `
+        + `data-q="${escapeHtml(g.qn)}" data-opt="${escapeHtml(o.letter)}" data-label="${escapeHtml(o.label)}" `
         + `title="${escapeHtml(o.label)}">(${escapeHtml(o.letter)})</button>`;
     h += `</div>`;
   }
   return h + `</div>`;
 }
+const pickState = {};   // fp -> { qn -> {opt, label} } — accumulates so the composer shows all picks
 async function pickOption(btn) {
-  const { fp, q, opt, label } = btn.dataset;
-  await post("/pick", { fp, q, opt, label });
+  const { fp, src, q, opt, label } = btn.dataset;
+  (pickState[fp] || (pickState[fp] = {}))[q || "?"] = { opt, label };
+  const summary = "Cockpit picks — " + Object.entries(pickState[fp])
+    .map(([qn, v]) => `${qn}=(${v.opt}) ${v.label}`).join("; ");
   btn.parentElement.querySelectorAll(".pend-opt").forEach(x => x.classList.remove("picked"));
   btn.classList.add("picked");
+  await post("/pick", { fp, src, q, opt, label, summary });
 }
 
 // Draggable column splitters: dragging a gutter sets --cw-left / --cw-mid (px); right col is 1fr.

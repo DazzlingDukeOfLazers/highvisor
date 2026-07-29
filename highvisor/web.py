@@ -96,10 +96,23 @@ def make_web_server(engine, bus, bridge=None, orchestrator=None,
                     req.get("fp"), req.get("action"))))
             if self.path == "/pick":
                 # A human clicked a choice button the cockpit rendered from an ask's `(x)` options.
-                # Record it on the bus (visible in the log + SSE) so the decision is captured.
+                # 1) Record it on the bus (visible in the log + SSE) so the decision is captured.
                 bus.publish("pick", q=str(req.get("q", "")), opt=str(req.get("opt", "")),
                             label=str(req.get("label", "")), fp=req.get("fp"))
-                return self._send(200, json.dumps({"ok": True}))
+                # 2) Paste the running pick summary into the ASKER's composer (the ask's source),
+                #    WITHOUT submitting — the human presses enter to send. Closes the manual-relay gap.
+                pasted = None
+                if orchestrator is not None:
+                    agent = (str(req.get("src", "") or "").split("/")[-1]) or "claude"
+                    summary = str(req.get("summary", "")) or ("%s=(%s)" % (req.get("q", ""), req.get("opt", "")))
+                    try:
+                        res = orchestrator.deliver(agent, summary, submit=False)
+                        if not res.get("ok") and agent != "claude":     # fall back to the primary asker
+                            res = orchestrator.deliver("claude", summary, submit=False)
+                        pasted = res.get("ok")
+                    except Exception as e:
+                        bus.publish("orch", msg="pick paste failed: %s" % e)
+                return self._send(200, json.dumps({"ok": True, "pasted": pasted}))
             if self.path == "/shutdown":
                 # localhost-only cockpit -> local off switch. Reply first, then exit
                 # after a beat so the response reaches the browser.
