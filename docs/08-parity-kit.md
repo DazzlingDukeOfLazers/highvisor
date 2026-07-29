@@ -67,8 +67,25 @@ relative to the file). Non-object keys (e.g. a `_note`) are ignored by `--all`.
 ```
 
 Steps (one action each): `{"move":[x,y,w,h]}`, `{"click":[x,y], "hover":bool, "double":bool,
-"button":"left|right"}`, `{"key":"Escape", "focus":true}`, `{"wait":seconds}`. An optional
-per-scene/-reference `"reset":[…]` runs before `steps` to normalize state.
+"button":"left|right"}`, `{"key":"Escape", "focus":true}`, `{"wait":seconds}`, and
+`{"shell":[argv…], "timeout":secs}`. An optional per-scene/-reference `"reset":[…]` runs before
+`steps` to normalize state.
+
+A **`shell`** step runs a command before the capture continues — the hook for deterministic **data
+setup**. Its cwd is the scene config's directory (so `../capture/presets.py` resolves from
+`tools/regression/`); a non-zero exit aborts the scene with the captured stderr. The canonical use is
+loading a Raves option preset so a scene captures a **known configuration**:
+
+```json
+"reset": [
+  { "shell": ["python3", "../capture/presets.py", "load", "some-qud-preset"] },
+  { "click": [140, 952] }, { "wait": 0.6 }
+]
+```
+
+Caveat: a preset's *Qud* options apply live over the bridge (fine in-scene), but its *Raves* settings
+(camera/full_info) only take effect on a Raves **launch** — for those, relaunch at the script level
+(`presets.py load X` → `hv launch raves` → `hv scene …`) rather than an in-scene `shell` step.
 
 Raves' suite lives in the *Raves* repo (`tools/regression/scenes.json` + `golden/`), run as:
 
