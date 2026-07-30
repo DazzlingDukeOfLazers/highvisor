@@ -188,6 +188,13 @@ class Engine:
         if op == P.OP_PROBE:
             return self._probe(b, req.get("app"), req.get("window"), req.get("port"))
 
+        if op == P.OP_GAMETREE:
+            from . import gametree
+            return {"ok": True, "tree": gametree.load_tree(force=bool(req.get("reload")))}
+
+        if op == P.OP_GAMESTATE:
+            return self._gamestate(b, ocr=bool(req.get("ocr", False)))
+
         if op == P.OP_LAYOUT_LIST:
             from .layouts import load_layouts
             return {"ok": True, "layouts": [
@@ -340,6 +347,41 @@ class Engine:
         return {"ok": True, "app": app, "running": win is not None, "state": state,
                 "port": port, "port_open": port_open,
                 "window": win.to_dict() if win else None}
+
+    def _gamestate(self, b, ocr=False):
+        """Evaluate the game state-machine tree against live signals for each app.
+
+        Cheap by default — window presence + Qud's 48710 bridge port. Pass ocr=True to
+        also OCR each present window so menu-side screens (title / load / chargen) can be
+        told apart; that path is heavier, so the cockpit polls it on a slower cadence.
+        See gametree.py for the matching rules."""
+        from . import gametree
+        import socket
+        tree = gametree.load_tree()
+        wins = b.list_targets()
+        states = {}
+        for app, cfg in gametree.apps(tree).items():
+            win = self._find_win(wins, cfg.get("window"))
+            signals = {"present": win is not None, "port_open": None, "ocr_text": None}
+            port = cfg.get("port")
+            if port:
+                try:
+                    with socket.create_connection(("127.0.0.1", int(port)), timeout=0.4):
+                        signals["port_open"] = True
+                except OSError:
+                    signals["port_open"] = False
+            if ocr and win is not None:
+                try:
+                    res = b.ocr(win.id)
+                    signals["ocr_text"] = "\n".join(x.get("text", "") for x in res.get("boxes", []))
+                except Exception:
+                    signals["ocr_text"] = None
+            st = gametree.evaluate(tree, app, signals)
+            st["window"] = win.to_dict() if win else None
+            st["signals"] = {"present": signals["present"], "port_open": signals["port_open"],
+                             "ocr_used": signals["ocr_text"] is not None}
+            states[app] = st
+        return {"ok": True, "ocr": bool(ocr), "states": states}
 
     def _apply_layout(self, b, name):
         from .layouts import load_layouts, placement_rect

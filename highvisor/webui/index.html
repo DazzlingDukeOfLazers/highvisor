@@ -123,6 +123,15 @@
     <div class="gutter" data-resize="mid" title="drag to resize columns"></div>
 
     <section class="col right">
+      <div class="panel gt-resizable" id="gt-panel">
+        <div class="panel-hd">
+          state tree
+          <span id="gt-legend" class="gt-legend muted"></span>
+          <button id="gt-ocr" title="refine menu-side screens (title / load / chargen) with an OCR read now">ocr</button>
+        </div>
+        <div id="gametree" class="gametree"><div class="muted" style="padding:8px">loading…</div></div>
+      </div>
+      <div class="hgutter" data-resize="gametree" title="drag to resize state tree / log"></div>
       <div class="panel grow">
         <div class="panel-hd">log <button id="clearlog" title="clear">clear</button></div>
         <div id="log" class="log"></div>

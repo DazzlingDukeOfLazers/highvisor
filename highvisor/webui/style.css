@@ -173,6 +173,29 @@ main {
 .hgutter { align-self: stretch; height: 4px; border-radius: 3px; background: var(--line);
   cursor: row-resize; transition: background .1s; }
 .hgutter:hover, .hgutter.dragging { background: var(--accent); }
+
+/* ---- game state-machine tree (right column, above the log) ---- */
+.panel.gt-resizable { flex: none; height: var(--gth, 300px); min-height: 110px; }
+.gametree { flex: 1; min-height: 0; overflow: auto; padding: 3px 6px 6px; }
+.gt-legend { flex: 1; min-width: 0; font-size: 11px; text-transform: none; letter-spacing: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gt-row { display: flex; align-items: center; gap: 6px; padding: 1px 2px; border-radius: 4px; }
+.gt-row.rowcur { background: #1f6feb1a; }
+.gt-head { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .5px;
+  border-bottom: 1px solid var(--line); padding-bottom: 3px; margin-bottom: 2px;
+  position: sticky; top: 0; background: var(--panel); z-index: 1; }
+.gt-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gt-cell { width: 88px; flex: none; display: flex; align-items: center; gap: 5px;
+  padding: 1px 4px; border-radius: 3px; }
+.gt-head-cell { justify-content: center; }
+.gt-cell.cur { background: #4ea1ff26; outline: 1px solid var(--accent); }
+.gt-cell.onpath { background: #4ea1ff10; }
+.gt-bar { flex: 1; height: 6px; border-radius: 3px; background: var(--panel2);
+  overflow: hidden; display: inline-block; }
+.gt-bar-fill { display: block; height: 100%; background: var(--ok); }
+.gt-bar-na { background: transparent; }
+.gt-num { color: var(--muted); font-size: 10px; width: 20px; text-align: right; }
+.gt-here { color: var(--accent); font-size: 11px; line-height: 1; }
 /* option buttons parsed from an ask body: each shows its FULL choice text, stacked per question */
 .pend-opts { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 6px; }
 .pend-answerhint { color: var(--ok); font-size: 11px; }

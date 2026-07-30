@@ -625,6 +625,7 @@ function initGutters() {
       let el, varName, min;
       if (which === "left") { el = document.querySelector(".col.left"); varName = "--cw-left"; min = 140; }
       else if (which === "mid") { el = document.querySelector(".col.mid"); varName = "--cw-mid"; min = 140; }
+      else if (which === "gametree") { el = document.querySelector(".col.right .gt-resizable"); varName = "--gth"; min = 110; }
       else { el = document.querySelector(".panel.resizable"); varName = "--ph"; min = 90; }
       const startPos = vertical ? e.clientY : e.clientX;
       const startSize = el.getBoundingClientRect()[vertical ? "height" : "width"];
@@ -731,6 +732,83 @@ async function checkStale() {
   if (msg) msg.hidden = !stale;
 }
 
+// ------------------------------------------------------- game state tree
+// One canonical tree (from the `gametree` op) rendered as an aligned master column
+// (the node labels) + a Raves column + a Qud column, each showing that app's 0–1
+// completion bar and a live "you are here" highlight. Live state comes from the
+// `gamestate` op: a cheap window+port poll (fast) merged with a slower OCR poll that
+// refines menu-side screens (title / load / chargen). The OCR result wins while fresh
+// so the highlight doesn't flicker back to the coarse guess between OCR reads.
+let gtTree = null;
+const gtCoarse = {};   // app -> last cheap poll result
+const gtFine = {};     // app -> last OCR poll result (+ .ts)
+
+function gtCurrent(app) {
+  const f = gtFine[app];
+  if (f && f.running && (Date.now() - f.ts) < 12000) return f;
+  return gtCoarse[app] || null;
+}
+
+async function loadGameTree() {
+  const r = await rpc("gametree");
+  if (r.ok && r.tree) { gtTree = r.tree; renderGameTree(); }
+}
+
+async function pollGameState(ocr) {
+  const r = await rpc("gamestate", ocr ? { ocr: true } : {});
+  if (!r.ok || !r.states) return;
+  const now = Date.now();
+  for (const [app, st] of Object.entries(r.states)) {
+    st.ts = now;
+    if (ocr) gtFine[app] = st; else gtCoarse[app] = st;
+  }
+  renderGameTree();
+}
+
+function gtRow(node, depth, appIds, cur) {
+  const pad = 6 + depth * 14;
+  let cells = "";
+  for (const app of appIds) {
+    const st = cur[app];
+    const isCur = !!(st && st.node === node.id);
+    const onPath = !!(st && Array.isArray(st.path) && st.path.includes(node.id) && !isCur);
+    const done = (node.done && typeof node.done[app] === "number") ? node.done[app] : null;
+    const bar = done == null
+      ? `<span class="gt-bar gt-bar-na"></span><span class="gt-num"></span>`
+      : `<span class="gt-bar"><span class="gt-bar-fill" style="width:${Math.round(done * 100)}%"></span></span><span class="gt-num">${done.toFixed(1)}</span>`;
+    cells += `<span class="gt-cell${isCur ? " cur" : ""}${onPath ? " onpath" : ""}">${bar}${isCur ? '<span class="gt-here">●</span>' : ""}</span>`;
+  }
+  const anyCur = appIds.some(a => cur[a] && cur[a].node === node.id);
+  return `<div class="gt-row${anyCur ? " rowcur" : ""}"><span class="gt-label" style="padding-left:${pad}px" title="${escapeHtml(node.id)}">${escapeHtml(node.label || node.id)}</span>${cells}</div>`;
+}
+
+function renderGameTree() {
+  const host = $("gametree");
+  if (!host) return;
+  if (!gtTree) { host.innerHTML = '<div class="muted" style="padding:8px">loading…</div>'; return; }
+  const appIds = Object.keys(gtTree.apps || {});
+  const cur = {};
+  const legend = [];
+  for (const app of appIds) {
+    const st = gtCurrent(app);
+    cur[app] = st;
+    const lbl = (gtTree.apps[app].label || app);
+    legend.push(`${lbl}: ${st ? (st.off ? "off" : (st.label || "…")) : "—"}`);
+  }
+  const leg = $("gt-legend"); if (leg) leg.textContent = legend.join("   ·   ");
+  let html = '<div class="gt-row gt-head"><span class="gt-label">screen</span>';
+  for (const app of appIds) html += `<span class="gt-cell gt-head-cell">${escapeHtml(gtTree.apps[app].label || app)}</span>`;
+  html += "</div>";
+  const rows = [];
+  const walk = (node, depth) => {
+    if (node.id === "root") { for (const ch of node.children || []) walk(ch, 0); return; }
+    rows.push(gtRow(node, depth, appIds, cur));
+    for (const ch of node.children || []) walk(ch, depth + 1);
+  };
+  walk(gtTree.root, 0);
+  host.innerHTML = html + rows.join("");
+}
+
 async function init() {
   const p = await rpc("ping");
   if (p.ok) $("backend").textContent = "backend: " + p.backend;
@@ -773,6 +851,7 @@ async function init() {
   $("raves-1to1").onclick = toggleRaves1to1;
   $("layoutsel").onchange = showLayoutDesc;
   $("clearlog").onclick = () => (logEl().innerHTML = "");
+  $("gt-ocr").onclick = () => pollGameState(true);
   $("off").onclick = async () => {
     if (!confirm("Shut down the highvisor daemon? You'll restart it from a terminal.")) return;
     try { await fetch("/shutdown", { method: "POST" }); } catch {}
@@ -793,5 +872,12 @@ async function init() {
   setInterval(refreshPending, 3000);
   setInterval(refreshUserTestStatus, 3000);   // live Raves/Qud duplicate checker
   setInterval(checkStale, 5000);
+  // game state tree: load structure, then poll live state (cheap fast + OCR slow)
+  await loadGameTree();
+  pollGameState(false);
+  pollGameState(true);
+  setInterval(() => pollGameState(false), 2500);   // window + Qud port — cheap, responsive
+  setInterval(() => pollGameState(true), 8000);    // OCR refine of menu-side screens
+  setInterval(loadGameTree, 20000);                // pick up gametree.json edits (completion, structure)
 }
 init();

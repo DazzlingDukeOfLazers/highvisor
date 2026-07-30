@@ -41,6 +41,8 @@ OP_PEER_SHOT = "peer_shot"        # peer, target -> {ok, png_b64, bytes} (via br
 OP_LAUNCH = "launch"              # name (launcher) | raw spec -> ActionResult
 OP_LAUNCH_LIST = "launch_list"    # -> {ok, launchers:{name: spec}}
 OP_LAUNCH_SAVE = "launch_save"    # name, spec -> {ok, saved, path}
+OP_GAMETREE = "gametree"          # -> {ok, tree} (the canonical game state-machine tree)
+OP_GAMESTATE = "gamestate"        # [ocr] -> {ok, states:{app:{node,label,path,off,running,via}}}
 
 MAX_FRAME = 64 * 1024 * 1024  # 64 MiB guard (a 4k screenshot fits easily)
 

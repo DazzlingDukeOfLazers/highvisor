@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "note": "Canonical game state-machine tree (one source, three views). done[app] = 0..1, how finished our 1:1 work is on that screen for that app (Qud = reference/how well we detect+drive it; Raves = render/impl fidelity). Edit freely; the cockpit reloads on file change. detect[app] recognises 'we are here' from live signals: port (Qud's 48710 bridge, open only in-game) and ocr_any (case-insensitive substrings in an OCR of the window). A node matches when all its conditions hold; the DEEPEST match wins. Conditions needing OCR only match on an OCR-enabled poll, so cheap polls fall back to the coarsest ancestor.",
+  "apps": {
+    "qud":   { "label": "Qud",   "window": "CavesOfQud",   "port": 48710 },
+    "raves": { "label": "Raves", "window": "Raves of Qud" }
+  },
+  "root": {
+    "id": "root",
+    "label": "Game",
+    "children": [
+      {
+        "id": "freehold",
+        "label": "Freehold Games splash",
+        "note": "transient boot splash — no reliable detector yet",
+        "done": { "qud": 1.0, "raves": 0.0 },
+        "detect": {}
+      },
+      {
+        "id": "title",
+        "label": "Title Screen",
+        "done": { "qud": 1.0, "raves": 0.6 },
+        "detect": {
+          "qud":   { "port": false },
+          "raves": { "ocr_any": ["caves of qud", "new game", "continue", "records", "modding toolkit"] }
+        },
+        "children": [
+          {
+            "id": "new_game",
+            "label": "New Game → Character Creation",
+            "done": { "qud": 0.6, "raves": 0.4 },
+            "detect": {
+              "qud":   { "port": false, "ocr_any": ["character creation", "choose genotype", "choose preset", "choose calling", "mutations", "pregens"] },
+              "raves": { "ocr_any": ["character creation", "choose genotype", "choose preset", "genotype"] }
+            },
+            "children": [
+              { "id": "genotype",   "label": "Choose Genotype",   "done": { "qud": 0.6, "raves": 0.5 }, "detect": {} },
+              { "id": "calling",    "label": "Calling / Subtype",  "done": { "qud": 0.5, "raves": 0.2 }, "detect": {} },
+              { "id": "attributes", "label": "Attributes",         "done": { "qud": 0.4, "raves": 0.1 }, "detect": {} },
+              { "id": "embark",     "label": "Embark",             "done": { "qud": 0.5, "raves": 0.1 }, "detect": {} }
+            ]
+          },
+          {
+            "id": "continue",
+            "label": "Continue → Load Game",
+            "done": { "qud": 0.9, "raves": 0.2 },
+            "detect": {
+              "qud":   { "port": false, "ocr_any": ["load game"] },
+              "raves": { "ocr_any": ["load game"] }
+            },
+            "children": [
+              { "id": "load_game", "label": "Load Game (save picker)", "done": { "qud": 0.9, "raves": 0.2 }, "detect": {} }
+            ]
+          },
+          { "id": "records", "label": "Records", "done": { "qud": 0.3, "raves": 0.0 }, "detect": {} },
+          { "id": "options", "label": "Options", "done": { "qud": 0.4, "raves": 0.2 }, "detect": {} },
+          { "id": "mods",    "label": "Mods",    "done": { "qud": 0.3, "raves": 0.0 }, "detect": {} }
+        ]
+      },
+      {
+        "id": "in_game",
+        "label": "In-Game",
+        "done": { "qud": 1.0, "raves": 0.5 },
+        "detect": {
+          "qud":   { "port": true },
+          "raves": { "ocr_any": ["make camp", "abilities", "active effects", "message log", "sprint"] }
+        },
+        "children": [
+          { "id": "world",          "label": "Play Field / Holodeck", "done": { "qud": 1.0, "raves": 0.5 }, "detect": {} },
+          { "id": "top_bar",        "label": "Top Status Bar",        "done": { "qud": 1.0, "raves": 0.7 }, "detect": {} },
+          { "id": "ability_bar",    "label": "Ability / Command Bar",  "done": { "qud": 1.0, "raves": 0.3 }, "detect": {} },
+          { "id": "message_log",    "label": "Message Log",            "done": { "qud": 1.0, "raves": 0.3 }, "detect": {} },
+          { "id": "inventory",      "label": "Inventory / Equipment",  "done": { "qud": 1.0, "raves": 0.1 }, "detect": {} },
+          { "id": "character_sheet","label": "Character Sheet",        "done": { "qud": 1.0, "raves": 0.1 }, "detect": {} },
+          { "id": "look",           "label": "Look / Examine",         "done": { "qud": 1.0, "raves": 0.2 }, "detect": {} },
+          { "id": "direction_pick", "label": "Direction Picker",       "done": { "qud": 1.0, "raves": 0.4 }, "detect": {} }
+        ]
+      }
+    ]
+  }
+}
