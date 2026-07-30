@@ -70,8 +70,42 @@
       </div>
       <div class="hgutter" data-resize="pending" title="drag to resize pending / preview"></div>
       <div class="panel grow">
-        <div class="panel-hd">preview <span id="shotlabel" class="muted"></span></div>
+        <div class="panel-hd">
+          <span class="tabs">
+            <button class="tab active" data-tab="preview">preview</button>
+            <button class="tab" data-tab="congruence">congruence</button>
+          </span>
+          <span id="shotlabel" class="muted"></span>
+        </div>
         <div id="shotwrap" class="shotwrap"><span class="muted">click a window to capture</span></div>
+        <div id="congruence" class="cong" hidden>
+          <div class="cong-bar">
+            <button id="cong-capture" class="primary">⧉ Capture Raves + Qud</button>
+            <span id="cong-status" class="muted"></span>
+          </div>
+          <div class="cong-bar">
+            <span class="cong-fade-lbl">Qud</span>
+            <input id="cong-fade" class="cong-slider" type="range" min="0" max="100" value="50"
+                   title="cross-fade between Qud and Raves">
+            <span class="cong-fade-lbl">Raves</span>
+          </div>
+          <div class="cong-bar">
+            <label class="cong-check"><input id="cong-sim-toggle" type="checkbox"> similarity map</label>
+            <span class="cong-thresh" hidden>tol
+              <input id="cong-thresh" class="cong-slider" type="range" min="0" max="64" value="10"
+                     title="per-channel tolerance — pixels within this count as the same">
+              <span id="cong-thresh-val" class="muted">10</span>
+            </span>
+          </div>
+          <div id="cong-stage" class="cong-stage">
+            <span class="muted cong-empty">capture Raves + Qud to compare them</span>
+            <div id="cong-frame" class="cong-frame" hidden>
+              <canvas id="cong-qud"></canvas>
+              <canvas id="cong-raves"></canvas>
+              <canvas id="cong-sim" hidden></canvas>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="panel">
         <div class="panel-hd">context handoff <span class="muted">→ peers</span></div>

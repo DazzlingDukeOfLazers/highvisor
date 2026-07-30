@@ -54,6 +54,109 @@ async function shoot(target, label) {
   wrap.appendChild(img);
 }
 
+// ------------------------------------------------ congruence (1:1 diff tool)
+// Overlay a Raves capture and a Qud capture: cross-fade between them, and toggle
+// a "similarity map" that hides matching pixels and paints the mismatches the
+// midway colour of the two — so 1:1 drift jumps out.
+let _congImgs = null;   // {qud: Image, raves: Image} of the last capture
+
+function switchPreviewTab(tab) {
+  document.querySelectorAll(".panel-hd .tab").forEach(b =>
+    b.classList.toggle("active", b.dataset.tab === tab));
+  $("shotwrap").hidden = tab !== "preview";
+  $("congruence").hidden = tab !== "congruence";
+  $("shotlabel").style.visibility = tab === "preview" ? "" : "hidden";
+}
+
+function _shotImage(target) {
+  return rpc("screenshot", { target }).then(res => {
+    if (!res.ok) throw new Error(res.error || "capture failed");
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("decode failed"));
+      img.src = "data:image/png;base64," + res.png_b64;
+    });
+  });
+}
+
+async function captureCongruence() {
+  const btn = $("cong-capture"), status = $("cong-status");
+  const wins = await rpc("list_targets");
+  if (!wins.ok) { status.className = "bad"; status.textContent = "list_targets failed"; return; }
+  const { raves, qud } = classifyRavesQud(wins.targets);
+  if (raves.length !== 1 || qud.length !== 1) {
+    status.className = "bad";
+    status.textContent = _dupMessage(raves, qud).split("\n")[0];
+    return;
+  }
+  btn.disabled = true; status.className = "muted"; status.textContent = "capturing…";
+  try {
+    const [qImg, rImg] = await Promise.all([_shotImage(qud[0].id), _shotImage(raves[0].id)]);
+    _congImgs = { qud: qImg, raves: rImg };
+    _renderCongruence();
+  } catch (e) {
+    status.className = "bad"; status.textContent = "capture failed: " + (e.message || e);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function _renderCongruence() {
+  if (!_congImgs) return;
+  const { qud, raves } = _congImgs;
+  const w = qud.naturalWidth, h = qud.naturalHeight;   // compare on Qud's pixel grid
+  const qc = $("cong-qud"), rc = $("cong-raves"), sc = $("cong-sim");
+  for (const c of [qc, rc, sc]) { c.width = w; c.height = h; }
+  qc.getContext("2d").drawImage(qud, 0, 0, w, h);
+  rc.getContext("2d").drawImage(raves, 0, 0, w, h);    // scaled to match if sizes differ
+  $("cong-frame").hidden = false;
+  document.querySelector(".cong-empty").hidden = true;
+  _applyCrossfade();
+  _buildSimilarity();
+  _applySimToggle();
+}
+
+function _applyCrossfade() {
+  // Qud is the base layer (full opacity); Raves fades in on top. 0 = Qud, 1 = Raves.
+  $("cong-raves").style.opacity = String((+$("cong-fade").value) / 100);
+}
+
+function _buildSimilarity() {
+  if (!_congImgs) return;
+  const qc = $("cong-qud"), rc = $("cong-raves"), sc = $("cong-sim");
+  const w = qc.width, h = qc.height;
+  const qd = qc.getContext("2d").getImageData(0, 0, w, h).data;
+  const rd = rc.getContext("2d").getImageData(0, 0, w, h).data;
+  const ctx = sc.getContext("2d");
+  const out = ctx.createImageData(w, h);   // starts fully transparent (alpha 0)
+  const o = out.data;
+  const tol = +$("cong-thresh").value;     // per-channel tolerance (drift-forgiving)
+  let diff = 0;
+  for (let i = 0; i < qd.length; i += 4) {
+    const d = Math.max(Math.abs(qd[i] - rd[i]),
+                       Math.abs(qd[i + 1] - rd[i + 1]),
+                       Math.abs(qd[i + 2] - rd[i + 2]));
+    if (d > tol) {                          // different -> opaque midway colour
+      o[i]     = (qd[i]     + rd[i])     >> 1;
+      o[i + 1] = (qd[i + 1] + rd[i + 1]) >> 1;
+      o[i + 2] = (qd[i + 2] + rd[i + 2]) >> 1;
+      o[i + 3] = 255;
+      diff++;
+    }                                       // same -> left transparent (alpha 0)
+  }
+  ctx.putImageData(out, 0, 0);
+  const pct = (100 * diff / (w * h)).toFixed(1);
+  $("cong-status").className = "muted";
+  $("cong-status").textContent = `${pct}% of pixels differ (tolerance ${tol})`;
+}
+
+function _applySimToggle() {
+  const on = $("cong-sim-toggle").checked;
+  $("cong-sim").hidden = !on || !_congImgs;
+  document.querySelector(".cong-thresh").hidden = !on;
+}
+
 // ------------------------------------------------------------------ peers
 async function refreshPeers() {
   let res;
@@ -504,6 +607,15 @@ async function init() {
   $("send").onclick = sendContext;
   $("applylayout").onclick = applyLayout;
   $("savelayout").onclick = saveLayout;
+  document.querySelectorAll(".panel-hd .tab").forEach(b =>
+    (b.onclick = () => switchPreviewTab(b.dataset.tab)));
+  $("cong-capture").onclick = captureCongruence;
+  $("cong-fade").oninput = _applyCrossfade;
+  $("cong-sim-toggle").onchange = _applySimToggle;
+  $("cong-thresh").oninput = () => {
+    $("cong-thresh-val").textContent = $("cong-thresh").value;
+    _buildSimilarity();
+  };
   $("start-raves").onclick = startRavesLatest;
   document.querySelectorAll(".ut").forEach(b =>
     (b.onclick = () => userTestLayout(+b.dataset.w, +b.dataset.h)));

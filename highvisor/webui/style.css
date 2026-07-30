@@ -5,6 +5,9 @@
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 }
 * { box-sizing: border-box; }
+/* honor the `hidden` attribute even on elements we give a display (flex) — the tab
+   subviews (#shotwrap / #congruence) and toggled rows rely on it. */
+[hidden] { display: none !important; }
 html, body { height: 100%; margin: 0; }
 body {
   background: var(--bg); color: var(--fg); font: 13px/1.5 var(--mono);
@@ -74,6 +77,38 @@ main {
 }
 .shotwrap img { max-width: 100%; max-height: 100%; image-rendering: auto;
   border: 1px solid var(--line); }
+
+/* preview / congruence tabs in the panel header */
+.panel-hd .tabs { display: flex; gap: 4px; }
+.panel-hd .tab {
+  margin-left: 0; background: transparent; color: var(--muted);
+  border: 1px solid transparent; border-radius: 4px; cursor: pointer;
+  font: inherit; font-size: 11px; text-transform: uppercase; letter-spacing: .6px; padding: 1px 8px;
+}
+.panel-hd .tab:hover { color: var(--fg); }
+.panel-hd .tab.active { color: var(--fg); border-color: var(--line); background: var(--panel2); }
+#shotlabel { margin-left: auto; }
+
+/* congruence view — overlay Raves/Qud captures, cross-fade + similarity map */
+.cong { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 8px; }
+.cong-bar { display: flex; align-items: center; gap: 8px; }
+.cong-bar button.primary {
+  background: var(--accent); color: #071019; border: none; border-radius: 4px;
+  cursor: pointer; font: inherit; font-weight: 700; padding: 4px 12px;
+}
+.cong-bar button.primary:disabled { opacity: .5; cursor: default; }
+.cong-slider { flex: 1; min-width: 60px; accent-color: var(--accent); }
+.cong-fade-lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+.cong-check { display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer; }
+.cong-thresh { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); flex: 1; }
+.cong-stage {
+  position: relative; flex: 1; min-height: 0; overflow: auto; background: #0a0d11;
+  display: flex; align-items: flex-start; justify-content: center; padding: 8px;
+}
+.cong-empty { margin: auto; }
+.cong-frame { position: relative; max-width: 100%; line-height: 0; border: 1px solid var(--line); }
+.cong-frame canvas { max-width: 100%; height: auto; display: block; }
+.cong-frame #cong-raves, .cong-frame #cong-sim { position: absolute; inset: 0; width: 100%; height: 100%; }
 
 .handoff { display: flex; gap: 6px; padding: 8px; }
 .handoff textarea {
