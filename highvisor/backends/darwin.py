@@ -203,22 +203,29 @@ class MacBackend(PlatformBackend):
         url = app.bundleURL() or app.executableURL()
         return url.path() if url is not None else ""
 
-    def launch(self, spec: str) -> ActionResult:
+    def launch(self, spec: str, args=None) -> ActionResult:
         import subprocess
         spec = (spec or "").strip()
         if not spec:
             return ActionResult.fail("empty launch spec")
+        args = [str(a) for a in (args or [])]
         if "://" in spec:                              # URL scheme (steam://, …)
-            args = ["open", spec]
+            cmd = ["open", spec]
         elif spec.startswith("/") or spec.endswith(".app"):
-            args = ["open", spec]                      # a path / .app bundle
+            # `-n` opens a fresh instance so passed argv actually take effect (an
+            # already-running bundle would otherwise just get re-activated).
+            cmd = ["open", "-n", spec] if args else ["open", spec]
         else:
-            args = ["open", "-a", spec]                # an app name
+            cmd = ["open", "-a", spec]                 # an app name
+        if args:
+            # Everything after --args is forwarded to the program's argv. Raves
+            # reads these (`-- --launch-qud <coq> …`) to spawn Caves of Qud itself.
+            cmd += ["--args"] + args
         try:
-            subprocess.Popen(args)
+            subprocess.Popen(cmd)
         except Exception as e:
             return ActionResult.fail("launch failed: %s" % e)
-        return ActionResult(ok=True, detail="open %s" % " ".join(args[1:]))
+        return ActionResult(ok=True, detail="open %s" % " ".join(cmd[1:]))
 
     def screen_size(self):
         d = Quartz.CGMainDisplayID()

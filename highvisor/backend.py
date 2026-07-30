@@ -120,9 +120,10 @@ class PlatformBackend:
     def list_targets(self) -> List[Target]:
         raise NotImplementedError
 
-    def launch(self, spec: str) -> "ActionResult":
+    def launch(self, spec: str, args=None) -> "ActionResult":
         """Start a program. ``spec`` is OS-interpreted: a URL scheme
-        (``steam://rungameid/...``), an app path/bundle, or an app name."""
+        (``steam://rungameid/...``), an app path/bundle, or an app name. ``args``,
+        if given, is forwarded to the program's argv."""
         raise NotImplementedError
 
     def screenshot(self, target: Optional[str], native: bool = False) -> bytes:

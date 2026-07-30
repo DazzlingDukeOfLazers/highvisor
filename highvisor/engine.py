@@ -210,12 +210,12 @@ class Engine:
             return self.bridge.request_shot(req.get("peer"), req.get("target"))
 
         if op == P.OP_LAUNCH:
-            from .launch import resolve
-            spec = resolve(req.get("name", ""))
+            from .launch import resolve_launch
+            spec, largs = resolve_launch(req.get("name", ""))
             if not spec:
                 return {"ok": False, "error": "no launcher/spec %r" % req.get("name")}
             before = {t.id for t in b.list_targets()}
-            d = b.launch(spec).to_dict()
+            d = b.launch(spec, largs).to_dict()
             d["spec"] = spec
             # defacto: if the just-launched window carries a standing dock rule
             # (e.g. Raves -> above Caves of Qud), highvisor stacks it on its own.

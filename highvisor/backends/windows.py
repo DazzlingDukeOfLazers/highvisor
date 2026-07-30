@@ -201,16 +201,22 @@ class WindowsBackend(PlatformBackend):
                 continue
         return out
 
-    def launch(self, spec: str) -> ActionResult:
+    def launch(self, spec: str, args=None) -> ActionResult:
         import os
+        import subprocess
         spec = (spec or "").strip()
         if not spec:
             return ActionResult.fail("empty launch spec")
+        args = [str(a) for a in (args or [])]
         try:
-            os.startfile(spec)  # a path, a URL scheme (steam://…), or a doc/app
+            if args:
+                # os.startfile can't pass argv; Popen the target with its args.
+                subprocess.Popen([spec] + args)
+            else:
+                os.startfile(spec)  # a path, a URL scheme (steam://…), or a doc/app
         except Exception as e:
             return ActionResult.fail("launch failed: %s" % e)
-        return ActionResult(ok=True, detail="startfile %s" % spec)
+        return ActionResult(ok=True, detail="launch %s" % " ".join([spec] + args))
 
     def click(self, target: str, x: int, y: int, button: str = "left",
               double: bool = False) -> ActionResult:

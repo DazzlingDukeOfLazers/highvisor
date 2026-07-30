@@ -35,5 +35,17 @@ def save_launcher(name: str, spec: str) -> str:
 
 
 def resolve(name_or_spec: str) -> str:
-    """A saved launcher's spec if the arg is a known name, else the arg itself."""
-    return load_launchers().get(name_or_spec, name_or_spec)
+    """The open-target of a saved launcher (or the arg itself). Kept for callers
+    that only need the target; use :func:`resolve_launch` to also get its args."""
+    return resolve_launch(name_or_spec)[0]
+
+
+def resolve_launch(name_or_spec: str):
+    """``(open_target, args)`` for a launcher name. An entry may be a bare spec
+    string (no args) or an object ``{"open": <spec>, "args": [...]}`` — the object
+    form lets a launcher pass extra argv to the program (e.g. Raves telling Caves
+    of Qud to open borderless). An unknown name is treated as a literal spec."""
+    entry = load_launchers().get(name_or_spec, name_or_spec)
+    if isinstance(entry, dict):
+        return str(entry.get("open", "")), [str(a) for a in entry.get("args", [])]
+    return str(entry), []
