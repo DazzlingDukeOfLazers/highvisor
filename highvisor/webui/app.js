@@ -509,9 +509,13 @@ async function userTestLayout(W, H) {
     // height >= 2H. Prefer the roomiest such display; else the largest overall.
     const byArea = displays.slice().sort((a, b) => b.w * b.h - a.w * a.h);
     const d = byArea.find(x => x.w >= W && x.h >= 2 * H) || byArea[0];
-    const x = d.x + Math.max(0, d.w - W);          // right-edge aligned -> right half
-    const yTop = d.y;                              // upper-right quadrant
-    const yBot = d.y + Math.floor(d.h / 2);        // lower-right quadrant
+    // Overscan nudge: the monitor clips edge pixels. Shift both LEFT off the right edge, and the
+    // whole right-half column DOWN a touch so Raves' top clears the edge — splitting the ~8px the
+    // windows currently spill past the top. Both windows end flush at their shared centre line.
+    const MARGIN_X = 50, MARGIN_Y = 4;
+    const x = d.x + Math.max(0, d.w - W) - MARGIN_X;     // right-edge aligned, shifted left
+    const yTop = d.y - MARGIN_Y;                         // Raves ▲  (down off the current top spill)
+    const yBot = d.y + Math.floor(d.h / 2) - MARGIN_Y;   // Qud ▼    (up off the bottom edge)
     await rpc("move", { target: raves[0].id, x, y: yTop, w: W, h: H, topmost: false });
     await rpc("move", { target: qud[0].id, x, y: yBot, w: W, h: H, topmost: false });
     await refreshWindows();
