@@ -113,6 +113,7 @@ function _renderCongruence() {
   $("cong-frame").hidden = false;
   document.querySelector(".cong-empty").hidden = true;
   _applyCrossfade();
+  _applySourcesToggle();
   _buildSimilarity();
   _applySimToggle();
 }
@@ -120,6 +121,14 @@ function _renderCongruence() {
 function _applyCrossfade() {
   // Qud is the base layer (full opacity); Raves fades in on top. 0 = Qud, 1 = Raves.
   $("cong-raves").style.opacity = String((+$("cong-fade").value) / 100);
+}
+
+function _applySourcesToggle() {
+  // Hide the Qud/Raves capture (via visibility, so #cong-qud still sizes the frame)
+  // to view the similarity map alone on the stage. Pixel data is untouched.
+  const v = $("cong-sources-toggle").checked ? "" : "hidden";
+  $("cong-qud").style.visibility = v;
+  $("cong-raves").style.visibility = v;
 }
 
 function _buildSimilarity() {
@@ -611,6 +620,7 @@ async function init() {
     (b.onclick = () => switchPreviewTab(b.dataset.tab)));
   $("cong-capture").onclick = captureCongruence;
   $("cong-fade").oninput = _applyCrossfade;
+  $("cong-sources-toggle").onchange = _applySourcesToggle;
   $("cong-sim-toggle").onchange = _applySimToggle;
   $("cong-thresh").oninput = () => {
     $("cong-thresh-val").textContent = $("cong-thresh").value;
