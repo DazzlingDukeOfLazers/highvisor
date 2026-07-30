@@ -212,6 +212,51 @@ async function toggleRaves1to1() {
   }
 }
 
+// Start the latest Raves build and arrange it. Launches via the `raves` launcher
+// (which itself spawns Caves of Qud borderless — see launch.json / QudLauncher),
+// waits for BOTH windows to appear (Qud's takes ~20s), then tiles at 1920×1080.
+// Idempotent-ish: if a Raves is already open it skips the launch and just arranges,
+// so a second click won't spawn a duplicate.
+async function startRavesLatest() {
+  const btn = $("start-raves");
+  const status = $("uttest-status");
+  const setStatus = (cls, txt) => {
+    if (status) { status.className = "uttest-status " + cls; status.textContent = txt; }
+  };
+  btn.disabled = true;
+  try {
+    const first = await rpc("list_targets");
+    const cur = classifyRavesQud(first.ok ? first.targets : []);
+    if (cur.raves.length > 1) { alert(_dupMessage(cur.raves, cur.qud)); return; }
+    if (cur.raves.length === 0) {
+      setStatus("muted", "launching latest Raves… (it starts Caves of Qud)");
+      const r = await rpc("launch", { name: "raves" });
+      if (!r.ok) { alert("launch failed: " + (r.error || "?")); return; }
+    }
+    // Wait for exactly one Raves and one Qud window (Qud boots ~20s after spawn).
+    const deadline = Date.now() + 90000;
+    for (;;) {
+      const t = await rpc("list_targets");
+      const c = classifyRavesQud(t.ok ? t.targets : []);
+      await refreshWindows();
+      if (c.raves.length > 1 || c.qud.length > 1) { alert(_dupMessage(c.raves, c.qud)); return; }
+      if (c.raves.length === 1 && c.qud.length === 1) break;
+      if (Date.now() > deadline) {
+        setStatus("warn", "timed out waiting for Raves + Qud to open");
+        return;
+      }
+      const need = [c.raves.length ? null : "Raves", c.qud.length ? null : "Qud"].filter(Boolean);
+      setStatus("muted", "waiting for " + need.join(" + ") + "…");
+      await new Promise(res => setTimeout(res, 1500));
+    }
+    await userTestLayout(1920, 1080);   // both up → tile Raves ▲ / Qud ▼
+  } catch (e) {
+    alert("start Raves failed: " + (e.message || e));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // One-click user-testing setup at a chosen resolution: Raves in the UPPER-RIGHT
 // quadrant, Caves of Qud in the LOWER-RIGHT, W×H each (right-edge aligned in the
 // right half — the same placement the responsive parity test uses). Refuses to
@@ -459,6 +504,7 @@ async function init() {
   $("send").onclick = sendContext;
   $("applylayout").onclick = applyLayout;
   $("savelayout").onclick = saveLayout;
+  $("start-raves").onclick = startRavesLatest;
   document.querySelectorAll(".ut").forEach(b =>
     (b.onclick = () => userTestLayout(+b.dataset.w, +b.dataset.h)));
   $("raves-1to1").onclick = toggleRaves1to1;
