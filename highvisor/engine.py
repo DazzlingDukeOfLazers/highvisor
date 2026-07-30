@@ -20,6 +20,14 @@ from .backend import BackendError
 __version__ = "0.0.1"
 
 
+def _png_dims(png: bytes):
+    """(width, height) from a PNG's IHDR, or None. Cheap header read — avoids a
+    full decode just to report the capture's pixel size."""
+    if len(png) >= 24 and png[:8] == b"\x89PNG\r\n\x1a\n" and png[12:16] == b"IHDR":
+        return (int.from_bytes(png[16:20], "big"), int.from_bytes(png[20:24], "big"))
+    return None
+
+
 class _Job:
     __slots__ = ("request", "event", "result")
 
@@ -113,9 +121,13 @@ class Engine:
             return {"ok": True, "targets": [t.to_dict() for t in b.list_targets()]}
 
         if op == P.OP_SHOT:
-            png = b.screenshot(req.get("target"))
-            return {"ok": True, "bytes": len(png),
+            png = b.screenshot(req.get("target"), native=bool(req.get("native")))
+            resp = {"ok": True, "bytes": len(png),
                     "png_b64": base64.b64encode(png).decode("ascii")}
+            dims = _png_dims(png)
+            if dims:
+                resp["w"], resp["h"] = dims
+            return resp
 
         # For actions, the response IS the ActionResult dict: its ``ok`` reports
         # whether the action landed (RPC-level failures come back as exceptions).

@@ -44,6 +44,9 @@ from ..backend import ActionResult, BackendError, Element, PlatformBackend, Targ
 # NSBitmapImageFileTypePNG is 4; the symbol moved across pyobjc versions, so pin it.
 _PNG = 4
 
+_CAPTURE_DENIED = ("capture returned nothing — is Screen Recording granted? "
+                   "(System Settings > Privacy & Security > Screen Recording)")
+
 # AX attribute / action names as plain strings — robust across pyobjc versions.
 _ROLE, _TITLE, _DESC = "AXRole", "AXTitle", "AXDescription"
 _VALUE, _POS, _SIZE = "AXValue", "AXPosition", "AXSize"
@@ -239,25 +242,73 @@ class MacBackend(PlatformBackend):
             })
         return out
 
-    def screenshot(self, target: Optional[str]) -> bytes:
+    def screenshot(self, target: Optional[str], native: bool = False) -> bytes:
         w = self._resolve(target)
         if w is None:
             img = Quartz.CGDisplayCreateImage(Quartz.CGMainDisplayID())
-        else:
-            wid = int(w["kCGWindowNumber"])
-            # BestResolution captures at the window's native backing scale (2x on a
-            # Retina display) instead of point size, so a 1913x1062-pt window comes
-            # back as ~3826x2124 px — full fidelity for the parity diff.
-            opts = (Quartz.kCGWindowImageBoundsIgnoreFraming
-                    | getattr(Quartz, "kCGWindowImageBestResolution", 0))
-            img = Quartz.CGWindowListCreateImage(
-                Quartz.CGRectNull, Quartz.kCGWindowListOptionIncludingWindow,
-                wid, opts)
+            if img is None:
+                raise BackendError(_CAPTURE_DENIED)
+            return self._png(img)
+
+        wid = int(w["kCGWindowNumber"])
+        # `native`: capture through ScreenCaptureKit (the non-deprecated engine;
+        # CGWindowListCreateImage is deprecated as of macOS 14 and slated for
+        # removal). SCK also captures at true backing scale — 2x on a Retina
+        # display. It runs in a short-lived subprocess because SCK's async API
+        # delivers only to a MAIN-thread run loop and we're on the Engine worker
+        # thread (see highvisor/_sckshot.py). If it fails for any reason we fall
+        # back to the in-process CG path so a shot never hard-fails.
+        if native:
+            png = self._sck_shot(wid, backing=True)
+            if png is not None:
+                return png
+
+        # Default (and native fallback): CGWindowListCreateImage. On macOS 26 this
+        # returns the window's native backing pixels regardless of the
+        # BestResolution flag (measured: nominal == Best == 2x on Retina), so a
+        # full-size window on a 1x display comes back 1:1 px<->pt — read coords
+        # straight off it — while a Retina-display window comes back 2x.
+        opts = (Quartz.kCGWindowImageBoundsIgnoreFraming
+                | getattr(Quartz, "kCGWindowImageBestResolution", 0))
+        img = Quartz.CGWindowListCreateImage(
+            Quartz.CGRectNull, Quartz.kCGWindowListOptionIncludingWindow,
+            wid, opts)
         if img is None:
-            raise BackendError(
-                "capture returned nothing — is Screen Recording granted? "
-                "(System Settings > Privacy & Security > Screen Recording)")
+            raise BackendError(_CAPTURE_DENIED)
         return self._png(img)
+
+    def _sck_shot(self, wid: int, backing: bool) -> Optional[bytes]:
+        """ScreenCaptureKit capture of one window via the _sckshot subprocess.
+        Returns PNG bytes, or None to signal the caller to fall back (SCK missing,
+        subprocess error, timeout, or empty output)."""
+        import os
+        import subprocess
+        import sys
+        import tempfile
+
+        fd, path = tempfile.mkstemp(suffix=".png", prefix="hv-sck-")
+        os.close(fd)
+        try:
+            # Pass the daemon's own sys.path as PYTHONPATH so the child resolves
+            # both ScreenCaptureKit (venv site-packages) and the highvisor package
+            # regardless of how sys.executable itself resolves.
+            env = dict(os.environ, PYTHONPATH=os.pathsep.join(p for p in sys.path if p))
+            proc = subprocess.run(
+                [sys.executable, "-m", "highvisor._sckshot", str(wid),
+                 "1" if backing else "0", path],
+                capture_output=True, text=True, timeout=12, env=env)
+            if proc.returncode != 0:
+                return None
+            with open(path, "rb") as f:
+                data = f.read()
+            return data or None
+        except Exception:  # noqa: BLE001 — any failure means "fall back to CG"
+            return None
+        finally:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
 
     def _png(self, cgimage) -> bytes:
         rep = NSBitmapImageRep.alloc().initWithCGImage_(cgimage)

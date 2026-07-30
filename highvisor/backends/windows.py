@@ -233,7 +233,9 @@ class WindowsBackend(PlatformBackend):
                             detail="%s%s click @ (%d,%d)"
                                    % ("double " if double else "", button, gx, gy))
 
-    def screenshot(self, target: Optional[str]) -> bytes:
+    def screenshot(self, target: Optional[str], native: bool = False) -> bytes:
+        # `native` is a macOS/ScreenCaptureKit distinction; the Windows path is
+        # already physical-pixel (DPI-aware), so it's accepted and ignored.
         from io import BytesIO
         from PIL import Image
         hwnd = self._resolve(target)

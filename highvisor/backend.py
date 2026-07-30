@@ -125,9 +125,11 @@ class PlatformBackend:
         (``steam://rungameid/...``), an app path/bundle, or an app name."""
         raise NotImplementedError
 
-    def screenshot(self, target: Optional[str]) -> bytes:
+    def screenshot(self, target: Optional[str], native: bool = False) -> bytes:
         """PNG bytes of ``target`` (a window ref) or the screen if target is
-        None/"screen". Must work for an UNFOCUSED window."""
+        None/"screen". Must work for an UNFOCUSED window. ``native`` requests a
+        true-backing-scale capture via the platform's non-deprecated engine where
+        one exists (macOS: ScreenCaptureKit); backends may ignore it."""
         raise NotImplementedError
 
     def activate(self, target: str) -> ActionResult:

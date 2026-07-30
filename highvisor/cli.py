@@ -6,7 +6,7 @@ other language could reimplement this in a few lines (that's the point).
 
     hv ping
     hv ls
-    hv shot <target> [out.png]
+    hv shot <target> [out.png] [--native]
     hv text <target> <string...>
     hv key <target> <keys> [--focus]
     hv click <target> <x> <y> [--right] [--double]
@@ -74,14 +74,22 @@ def _cmd_ls(a):
 
 
 def _cmd_shot(a):
-    resp = _call({"op": P.OP_SHOT, "target": a.target})
+    resp = _call({"op": P.OP_SHOT, "target": a.target, "native": a.native})
     if not resp.get("ok"):
         _print_json(resp)
         return 1
     out = a.out or "shot.png"
     with open(out, "wb") as f:
         f.write(base64.b64decode(resp["png_b64"]))
-    print("wrote %s (%d bytes)" % (out, resp.get("bytes", 0)))
+    dims = ""
+    w, h = resp.get("w"), resp.get("h")
+    if w and h:
+        # Report the pixel size so you can tell a 1x (point-size, click-1:1)
+        # capture from a 2x Retina one at a glance — on a 2x shot a coordinate
+        # read off the PNG must be halved before you click it (see the
+        # click-coordinate note in the ops quickref).
+        dims = " %dx%d px%s" % (w, h, " (native/backing)" if a.native else "")
+    print("wrote %s (%d bytes)%s" % (out, resp.get("bytes", 0), dims))
 
 
 def _cmd_text(a):
@@ -576,6 +584,9 @@ def build_parser():
     s = sub.add_parser("shot")
     s.add_argument("target")
     s.add_argument("out", nargs="?")
+    s.add_argument("--native", action="store_true",
+                   help="capture via ScreenCaptureKit at true backing scale "
+                        "(2x on a Retina display); non-deprecated engine")
     s.set_defaults(fn=_cmd_shot)
 
     s = sub.add_parser("text")
