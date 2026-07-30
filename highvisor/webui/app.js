@@ -110,12 +110,130 @@ function _renderCongruence() {
   for (const c of [qc, rc, sc]) { c.width = w; c.height = h; }
   qc.getContext("2d").drawImage(qud, 0, 0, w, h);
   rc.getContext("2d").drawImage(raves, 0, 0, w, h);    // scaled to match if sizes differ
+  _congIW = w; _congIH = h;
+  _congMark = null;
   $("cong-frame").hidden = false;
   document.querySelector(".cong-empty").hidden = true;
   _applyCrossfade();
   _applySourcesToggle();
   _buildSimilarity();
   _applySimToggle();
+  _congFitView();                                      // reset zoom/pan to fit
+}
+
+// ------ zoom / pan / pick-position for the congruence viewer ------
+let _congIW = 1920, _congIH = 1080;   // source image dims (Qud grid)
+let _congZoom = 1, _congFit = 1, _congOX = 0, _congOY = 0;
+let _congMark = null;                 // {px, py} last right-clicked image point
+let _congPan = null;                  // drag anchor while panning
+
+function _congStageSize() {
+  const s = $("cong-stage");
+  return { w: s.clientWidth, h: s.clientHeight };
+}
+
+function _congComputeFit() {
+  const { w, h } = _congStageSize();
+  _congFit = Math.min(w / _congIW, h / _congIH) || 1;
+}
+
+function _congApplyTransform() {
+  $("cong-frame").style.transform =
+    `translate(${_congOX}px, ${_congOY}px) scale(${_congZoom})`;
+  const zl = $("cong-zoom");
+  zl.hidden = !_congImgs;
+  zl.textContent = Math.round(100 * _congZoom / _congFit) + "%";
+  _congUpdateMarker();
+}
+
+function _congClamp() {
+  const { w: SW, h: SH } = _congStageSize();
+  const iw = _congIW * _congZoom, ih = _congIH * _congZoom;
+  _congOX = iw <= SW ? (SW - iw) / 2 : Math.min(0, Math.max(SW - iw, _congOX));
+  _congOY = ih <= SH ? (SH - ih) / 2 : Math.min(0, Math.max(SH - ih, _congOY));
+}
+
+function _congFitView() {
+  if (!_congImgs) return;
+  _congComputeFit();
+  _congZoom = _congFit;
+  _congClamp();                        // centers, since fit <= stage
+  _congApplyTransform();
+}
+
+function _congWheel(e) {
+  if (!_congImgs) return;
+  e.preventDefault();
+  const rect = $("cong-stage").getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+  const z2 = Math.max(_congFit, Math.min(_congFit * 40, _congZoom * factor));
+  _congOX = mx - (mx - _congOX) * (z2 / _congZoom);    // zoom toward the cursor
+  _congOY = my - (my - _congOY) * (z2 / _congZoom);
+  _congZoom = z2;
+  _congClamp();
+  _congApplyTransform();
+}
+
+function _congPanStart(e) {
+  if (e.button !== 0 || !_congImgs) return;
+  _congPan = { x: e.clientX, y: e.clientY };
+  $("cong-stage").classList.add("panning");
+}
+function _congPanMove(e) {
+  if (!_congPan) return;
+  _congOX += e.clientX - _congPan.x;
+  _congOY += e.clientY - _congPan.y;
+  _congPan = { x: e.clientX, y: e.clientY };
+  _congClamp();
+  _congApplyTransform();
+}
+function _congPanEnd() {
+  if (!_congPan) return;
+  _congPan = null;
+  $("cong-stage").classList.remove("panning");
+}
+
+function _congImagePos(clientX, clientY) {
+  const rect = $("cong-stage").getBoundingClientRect();
+  const ix = (clientX - rect.left - _congOX) / _congZoom;
+  const iy = (clientY - rect.top - _congOY) / _congZoom;
+  return { px: Math.round(ix), py: Math.round(iy), u: ix / _congIW, v: iy / _congIH,
+           inBounds: ix >= 0 && ix < _congIW && iy >= 0 && iy < _congIH };
+}
+
+function _congUpdateMarker() {
+  const m = $("cong-marker");
+  if (!_congMark || !_congImgs) { m.hidden = true; return; }
+  m.hidden = false;
+  m.style.left = (_congOX + _congMark.px * _congZoom) + "px";
+  m.style.top = (_congOY + _congMark.py * _congZoom) + "px";
+}
+
+function _congContextMenu(e) {
+  if (!_congImgs) return;
+  e.preventDefault();
+  const p = _congImagePos(e.clientX, e.clientY);
+  if (!p.inBounds) { _congHideMenu(); return; }
+  _congMark = { px: p.px, py: p.py };
+  _congUpdateMarker();
+  const menu = $("cong-menu");
+  Object.assign(menu.dataset, { px: p.px, py: p.py, u: p.u.toFixed(4), v: p.v.toFixed(4) });
+  $("cong-menu-pos").textContent = `x ${p.px} · y ${p.py}  (${p.u.toFixed(3)}, ${p.v.toFixed(3)})`;
+  menu.style.left = Math.min(e.clientX, innerWidth - 180) + "px";
+  menu.style.top = Math.min(e.clientY, innerHeight - 90) + "px";
+  menu.hidden = false;
+  $("cong-status").className = "muted";
+  $("cong-status").textContent = `picked x=${p.px} y=${p.py} (${p.u.toFixed(3)}, ${p.v.toFixed(3)})`;
+}
+
+function _congHideMenu() { $("cong-menu").hidden = true; }
+
+function _congCopy(kind) {
+  const d = $("cong-menu").dataset;
+  const txt = kind === "uv" ? `${d.u},${d.v}` : `${d.px},${d.py}`;
+  _congHideMenu();
+  if (navigator.clipboard) navigator.clipboard.writeText(txt).catch(() => {});
 }
 
 function _applyCrossfade() {
@@ -622,6 +740,25 @@ async function init() {
   $("cong-fade").oninput = _applyCrossfade;
   $("cong-sources-toggle").onchange = _applySourcesToggle;
   $("cong-sim-toggle").onchange = _applySimToggle;
+  const stage = $("cong-stage");
+  stage.addEventListener("wheel", _congWheel, { passive: false });
+  stage.addEventListener("pointerdown", _congPanStart);
+  window.addEventListener("pointermove", _congPanMove);
+  window.addEventListener("pointerup", _congPanEnd);
+  stage.addEventListener("contextmenu", _congContextMenu);
+  stage.addEventListener("dblclick", _congFitView);
+  $("cong-menu").querySelectorAll("button").forEach(b =>
+    (b.onclick = () => _congCopy(b.dataset.copy)));
+  document.addEventListener("pointerdown", (e) => {
+    if (!$("cong-menu").hidden && !$("cong-menu").contains(e.target)) _congHideMenu();
+  });
+  new ResizeObserver(() => {
+    if (!_congImgs) return;
+    const wasFit = Math.abs(_congZoom - _congFit) < 1e-3;
+    _congComputeFit();
+    if (wasFit || _congZoom < _congFit) _congFitView();
+    else { _congClamp(); _congApplyTransform(); }
+  }).observe(stage);
   $("cong-thresh").oninput = () => {
     $("cong-thresh-val").textContent = $("cong-thresh").value;
     _buildSimilarity();

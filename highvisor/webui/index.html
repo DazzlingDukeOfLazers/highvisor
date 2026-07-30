@@ -98,13 +98,16 @@
               <span id="cong-thresh-val" class="muted">10</span>
             </span>
           </div>
-          <div id="cong-stage" class="cong-stage">
+          <div id="cong-stage" class="cong-stage"
+               title="scroll to zoom · drag to pan · double-click to fit · right-click to capture a position">
             <span class="muted cong-empty">capture Raves + Qud to compare them</span>
             <div id="cong-frame" class="cong-frame" hidden>
               <canvas id="cong-qud"></canvas>
               <canvas id="cong-raves"></canvas>
               <canvas id="cong-sim" hidden></canvas>
             </div>
+            <div id="cong-marker" class="cong-marker" hidden></div>
+            <div id="cong-zoom" class="cong-zoom" hidden></div>
           </div>
         </div>
       </div>
@@ -128,6 +131,13 @@
   </main>
 
   <div id="downmsg">highvisor stopped — restart it from a terminal, then reload.</div>
+
+  <div id="cong-menu" class="cong-menu" hidden>
+    <div id="cong-menu-pos" class="cong-menu-pos"></div>
+    <button data-copy="px">Copy x,y (pixels)</button>
+    <button data-copy="uv">Copy u,v (0–1)</button>
+  </div>
+
   <script src="/app.js"></script>
 </body>
 </html>

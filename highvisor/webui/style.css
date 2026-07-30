@@ -102,13 +102,32 @@ main {
 .cong-check { display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer; }
 .cong-thresh { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); flex: 1; }
 .cong-stage {
-  position: relative; flex: 1; min-height: 0; overflow: auto; background: #0a0d11;
-  display: flex; align-items: flex-start; justify-content: center; padding: 8px;
+  position: relative; flex: 1; min-height: 0; overflow: hidden; background: #0a0d11;
+  cursor: grab; touch-action: none;
 }
-.cong-empty { margin: auto; }
-.cong-frame { position: relative; max-width: 100%; line-height: 0; border: 1px solid var(--line); }
-.cong-frame canvas { max-width: 100%; height: auto; display: block; }
-.cong-frame #cong-raves, .cong-frame #cong-sim { position: absolute; inset: 0; width: 100%; height: 100%; }
+.cong-stage.panning { cursor: grabbing; }
+.cong-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.cong-frame { position: absolute; top: 0; left: 0; transform-origin: 0 0; line-height: 0; z-index: 1; }
+.cong-frame canvas { display: block; }
+.cong-frame #cong-raves, .cong-frame #cong-sim { position: absolute; top: 0; left: 0; }
+/* screen-space marker for the last right-clicked point (constant size, not scaled) */
+.cong-marker { position: absolute; width: 15px; height: 15px; margin: -7px 0 0 -7px;
+  pointer-events: none; z-index: 3; }
+.cong-marker::before, .cong-marker::after { content: ""; position: absolute;
+  background: var(--accent); box-shadow: 0 0 0 1px rgba(0,0,0,.7); }
+.cong-marker::before { left: 6px; top: 0; width: 3px; height: 15px; }
+.cong-marker::after { top: 6px; left: 0; height: 3px; width: 15px; }
+.cong-zoom { position: absolute; right: 6px; bottom: 6px; z-index: 4; font-size: 11px;
+  color: var(--muted); background: rgba(0,0,0,.55); padding: 1px 6px; border-radius: 3px;
+  pointer-events: none; }
+.cong-menu { position: fixed; z-index: 50; background: var(--panel2); border: 1px solid var(--line);
+  border-radius: 5px; padding: 4px; display: flex; flex-direction: column; gap: 2px;
+  min-width: 172px; box-shadow: 0 6px 20px rgba(0,0,0,.5); }
+.cong-menu-pos { font-size: 11px; color: var(--muted); padding: 3px 6px 5px;
+  border-bottom: 1px solid var(--line); margin-bottom: 2px; }
+.cong-menu button { background: transparent; color: var(--fg); border: none; border-radius: 3px;
+  text-align: left; cursor: pointer; font: inherit; font-size: 12px; padding: 4px 8px; }
+.cong-menu button:hover { background: var(--accent); color: #071019; }
 
 .handoff { display: flex; gap: 6px; padding: 8px; }
 .handoff textarea {
