@@ -386,14 +386,27 @@ class Engine:
         states = {}
         for app, cfg in gametree.apps(tree).items():
             win = self._find_win(wins, cfg.get("window"))
-            signals = {"present": win is not None, "port_open": None, "ocr_text": None}
+            signals = {"present": win is not None, "port_open": None,
+                       "game_live": None, "ocr_text": None}
             port = cfg.get("port")
             if port:
                 try:
-                    with socket.create_connection(("127.0.0.1", int(port)), timeout=0.4):
+                    with socket.create_connection(("127.0.0.1", int(port)), timeout=0.4) as s:
                         signals["port_open"] = True
+                        # The mod's bridge listener is open even at Qud's MAIN MENU (it starts at
+                        # load), so port-open alone can't tell menu from in-game. But the mod
+                        # force-publishes a snapshot to every client on connect ONLY when a game is
+                        # actually live (the server is multi-client, so this is harmless to Raves's
+                        # own connection). So a brief read is the true liveness signal: bytes -> a
+                        # game is running; silence -> a menu screen. Mirrors MainMenu's own probe.
+                        s.settimeout(0.35)
+                        try:
+                            signals["game_live"] = len(s.recv(1)) > 0
+                        except (socket.timeout, OSError):
+                            signals["game_live"] = False
                 except OSError:
                     signals["port_open"] = False
+                    signals["game_live"] = False
             if ocr and win is not None:
                 try:
                     res = b.ocr(win.id)
@@ -403,6 +416,7 @@ class Engine:
             st = gametree.evaluate(tree, app, signals)
             st["window"] = win.to_dict() if win else None
             st["signals"] = {"present": signals["present"], "port_open": signals["port_open"],
+                             "game_live": signals["game_live"],
                              "ocr_used": signals["ocr_text"] is not None}
             states[app] = st
         return {"ok": True, "ocr": bool(ocr), "states": states}

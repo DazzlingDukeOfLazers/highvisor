@@ -53,6 +53,10 @@ def _matches(detect, app, signals):
         po = signals.get("port_open")
         if po is None or bool(po) != bool(cond["port"]):
             return False
+    if "game_live" in cond:
+        gl = signals.get("game_live")
+        if gl is None or bool(gl) != bool(cond["game_live"]):
+            return False
     if "ocr_any" in cond:
         text = signals.get("ocr_text")
         if not text:
@@ -83,7 +87,9 @@ def evaluate(tree, app, signals):
         here_path = path if nid == "root" else path + [nid]
         if nid != "root" and _matches(node.get("detect"), app, signals):
             cond = node["detect"][app]
-            via = "ocr" if "ocr_any" in cond else ("port" if "port" in cond else "window")
+            via = ("ocr" if "ocr_any" in cond
+                   else "live" if "game_live" in cond
+                   else "port" if "port" in cond else "window")
             if best is None or depth > best[0]:
                 best = (depth, node, here_path, via)
         for ch in node.get("children", []) or []:
