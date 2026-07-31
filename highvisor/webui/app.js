@@ -748,14 +748,15 @@ async function checkStale() {
 // Live pan/zoom of Raves' title background. Writes ~/Library/.../RavesOfQud/title_bg.json,
 // which MainMenu polls (~3x/s) and applies with no rebuild. Bake the readout into
 // title_bg.seed.json once dialed in.
-const bgNudge = { dx: 0, dy: 0, scale: 1.0 };
+const bgNudge = { dx: 0, dy: 0, sx: 1.0, sy: 1.0 };
 const BGN_PATH = "~/Library/Application Support/RavesOfQud/title_bg.json";
 let bgnWriteTimer = null;
 
 function bgnRender() {
   $("bgn-dx").textContent = bgNudge.dx;
   $("bgn-dy").textContent = bgNudge.dy;
-  $("bgn-scale").textContent = bgNudge.scale.toFixed(3);
+  $("bgn-sx").textContent = bgNudge.sx.toFixed(3);
+  $("bgn-sy").textContent = bgNudge.sy.toFixed(3);
   $("bgn-readout").textContent = JSON.stringify(bgNudge);
 }
 function bgnWrite() {
@@ -764,7 +765,7 @@ function bgnWrite() {
 }
 function bgnStep(k, d) {
   bgNudge[k] = Math.round((bgNudge[k] + d) * 1000) / 1000;
-  if (k === "scale") bgNudge.scale = Math.max(0.1, bgNudge.scale);   // allow below-cover (shows a border)
+  if (k === "sx" || k === "sy") bgNudge[k] = Math.max(0.1, bgNudge[k]);   // below-cover shows a border
   bgnRender();
   bgnWrite();
 }
@@ -891,7 +892,7 @@ async function init() {
   $("gt-ocr").onclick = () => pollGameState(true);
   document.querySelectorAll(".bgn-b").forEach(b =>
     (b.onclick = () => bgnStep(b.dataset.bgn, parseFloat(b.dataset.d))));
-  $("bgn-reset").onclick = () => { bgNudge.dx = 0; bgNudge.dy = 0; bgNudge.scale = 1.0; bgnRender(); bgnWrite(); };
+  $("bgn-reset").onclick = () => { bgNudge.dx = 0; bgNudge.dy = 0; bgNudge.sx = 1.0; bgNudge.sy = 1.0; bgnRender(); bgnWrite(); };
   $("bgn-readout").onclick = () => navigator.clipboard.writeText($("bgn-readout").textContent);
   bgnRender();
   $("off").onclick = async () => {
