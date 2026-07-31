@@ -110,7 +110,7 @@
                     "label": "Choose Game Mode",
                     "done": {
                       "qud": 0.7,
-                      "raves": 0.6
+                      "raves": 0.85
                     },
                     "detect": {}
                   },
