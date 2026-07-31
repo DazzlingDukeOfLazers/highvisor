@@ -106,6 +106,15 @@
                 },
                 "children": [
                   {
+                    "id": "game_mode",
+                    "label": "Choose Game Mode",
+                    "done": {
+                      "qud": 0.7,
+                      "raves": 0.6
+                    },
+                    "detect": {}
+                  },
+                  {
                     "id": "genotype",
                     "label": "Choose Genotype",
                     "done": {
