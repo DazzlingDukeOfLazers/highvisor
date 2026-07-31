@@ -195,6 +195,9 @@ class Engine:
         if op == P.OP_GAMESTATE:
             return self._gamestate(b, ocr=bool(req.get("ocr", False)))
 
+        if op == P.OP_WRITE_TEXT:
+            return self._write_text(req.get("path"), req.get("content", ""))
+
         if op == P.OP_LAYOUT_LIST:
             from .layouts import load_layouts
             return {"ok": True, "layouts": [
@@ -347,6 +350,27 @@ class Engine:
         return {"ok": True, "app": app, "running": win is not None, "state": state,
                 "port": port, "port_open": port_open,
                 "window": win.to_dict() if win else None}
+
+    def _write_text(self, path, content):
+        """Write a small text/JSON config file. Restricted to under $HOME so the cockpit's live
+        tuning tools (e.g. the title-bg nudge) can write app config a game hot-reloads, without a
+        general filesystem-write capability."""
+        import os
+        if not path:
+            return {"ok": False, "error": "no path"}
+        home = os.path.realpath(os.path.expanduser("~"))
+        full = os.path.realpath(os.path.expanduser(str(path)))
+        if full != home and not full.startswith(home + os.sep):
+            return {"ok": False, "error": "path must be under $HOME"}
+        try:
+            d = os.path.dirname(full)
+            if d:
+                os.makedirs(d, exist_ok=True)
+            with open(full, "w", encoding="utf-8") as fh:
+                fh.write(str(content))
+            return {"ok": True, "path": full, "bytes": len(str(content))}
+        except OSError as e:
+            return {"ok": False, "error": str(e)}
 
     def _gamestate(self, b, ocr=False):
         """Evaluate the game state-machine tree against live signals for each app.

@@ -56,6 +56,30 @@
         </div>
       </div>
       <div class="panel">
+        <div class="panel-hd">title bg nudge <button id="bgn-reset" title="reset to identity cover">reset</button></div>
+        <div class="bgnudge" title="pan/zoom Raves' title background live (writes title_bg.json; Raves polls it — no rebuild)">
+          <div class="bgn-row"><span class="bgn-lbl">X</span>
+            <button class="bgn-b" data-bgn="dx" data-d="-5">−5</button>
+            <button class="bgn-b" data-bgn="dx" data-d="-1">−1</button>
+            <span id="bgn-dx" class="bgn-val">0</span>
+            <button class="bgn-b" data-bgn="dx" data-d="1">+1</button>
+            <button class="bgn-b" data-bgn="dx" data-d="5">+5</button></div>
+          <div class="bgn-row"><span class="bgn-lbl">Y</span>
+            <button class="bgn-b" data-bgn="dy" data-d="-5">−5</button>
+            <button class="bgn-b" data-bgn="dy" data-d="-1">−1</button>
+            <span id="bgn-dy" class="bgn-val">0</span>
+            <button class="bgn-b" data-bgn="dy" data-d="1">+1</button>
+            <button class="bgn-b" data-bgn="dy" data-d="5">+5</button></div>
+          <div class="bgn-row"><span class="bgn-lbl">scale</span>
+            <button class="bgn-b" data-bgn="scale" data-d="-0.01">−.01</button>
+            <button class="bgn-b" data-bgn="scale" data-d="-0.002">−</button>
+            <span id="bgn-scale" class="bgn-val">1.000</span>
+            <button class="bgn-b" data-bgn="scale" data-d="0.002">+</button>
+            <button class="bgn-b" data-bgn="scale" data-d="0.01">+.01</button></div>
+          <div id="bgn-readout" class="bgn-readout muted" title="click to copy — bake into MainMenu _bg_nudge when dialed in">{"dx":0,"dy":0,"scale":1}</div>
+        </div>
+      </div>
+      <div class="panel">
         <div class="panel-hd">peers</div>
         <ul id="peers" class="list"><li class="muted">no bridge / no peers</li></ul>
       </div>

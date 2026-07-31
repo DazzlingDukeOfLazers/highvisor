@@ -43,6 +43,7 @@ OP_LAUNCH_LIST = "launch_list"    # -> {ok, launchers:{name: spec}}
 OP_LAUNCH_SAVE = "launch_save"    # name, spec -> {ok, saved, path}
 OP_GAMETREE = "gametree"          # -> {ok, tree} (the canonical game state-machine tree)
 OP_GAMESTATE = "gamestate"        # [ocr] -> {ok, states:{app:{node,label,path,off,running,via}}}
+OP_WRITE_TEXT = "write_text"      # path (under $HOME), content -> {ok, path, bytes} (small config writes)
 
 MAX_FRAME = 64 * 1024 * 1024  # 64 MiB guard (a 4k screenshot fits easily)
 

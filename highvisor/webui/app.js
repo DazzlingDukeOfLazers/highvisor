@@ -732,6 +732,31 @@ async function checkStale() {
   if (msg) msg.hidden = !stale;
 }
 
+// ------------------------------------------------------- title bg nudge
+// Live pan/zoom of Raves' title background. Writes ~/Library/.../RavesOfQud/title_bg.json,
+// which MainMenu polls (~3x/s) and applies with no rebuild. Bake the readout into
+// title_bg.seed.json once dialed in.
+const bgNudge = { dx: 0, dy: 0, scale: 1.0 };
+const BGN_PATH = "~/Library/Application Support/RavesOfQud/title_bg.json";
+let bgnWriteTimer = null;
+
+function bgnRender() {
+  $("bgn-dx").textContent = bgNudge.dx;
+  $("bgn-dy").textContent = bgNudge.dy;
+  $("bgn-scale").textContent = bgNudge.scale.toFixed(3);
+  $("bgn-readout").textContent = JSON.stringify(bgNudge);
+}
+function bgnWrite() {
+  clearTimeout(bgnWriteTimer);
+  bgnWriteTimer = setTimeout(() => rpc("write_text", { path: BGN_PATH, content: JSON.stringify(bgNudge) }), 60);
+}
+function bgnStep(k, d) {
+  bgNudge[k] = Math.round((bgNudge[k] + d) * 1000) / 1000;
+  if (k === "scale") bgNudge.scale = Math.max(1.0, bgNudge.scale);
+  bgnRender();
+  bgnWrite();
+}
+
 // ------------------------------------------------------- game state tree
 // One canonical tree (from the `gametree` op) rendered as an aligned master column
 // (the node labels) + a Raves column + a Qud column, each showing that app's 0–1
@@ -852,6 +877,11 @@ async function init() {
   $("layoutsel").onchange = showLayoutDesc;
   $("clearlog").onclick = () => (logEl().innerHTML = "");
   $("gt-ocr").onclick = () => pollGameState(true);
+  document.querySelectorAll(".bgn-b").forEach(b =>
+    (b.onclick = () => bgnStep(b.dataset.bgn, parseFloat(b.dataset.d))));
+  $("bgn-reset").onclick = () => { bgNudge.dx = 0; bgNudge.dy = 0; bgNudge.scale = 1.0; bgnRender(); bgnWrite(); };
+  $("bgn-readout").onclick = () => navigator.clipboard.writeText($("bgn-readout").textContent);
+  bgnRender();
   $("off").onclick = async () => {
     if (!confirm("Shut down the highvisor daemon? You'll restart it from a terminal.")) return;
     try { await fetch("/shutdown", { method: "POST" }); } catch {}
