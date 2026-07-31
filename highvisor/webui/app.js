@@ -110,15 +110,26 @@ function _renderCongruence() {
   for (const c of [qc, rc, sc]) { c.width = w; c.height = h; }
   qc.getContext("2d").drawImage(qud, 0, 0, w, h);
   rc.getContext("2d").drawImage(raves, 0, 0, w, h);    // scaled to match if sizes differ
+  const prevIW = _congIW, prevIH = _congIH;
   _congIW = w; _congIH = h;
-  _congMark = null;
   $("cong-frame").hidden = false;
   document.querySelector(".cong-empty").hidden = true;
   _applyCrossfade();
   _applySourcesToggle();
   _buildSimilarity();
   _applySimToggle();
-  _congFitView();                                      // reset zoom/pan to fit
+  // First capture fits to the stage; later re-captures KEEP the current zoom/pan (and marker)
+  // so you can hit "Capture" again without losing your place. Other settings (fader, toggles,
+  // threshold) already persist — they read live from the DOM inputs.
+  if (_congHadView) {
+    _congComputeFit();                                 // recompute the fit floor
+    if (_congZoom < _congFit) _congZoom = _congFit;    // respect it
+    if (w !== prevIW || h !== prevIH) _congClamp();    // only re-clamp if the compared grid resized
+    _congApplyTransform();                             // else keep the exact pan
+  } else {
+    _congFitView();
+    _congHadView = true;
+  }
 }
 
 // ------ zoom / pan / pick-position for the congruence viewer ------
@@ -126,6 +137,7 @@ let _congIW = 1920, _congIH = 1080;   // source image dims (Qud grid)
 let _congZoom = 1, _congFit = 1, _congOX = 0, _congOY = 0;
 let _congMark = null;                 // {px, py} last right-clicked image point
 let _congPan = null;                  // drag anchor while panning
+let _congHadView = false;             // has the viewer been fit once? (re-captures keep zoom/pan)
 
 function _congStageSize() {
   const s = $("cong-stage");
