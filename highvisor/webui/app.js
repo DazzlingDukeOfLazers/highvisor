@@ -752,7 +752,7 @@ function bgnWrite() {
 }
 function bgnStep(k, d) {
   bgNudge[k] = Math.round((bgNudge[k] + d) * 1000) / 1000;
-  if (k === "scale") bgNudge.scale = Math.max(1.0, bgNudge.scale);
+  if (k === "scale") bgNudge.scale = Math.max(0.1, bgNudge.scale);   // allow below-cover (shows a border)
   bgnRender();
   bgnWrite();
 }
