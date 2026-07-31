@@ -119,7 +119,7 @@
                     "label": "Choose Genotype",
                     "done": {
                       "qud": 0.6,
-                      "raves": 0.5
+                      "raves": 0.75
                     },
                     "detect": {}
                   },
