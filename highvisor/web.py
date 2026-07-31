@@ -67,8 +67,21 @@ def make_web_server(engine, bus, bridge=None, orchestrator=None,
             except (BrokenPipeError, ConnectionResetError):
                 pass
 
-        # ------------------------------------------------------------- GET
+        # A dropped client (reset/broken pipe mid-request) must never escape the handler thread.
         def do_GET(self):
+            try:
+                self._do_GET()
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                pass
+
+        def do_POST(self):
+            try:
+                self._do_POST()
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                pass
+
+        # ------------------------------------------------------------- GET
+        def _do_GET(self):
             path = self.path.split("?", 1)[0]
             if path == "/events":
                 return self._sse()
@@ -97,7 +110,7 @@ def make_web_server(engine, bus, bridge=None, orchestrator=None,
             return self._send(200, data, _CTYPES.get(ext, "application/octet-stream"))
 
         # ------------------------------------------------------------ POST
-        def do_POST(self):
+        def _do_POST(self):
             n = int(self.headers.get("Content-Length", 0) or 0)
             raw = self.rfile.read(n) if n else b"{}"
             try:

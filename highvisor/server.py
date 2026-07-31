@@ -7,13 +7,60 @@ only do socket I/O and block on ``engine.submit``.
 
 Run it with ``python -m highvisor.server`` (or the ``hvd`` console script).
 """
+import datetime
+import faulthandler
 import os
+import signal
 import socket
+import sys
 import threading
+import traceback
 
 from . import protocol as P
 from .backends import make_backend
 from .engine import Engine
+
+CRASH_LOG = os.path.expanduser("~/.highvisor/daemon.log")
+
+
+def _install_crash_guards():
+    """Make the daemon survivable and DIAGNOSABLE. Every Python socket path is already guarded, so a
+    full process death is almost certainly a NATIVE crash in the macOS backend (pyobjc / Quartz /
+    ScreenCaptureKit) — which no try/except can catch. So: ignore SIGPIPE; enable faulthandler to dump
+    a C-level traceback to the crash log on a fatal signal; and log any uncaught Python exception
+    (main or worker thread) there too. Returns the open log file (kept alive for faulthandler)."""
+    try:
+        signal.signal(signal.SIGPIPE, signal.SIG_IGN)   # writing to a dead socket → EPIPE, not death
+    except (ValueError, OSError, AttributeError):
+        pass
+    fp = None
+    try:
+        os.makedirs(os.path.dirname(CRASH_LOG), exist_ok=True)
+        fp = open(CRASH_LOG, "a", buffering=1)
+        fp.write("\n=== daemon start %s (pid %d) ===\n"
+                 % (datetime.datetime.now().isoformat(timespec="seconds"), os.getpid()))
+        faulthandler.enable(file=fp, all_threads=True)   # native crashes → traceback in the log
+    except Exception:
+        fp = None
+
+    def _log(kind, exc_type, exc, tb):
+        line = "\n[%s] UNCAUGHT %s\n%s\n" % (
+            datetime.datetime.now().isoformat(timespec="seconds"), kind,
+            "".join(traceback.format_exception(exc_type, exc, tb)))
+        try:
+            if fp is not None:
+                fp.write(line)
+        except Exception:
+            pass
+        try:
+            sys.stderr.write(line)
+        except Exception:
+            pass
+
+    sys.excepthook = lambda et, e, tb: _log("main thread", et, e, tb)
+    threading.excepthook = lambda a: _log("thread:%s" % a.thread.name,
+                                          a.exc_type, a.exc_value, a.exc_traceback)
+    return fp
 
 
 def _serve_conn(conn, addr, engine):
@@ -37,6 +84,7 @@ def _serve_conn(conn, addr, engine):
 
 def serve_forever(host=P.HOST, port=P.PORT, backend=None, web=True):
     from .events import EventBus
+    _crash_fp = _install_crash_guards()
     backend = backend or make_backend()
     bus = EventBus()
     engine = Engine(backend, bus=bus)
@@ -73,11 +121,21 @@ def serve_forever(host=P.HOST, port=P.PORT, backend=None, web=True):
             orchestrator = None
 
     if web:
+        import time
         from .web import make_web_server, WEB_PORT
         web_srv = make_web_server(engine, bus, bridge=bridge,
                                   orchestrator=orchestrator, host=host)
-        threading.Thread(target=web_srv.serve_forever, name="hv-web",
-                         daemon=True).start()
+
+        def _web_forever():
+            # If the web server loop ever throws, log + restart it rather than losing the cockpit.
+            while True:
+                try:
+                    web_srv.serve_forever()
+                except Exception as e:
+                    bus.publish("boot", msg="web server restart: %s" % e)
+                    time.sleep(0.5)
+
+        threading.Thread(target=_web_forever, name="hv-web", daemon=True).start()
         print("highvisor web cockpit: http://%s:%d" % (host, WEB_PORT), flush=True)
 
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -89,10 +147,24 @@ def serve_forever(host=P.HOST, port=P.PORT, backend=None, web=True):
     bus.publish("boot", backend=backend.name, msg="daemon up on %d" % port)
     try:
         while True:
-            conn, addr = srv.accept()
-            t = threading.Thread(target=_serve_conn, args=(conn, addr, engine),
-                                 name="hv-conn", daemon=True)
-            t.start()
+            try:
+                conn, addr = srv.accept()
+            except KeyboardInterrupt:
+                raise
+            except Exception as e:
+                # A transient accept() error (reset during handshake, fd churn) must NEVER end the
+                # accept loop — that's the whole daemon. Log it and keep serving.
+                bus.publish("boot", msg="accept error (continuing): %s" % e)
+                continue
+            try:
+                threading.Thread(target=_serve_conn, args=(conn, addr, engine),
+                                 name="hv-conn", daemon=True).start()
+            except Exception as e:
+                bus.publish("boot", msg="conn spawn error: %s" % e)
+                try:
+                    conn.close()
+                except Exception:
+                    pass
     except KeyboardInterrupt:
         print("shutting down", flush=True)
     finally:
