@@ -245,7 +245,7 @@
             "label": "Quit Confirm (Are you sure? Yes/No)",
             "done": {
               "qud": 1.0,
-              "raves": 0.85
+              "raves": 0.92
             },
             "detect": {
               "qud": {
