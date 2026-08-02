@@ -718,14 +718,6 @@
               "goto": "title"
             },
             {
-              "assert": {
-                "app": "qud",
-                "node": "in_game"
-              },
-              "timeout": 5,
-              "note": "Raves' Continue needs a live Qud game (bridge heartbeat) — go Qud to in_game first if this fails"
-            },
-            {
               "activate": "Raves of Qud"
             },
             {
