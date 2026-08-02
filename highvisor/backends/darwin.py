@@ -479,11 +479,14 @@ class MacBackend(PlatformBackend):
         actual = None
         for _ in range(6):                      # ~0.9s worst case
             time.sleep(0.15)
-            cur = self._resolve(target)
+            cur = self._resolve(target)         # raw CGWindow dict — frame lives in kCGWindowBounds
             if cur is not None:
-                actual = (int(cur.x), int(cur.y), int(cur.w), int(cur.h))
-                if (abs(cur.x - x) <= 2 and abs(cur.y - y) <= 2
-                        and abs(cur.w - w) <= 2 and abs(cur.h - h) <= 2):
+                bd = cur.get("kCGWindowBounds") or {}
+                ax_, ay_ = int(bd.get("X", 1 << 30)), int(bd.get("Y", 1 << 30))
+                aw_, ah_ = int(bd.get("Width", 0)), int(bd.get("Height", 0))
+                actual = (ax_, ay_, aw_, ah_)
+                if (abs(ax_ - x) <= 2 and abs(ay_ - y) <= 2
+                        and abs(aw_ - w) <= 2 and abs(ah_ - h) <= 2):
                     ok = True
                     break
                 ok = False

@@ -77,9 +77,9 @@
             },
             {
               "assert": {
-                "node": "title"
+                "scene": "MainMenu"
               },
-              "timeout": 40
+              "timeout": 90
             }
           ],
           "raves": [
@@ -90,6 +90,10 @@
             {
               "wait_window": "Raves of Qud",
               "timeout": 30
+            },
+            {
+              "dock": "Raves of Qud",
+              "note": "stack into the standard slot above Qud (fresh launches land off-slot)"
             },
             {
               "dismiss": {
@@ -218,7 +222,7 @@
                         {
                           "click_hover": [
                             958,
-                            562
+                            534
                           ],
                           "window": "CavesOfQud",
                           "note": "New Game on the title menu"
@@ -336,7 +340,7 @@
                     {
                       "click_hover": [
                         958,
-                        562
+                        534
                       ],
                       "window": "CavesOfQud",
                       "note": "New Game on the title menu"
@@ -431,7 +435,7 @@
                     {
                       "click_hover": [
                         958,
-                        654
+                        626
                       ],
                       "window": "CavesOfQud",
                       "note": "Records on the title menu"
@@ -494,7 +498,7 @@
                     {
                       "click_hover": [
                         958,
-                        700
+                        672
                       ],
                       "window": "CavesOfQud",
                       "note": "Options on the title menu"
@@ -557,7 +561,7 @@
                     {
                       "click_hover": [
                         958,
-                        746
+                        718
                       ],
                       "window": "CavesOfQud",
                       "note": "Mods on the title menu"
@@ -686,7 +690,7 @@
             {
               "click_hover": [
                 958,
-                608
+                580
               ],
               "window": "CavesOfQud",
               "note": "Continue on the title menu"
@@ -697,7 +701,7 @@
             {
               "click_hover": [
                 900,
-                198
+                190
               ],
               "window": "CavesOfQud",
               "note": "top save row in the Load Game picker"
@@ -725,16 +729,16 @@
               "activate": "Raves of Qud"
             },
             {
+              "sleep": 2.5,
+              "note": "let Continue enable (heartbeat poll) after a fresh launch"
+            },
+            {
               "click_hover": [
                 945,
                 580
               ],
               "window": "Raves of Qud",
               "note": "hover-select Continue"
-            },
-            {
-              "key": "space",
-              "window": "Raves of Qud"
             },
             {
               "assert": {

@@ -639,6 +639,13 @@ class Engine:
             elif "sleep" in step:
                 time.sleep(float(step["sleep"]))
                 steps.append({"step": step, "ok": True})
+            elif "dock" in step:
+                # place the window by its standing dock rule (Raves stacks above Qud with the
+                # anchor's size) — a fresh solo launch otherwise lands wherever the OS puts it
+                # and the recipe's window-relative clicks assume the standard 1920x1080 slot.
+                r = self._dock(b, step["dock"])
+                steps.append({"step": step, "ok": bool(r.get("ok")), "detail": r.get("error", "")})
+                time.sleep(0.4)
             elif "dismiss" in step:
                 # Conditional dismissal: if the app currently reports this scene (e.g. a quit
                 # dialog left open by a stray Escape), press the key to clear it; otherwise
