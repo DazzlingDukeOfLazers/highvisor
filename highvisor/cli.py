@@ -43,8 +43,13 @@ from . import protocol as P
 _HOST, _PORT = P.HOST, P.PORT  # set once from CLI args in main()
 
 
-def _call(request: dict) -> dict:
-    with socket.create_connection((_HOST, _PORT), timeout=30) as s:
+def _call(request: dict, timeout: float = 30.0) -> dict:
+    # Long-running ops (a goto recipe walks menus + waits on asserts; an assert
+    # polls up to its own --timeout) must outlive the socket read — pad past the
+    # op's own budget so the daemon, not the client, is the one that gives up.
+    if request.get("op") in ("gamego", "assert_state"):
+        timeout = max(timeout, float(request.get("timeout", 0)) + 150.0)
+    with socket.create_connection((_HOST, _PORT), timeout=timeout) as s:
         P.send_frame(s, request)
         resp = P.recv_frame(s)
     if resp is None:
