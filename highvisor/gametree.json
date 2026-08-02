@@ -92,6 +92,12 @@
               "timeout": 30
             },
             {
+              "dismiss": {
+                "scene": "quit_dialog",
+                "key": "Escape"
+              }
+            },
+            {
               "assert": {
                 "node": "title"
               },
@@ -178,6 +184,55 @@
                           "scene": "chargen_game_mode"
                         }
                       ]
+                    },
+                    "goto": {
+                      "raves": [
+                        {
+                          "goto": "title"
+                        },
+                        {
+                          "activate": "Raves of Qud"
+                        },
+                        {
+                          "click_hover": [
+                            945,
+                            536
+                          ],
+                          "window": "Raves of Qud",
+                          "note": "New Game (needs Qud running, else it launches Qud instead)"
+                        },
+                        {
+                          "assert": {
+                            "scene": "chargen_game_mode"
+                          },
+                          "timeout": 12
+                        }
+                      ],
+                      "qud": [
+                        {
+                          "goto": "title"
+                        },
+                        {
+                          "activate": "CavesOfQud"
+                        },
+                        {
+                          "click_hover": [
+                            958,
+                            562
+                          ],
+                          "window": "CavesOfQud",
+                          "note": "New Game on the title menu"
+                        },
+                        {
+                          "sleep": 1.0
+                        },
+                        {
+                          "assert": {
+                            "ocr_contains": "game mode"
+                          },
+                          "timeout": 15
+                        }
+                      ]
                     }
                   },
                   {
@@ -193,6 +248,24 @@
                           "scene": "chargen_genotype"
                         }
                       ]
+                    },
+                    "goto": {
+                      "raves": [
+                        {
+                          "goto": "game_mode"
+                        },
+                        {
+                          "key": "enter",
+                          "window": "Raves of Qud",
+                          "note": "confirm the default card (Classic)"
+                        },
+                        {
+                          "assert": {
+                            "scene": "chargen_genotype"
+                          },
+                          "timeout": 10
+                        }
+                      ]
                     }
                   },
                   {
@@ -206,6 +279,24 @@
                       "raves": [
                         {
                           "scene": "chargen_subtype"
+                        }
+                      ]
+                    },
+                    "goto": {
+                      "raves": [
+                        {
+                          "goto": "genotype"
+                        },
+                        {
+                          "key": "enter",
+                          "window": "Raves of Qud",
+                          "note": "confirm the default genotype"
+                        },
+                        {
+                          "assert": {
+                            "scene": "chargen_subtype"
+                          },
+                          "timeout": 10
                         }
                       ]
                     }
@@ -228,7 +319,39 @@
                     },
                     "detect": {}
                   }
-                ]
+                ],
+                "goto": {
+                  "raves": [
+                    {
+                      "goto": "game_mode"
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "goto": "title"
+                    },
+                    {
+                      "activate": "CavesOfQud"
+                    },
+                    {
+                      "click_hover": [
+                        958,
+                        562
+                      ],
+                      "window": "CavesOfQud",
+                      "note": "New Game on the title menu"
+                    },
+                    {
+                      "sleep": 1.0
+                    },
+                    {
+                      "assert": {
+                        "ocr_contains": "game mode"
+                      },
+                      "timeout": 15
+                    }
+                  ]
+                }
               },
               {
                 "id": "continue",
@@ -275,6 +398,54 @@
                       "scene": "records"
                     }
                   ]
+                },
+                "goto": {
+                  "raves": [
+                    {
+                      "goto": "title"
+                    },
+                    {
+                      "activate": "Raves of Qud"
+                    },
+                    {
+                      "click_hover": [
+                        945,
+                        628
+                      ],
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "assert": {
+                        "scene": "records"
+                      },
+                      "timeout": 12
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "goto": "title"
+                    },
+                    {
+                      "activate": "CavesOfQud"
+                    },
+                    {
+                      "click_hover": [
+                        958,
+                        654
+                      ],
+                      "window": "CavesOfQud",
+                      "note": "Records on the title menu"
+                    },
+                    {
+                      "sleep": 1.0
+                    },
+                    {
+                      "assert": {
+                        "ocr_contains": "records"
+                      },
+                      "timeout": 15
+                    }
+                  ]
                 }
               },
               {
@@ -290,6 +461,54 @@
                       "scene": "options"
                     }
                   ]
+                },
+                "goto": {
+                  "raves": [
+                    {
+                      "goto": "title"
+                    },
+                    {
+                      "activate": "Raves of Qud"
+                    },
+                    {
+                      "click_hover": [
+                        945,
+                        674
+                      ],
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "assert": {
+                        "scene": "options"
+                      },
+                      "timeout": 12
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "goto": "title"
+                    },
+                    {
+                      "activate": "CavesOfQud"
+                    },
+                    {
+                      "click_hover": [
+                        958,
+                        700
+                      ],
+                      "window": "CavesOfQud",
+                      "note": "Options on the title menu"
+                    },
+                    {
+                      "sleep": 1.0
+                    },
+                    {
+                      "assert": {
+                        "ocr_contains": "options"
+                      },
+                      "timeout": 15
+                    }
+                  ]
                 }
               },
               {
@@ -303,6 +522,54 @@
                   "raves": [
                     {
                       "scene": "mods"
+                    }
+                  ]
+                },
+                "goto": {
+                  "raves": [
+                    {
+                      "goto": "title"
+                    },
+                    {
+                      "activate": "Raves of Qud"
+                    },
+                    {
+                      "click_hover": [
+                        945,
+                        720
+                      ],
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "assert": {
+                        "scene": "mods"
+                      },
+                      "timeout": 12
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "goto": "title"
+                    },
+                    {
+                      "activate": "CavesOfQud"
+                    },
+                    {
+                      "click_hover": [
+                        958,
+                        746
+                      ],
+                      "window": "CavesOfQud",
+                      "note": "Mods on the title menu"
+                    },
+                    {
+                      "sleep": 1.0
+                    },
+                    {
+                      "assert": {
+                        "ocr_contains": "mods"
+                      },
+                      "timeout": 15
                     }
                   ]
                 }

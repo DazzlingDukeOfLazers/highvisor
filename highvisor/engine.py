@@ -639,6 +639,23 @@ class Engine:
             elif "sleep" in step:
                 time.sleep(float(step["sleep"]))
                 steps.append({"step": step, "ok": True})
+            elif "dismiss" in step:
+                # Conditional dismissal: if the app currently reports this scene (e.g. a quit
+                # dialog left open by a stray Escape), press the key to clear it; otherwise
+                # no-op. Keeps recipes self-healing without a full conditional language.
+                cond = step["dismiss"]
+                cur = (self._gamestate(b).get("states", {}).get(app) or {})
+                scene = (cur.get("signals") or {}).get("scene") or ""
+                want_scene = cond.get("scene", "")
+                if str(scene).lower() == str(want_scene).lower():
+                    cfg = gametree.apps(tree).get(app, {})
+                    win = self._find_win(b.list_targets(), cfg.get("window"))
+                    if win is not None:
+                        b.key(win.id, cond.get("key", "Escape"), focus=True)
+                        time.sleep(0.6)
+                    steps.append({"step": step, "ok": True, "detail": "dismissed %s" % scene})
+                else:
+                    steps.append({"step": step, "ok": True, "detail": "not present"})
             elif "assert" in step:
                 a = dict(step["assert"])
                 a.setdefault("app", app)
