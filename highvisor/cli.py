@@ -150,6 +150,51 @@ def _cmd_screen(a):
     _print_json(_call({"op": P.OP_SCREEN}))
 
 
+def _cmd_state(a):
+    """One-line-per-app live state (the state tree's evaluator, human-readable)."""
+    res = _call({"op": P.OP_GAMESTATE, **({"ocr": True} if a.ocr else {})})
+    if not res.get("ok"):
+        _print_json(res)
+        raise SystemExit(1)
+    for app, st in (res.get("states") or {}).items():
+        sig = st.get("signals") or {}
+        extra = st.get("extra") or {}
+        bits = [f"{app:6s}", "off" if st.get("off") else (st.get("label") or "?")]
+        if sig.get("scene"):
+            bits.append("scene=%s" % sig["scene"])
+        if extra.get("popup"):
+            bits.append("popup=%s" % extra["popup"])
+        if extra.get("mode"):
+            bits.append("mode=%s" % extra["mode"])
+        bits.append("via=%s" % st.get("via"))
+        print("  ".join(str(b) for b in bits))
+
+
+def _cmd_assert(a):
+    """TDD assert: block until the condition holds (exit 0) or times out (exit 1)."""
+    req = {"op": P.OP_ASSERT, "app": a.app, "timeout": a.timeout}
+    if a.node:
+        req["node"] = a.node
+    if a.scene:
+        req["scene"] = a.scene
+    if a.popup is not None:
+        req["popup"] = True if a.popup == "" else a.popup
+    if a.present is not None:
+        req["present"] = a.present == "yes"
+    if a.ocr_contains:
+        req["ocr_contains"] = a.ocr_contains
+    res = _call(req)
+    _print_json(res)
+    raise SystemExit(0 if res.get("ok") and res.get("passed") else 1)
+
+
+def _cmd_goto(a):
+    """Drive an app to a state-tree node via its goto recipe."""
+    res = _call({"op": P.OP_GAMEGO, "app": a.app, "node": a.node})
+    _print_json(res)
+    raise SystemExit(0 if res.get("ok") else 1)
+
+
 def _cmd_diff(a):
     # Local image analysis — no daemon round-trip.
     from . import imageops
@@ -640,6 +685,26 @@ def build_parser():
     s = sub.add_parser("dock", help="apply a window's standing dock rule (see docks.py)")
     s.add_argument("target", help="window id or title substring")
     s.set_defaults(fn=_cmd_dock)
+
+    s = sub.add_parser("state", help="live game-state per app (the state tree evaluator, one line each)")
+    s.add_argument("--ocr", action="store_true", help="also OCR the windows (refines menu screens)")
+    s.set_defaults(fn=_cmd_state)
+
+    s = sub.add_parser("assert", help="TDD assert: wait until an app reaches a state (exit 0) or time out (exit 1)")
+    s.add_argument("--app", required=True, help="app id from the game tree (qud | raves)")
+    s.add_argument("--node", help="tree node the app must be at (or inside), e.g. in_game")
+    s.add_argument("--scene", help="exact self-reported scene, e.g. chargen_genotype")
+    s.add_argument("--popup", nargs="?", const="", default=None,
+                   help="a popup must be up (optionally of this type, e.g. message | yesno | input)")
+    s.add_argument("--present", choices=["yes", "no"], help="window present / absent")
+    s.add_argument("--ocr-contains", dest="ocr_contains", help="window OCR must contain this text")
+    s.add_argument("--timeout", type=float, default=10.0)
+    s.set_defaults(fn=_cmd_assert)
+
+    s = sub.add_parser("goto", help="drive an app to a state-tree node (its goto recipe), e.g. hv goto qud in_game")
+    s.add_argument("app", help="qud | raves")
+    s.add_argument("node", help="tree node id, e.g. title | in_game")
+    s.set_defaults(fn=_cmd_goto)
 
     s = sub.add_parser("probe", help="is an app up, and in what state? (e.g. hv probe --app qud)")
     s.add_argument("--app", help="known app profile (see apps.py): qud")

@@ -24,21 +24,21 @@
         <ul id="windows" class="list"></ul>
       </div>
       <div class="panel">
-        <div class="panel-hd">layout</div>
+        <div class="panel-hd">game controls</div>
         <div class="layout">
-          <div class="layout-row">
-            <select id="layoutsel"></select>
-            <button id="applylayout">apply</button>
-          </div>
-          <div class="layout-row">
-            <input id="savename" placeholder="save current as…">
-            <button id="savelayout" title="snapshot current window positions">save</button>
-          </div>
-          <div class="uttest-hd muted">⊞ user test · Raves ▲ / Qud ▼</div>
+          <div class="uttest-hd muted">▶ launch · standard slots (Raves ▲ / Qud ▼)</div>
           <div class="layout-row">
             <button id="start-raves" class="full primary"
                     title="launch the latest Raves build (it starts Caves of Qud borderless), then place both at 1920×1080 — Raves ▲ / Qud ▼">▶ Start Raves + Qud · 1920×1080</button>
           </div>
+          <div class="layout-row uttest-btns">
+            <button id="start-qud-solo"
+                    title="launch ONLY Caves of Qud (borderless) and place it in its standard lower-right slot">▶ Qud only</button>
+            <button id="start-raves-solo"
+                    title="launch ONLY Raves (no Qud spawn) and place it in its standard upper-right slot">▶ Raves only</button>
+          </div>
+          <div id="uttest-status" class="uttest-status muted"></div>
+          <div class="uttest-hd muted">⊞ place at resolution</div>
           <div class="layout-row uttest-btns">
             <button class="ut" data-w="1920" data-h="1080"
                     title="1920×1080 — Raves upper-right, Caves of Qud lower-right">1920×1080</button>
@@ -47,10 +47,18 @@
             <button class="ut" data-w="1280" data-h="720"
                     title="1280×720 — Raves upper-right, Caves of Qud lower-right">1280×720</button>
           </div>
-          <div id="uttest-status" class="uttest-status muted"></div>
+          <div class="uttest-hd muted">⚙ tools</div>
           <div class="layout-row">
             <button id="raves-1to1" class="full"
                     title="toggle Raves between user mode and 1:1 (parity) mode — injects Ctrl+M into the Raves window">⇄ Raves: user ⇄ 1:1</button>
+          </div>
+          <div class="layout-row">
+            <select id="layoutsel"></select>
+            <button id="applylayout">apply</button>
+          </div>
+          <div class="layout-row">
+            <input id="savename" placeholder="save current as…">
+            <button id="savelayout" title="snapshot current window positions">save</button>
           </div>
           <div id="layoutdesc" class="muted"></div>
         </div>
@@ -157,6 +165,8 @@
         <div class="panel-hd">
           state tree
           <span id="gt-legend" class="gt-legend muted"></span>
+          <button id="gt-expand" title="expand all">⊞</button>
+          <button id="gt-collapse" title="collapse all">⊟</button>
           <button id="gt-ocr" title="refine menu-side screens (title / load / chargen) with an OCR read now">ocr</button>
         </div>
         <div id="gametree" class="gametree"><div class="muted" style="padding:8px">loading…</div></div>

@@ -8,14 +8,24 @@ signals for an app, decides which node that app is currently in. Gathering the s
 (window list, port check, OCR) lives in the engine, which has the backend.
 
 State evaluation (``evaluate``):
-  signals = {present: bool, port_open: bool|None, ocr_text: str|None}
+  signals = {present: bool, port_open: bool|None, ocr_text: str|None, scene: str|None}
   - present False                       -> {"off": True}  (no window)
   - else walk the tree; a node MATCHES when every condition in its detect[app] holds:
         "port": True/False   -> requires port_open to equal it (skip if port_open is None)
         "ocr_any": [subs]    -> requires ocr_text to contain any substring
                                 (fails when ocr_text is None -> OCR-only nodes need an OCR poll)
+        "scene": "name" | ["a","b"] -> requires the app-REPORTED scene to equal one of these.
+                                The apps author their own state files (the mod's qud_state.json;
+                                Raves' raves_state.json) — first-party truth, so it beats OCR
+                                guessing and works on every cheap poll. Fails when scene is None
+                                (file missing/stale), so the OCR/port fallbacks still apply.
     Return the DEEPEST matching node. If only the root region matches (window up but
     nothing specific), return {"running": True, node None} = "unknown screen".
+
+``goto`` recipes: a node may carry goto[app] = [step, ...] — the command sequence that
+drives the app from a KNOWN BASE (its title screen unless the recipe starts with
+``{"launch": ...}``) to this state. Executed by the engine's ``gamego`` op; steps are
+documented there. The tree only STORES them (one canonical map: detection + navigation).
 """
 import json
 import os
@@ -44,11 +54,31 @@ def apps(tree=None):
     return (tree or load_tree()).get("apps", {})
 
 
+def find_node(tree, node_id):
+    """The node dict with this id (depth-first), or None."""
+    def walk(node):
+        if node.get("id") == node_id:
+            return node
+        for ch in node.get("children", []) or []:
+            hit = walk(ch)
+            if hit is not None:
+                return hit
+        return None
+    return walk((tree or load_tree())["root"])
+
+
 def _matches(detect, app, signals):
-    """Does this node's detect[app] hold under the signals? Unknown -> False."""
+    """Does this node's detect[app] hold under the signals? Unknown -> False.
+
+    detect[app] is one signature dict (every condition must hold) or a LIST of
+    signature dicts (any one matching signature suffices) — the list form lets a
+    first-party ``scene`` report sit alongside an OCR fallback without requiring
+    both at once (the state file only exists once the app ships its reporter)."""
     cond = (detect or {}).get(app)
     if cond is None:
         return False  # no detector for this app on this node
+    if isinstance(cond, list):
+        return any(_matches({app: c}, app, signals) for c in cond)
     if "port" in cond:
         po = signals.get("port_open")
         if po is None or bool(po) != bool(cond["port"]):
@@ -63,6 +93,14 @@ def _matches(detect, app, signals):
             return False
         low = text.lower()
         if not any(str(s).lower() in low for s in cond["ocr_any"]):
+            return False
+    if "scene" in cond:
+        scene = signals.get("scene")
+        if not scene:
+            return False
+        want = cond["scene"]
+        want = want if isinstance(want, list) else [want]
+        if str(scene).lower() not in [str(w).lower() for w in want]:
             return False
     # matched every stated condition (a detector with only e.g. {"port": False} is valid)
     return True
@@ -87,7 +125,10 @@ def evaluate(tree, app, signals):
         here_path = path if nid == "root" else path + [nid]
         if nid != "root" and _matches(node.get("detect"), app, signals):
             cond = node["detect"][app]
-            via = ("ocr" if "ocr_any" in cond
+            if isinstance(cond, list):   # OR-list: report via the first signature that matched
+                cond = next((c for c in cond if _matches({app: c}, app, signals)), {})
+            via = ("scene" if "scene" in cond
+                   else "ocr" if "ocr_any" in cond
                    else "live" if "game_live" in cond
                    else "port" if "port" in cond else "window")
             if best is None or depth > best[0]:

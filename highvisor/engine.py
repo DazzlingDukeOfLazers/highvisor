@@ -28,6 +28,16 @@ def _png_dims(png: bytes):
     return None
 
 
+def _slim_state(st):
+    """A gamestate entry reduced to what an assert/goto caller needs to read."""
+    if not st:
+        return None
+    return {"node": st.get("node"), "label": st.get("label"), "off": st.get("off"),
+            "path": st.get("path"), "via": st.get("via"),
+            "scene": (st.get("signals") or {}).get("scene"),
+            "extra": st.get("extra")}
+
+
 class _Job:
     __slots__ = ("request", "event", "result")
 
@@ -194,6 +204,12 @@ class Engine:
 
         if op == P.OP_GAMESTATE:
             return self._gamestate(b, ocr=bool(req.get("ocr", False)))
+
+        if op == P.OP_GAMEGO:
+            return self._gamego(b, req.get("app"), req.get("node"))
+
+        if op == P.OP_ASSERT:
+            return self._assert_state(b, req)
 
         if op == P.OP_WRITE_TEXT:
             return self._write_text(req.get("path"), req.get("content", ""))
@@ -387,7 +403,8 @@ class Engine:
         for app, cfg in gametree.apps(tree).items():
             win = self._find_win(wins, cfg.get("window"))
             signals = {"present": win is not None, "port_open": None,
-                       "game_live": None, "ocr_text": None}
+                       "game_live": None, "ocr_text": None,
+                       "scene": self._read_scene(cfg.get("state_file"))}
             port = cfg.get("port")
             if port:
                 try:
@@ -417,9 +434,226 @@ class Engine:
             st["window"] = win.to_dict() if win else None
             st["signals"] = {"present": signals["present"], "port_open": signals["port_open"],
                              "game_live": signals["game_live"],
+                             "scene": signals["scene"],
                              "ocr_used": signals["ocr_text"] is not None}
+            st["extra"] = self._read_state_extra(cfg.get("state_file"))
             states[app] = st
         return {"ok": True, "ocr": bool(ocr), "states": states}
+
+    # App-authored state files — first-party scene reports (the Qud mod's qud_state.json,
+    # Raves' raves_state.json). Far more accurate than OCR and cheap enough for every poll.
+    # A report is trusted only while FRESH (mtime within STATE_FILE_TTL): a crashed app's
+    # last write must not pin the tree to a stale screen.
+    STATE_FILE_TTL = 6.0
+
+    def _read_state_file(self, path):
+        """Parsed JSON dict of a fresh state file, else None."""
+        import json as _json
+        import os as _os
+        import time as _time
+        if not path:
+            return None
+        p = _os.path.expanduser(path)
+        try:
+            if _time.time() - _os.path.getmtime(p) > self.STATE_FILE_TTL:
+                return None
+            with open(p, "r", encoding="utf-8") as fh:
+                d = _json.load(fh)
+            return d if isinstance(d, dict) else None
+        except (OSError, ValueError):
+            return None
+
+    def _read_scene(self, path):
+        d = self._read_state_file(path)
+        return d.get("scene") if d else None
+
+    def _read_state_extra(self, path):
+        """The full fresh report minus the scene key (mode, popup, zone, …) for the UI."""
+        d = self._read_state_file(path)
+        if not d:
+            return None
+        return {k: v for k, v in d.items() if k != "scene"}
+
+    # ----------------------------------------------------------- assert (TDD)
+    def _assert_state(self, b, req):
+        """Poll the live state until the requested condition holds, or time out.
+
+        The TDD primitive for state-dependent work: ``hv assert --app qud --node in_game
+        --timeout 20`` blocks until Qud reports in-game (exit 0) or dumps the actual
+        state (exit 1). Conditions (all supplied must hold):
+          app + node:     the app's current node == node, or node is on its path
+          scene:          the app's self-reported scene equals this
+          popup:          true = any popup up (state-file ``popup`` key), or a popup type
+          present:        window presence equals this bool
+          ocr_contains:   the app window's OCR contains this substring (heavy — forces OCR)
+        ``ok`` = the op ran; ``passed`` = the assertion's verdict."""
+        import time
+        app = req.get("app")
+        want = {k: req[k] for k in ("node", "scene", "popup", "present", "ocr_contains")
+                if k in req and req[k] is not None}
+        if not app or not want:
+            return {"ok": False, "error": "assert needs app and at least one condition"}
+        timeout = float(req.get("timeout", 10.0))
+        interval = max(0.2, float(req.get("interval", 0.8)))
+        need_ocr = "ocr_contains" in want
+        t0 = time.monotonic()
+        actual = None
+        while True:
+            st = self._gamestate(b, ocr=need_ocr).get("states", {}).get(app)
+            actual = st
+            if st is not None and self._assert_holds(want, st):
+                return {"ok": True, "passed": True, "app": app, "want": want,
+                        "elapsed": round(time.monotonic() - t0, 2), "actual": _slim_state(st)}
+            if time.monotonic() - t0 >= timeout:
+                return {"ok": True, "passed": False, "app": app, "want": want,
+                        "elapsed": round(time.monotonic() - t0, 2), "actual": _slim_state(st),
+                        "error": "assert timed out"}
+            time.sleep(interval)
+
+    def _assert_holds(self, want, st):
+        if "present" in want:
+            if bool(st.get("signals", {}).get("present")) != bool(want["present"]):
+                return False
+        if "node" in want:
+            node = want["node"]
+            if st.get("node") != node and node not in (st.get("path") or []):
+                return False
+        if "scene" in want:
+            if (st.get("signals", {}).get("scene") or "") != want["scene"]:
+                return False
+        if "popup" in want:
+            popup = (st.get("extra") or {}).get("popup")
+            if want["popup"] is True:
+                if not popup:
+                    return False
+            elif str(popup or "") != str(want["popup"]):
+                return False
+        if "ocr_contains" in want:
+            # _gamestate stored no raw text; re-derive from the evaluate input is overkill —
+            # OCR the window directly (need_ocr already made the poll heavy anyway).
+            win = st.get("window")
+            if not win:
+                return False
+            try:
+                res = self.backend.ocr(win["id"])
+                text = "\n".join(x.get("text", "") for x in res.get("boxes", [])).lower()
+            except Exception:
+                return False
+            if str(want["ocr_contains"]).lower() not in text:
+                return False
+        return True
+
+    # ------------------------------------------------------- gamego (drive-to-state)
+    def _gamego(self, b, app, node_id, _depth=0):
+        """Drive ``app`` to tree state ``node_id`` via the node's goto[app] recipe.
+
+        Idempotent: if the app is already at (or inside) the target node, no steps run.
+        Steps (executed in order; the first failure stops the run):
+          {"goto": node}                  run that node's recipe first (recursion, depth-capped)
+          {"launch": name, "unless_running": bool}   launch unless the app's window is up
+          {"wait_window": label, "timeout": s}       poll for the window
+          {"activate": label}             front the window
+          {"click_hover": [x,y], "window": label}    hover-click (menus need the hover)
+          {"click": [x,y], "window": label}          plain click
+          {"key": keys, "window": label}  focused key injection
+          {"sleep": s}                    settle pause
+          {"assert": {...}, "timeout": s} inline _assert_state (app defaults to this app)
+        """
+        import time
+        from . import gametree
+        if _depth > 4:
+            return {"ok": False, "error": "goto recursion too deep (recipe cycle?)"}
+        tree = gametree.load_tree()
+        if app not in gametree.apps(tree):
+            return {"ok": False, "error": "unknown app %r" % app}
+        node = gametree.find_node(tree, node_id)
+        if node is None:
+            return {"ok": False, "error": "no tree node %r" % node_id}
+        recipe = (node.get("goto") or {}).get(app)
+        if not recipe:
+            return {"ok": False, "error": "node %r has no goto recipe for %s" % (node_id, app)}
+        # already there? (node current or an ancestor of the current node)
+        st = self._gamestate(b).get("states", {}).get(app) or {}
+        if st.get("node") == node_id or node_id in (st.get("path") or []):
+            return {"ok": True, "app": app, "node": node_id, "steps": [],
+                    "detail": "already at %s" % node_id, "state": _slim_state(st)}
+        steps = []
+
+        def fail(step, why):
+            steps.append({"step": step, "ok": False, "error": why})
+            return {"ok": False, "app": app, "node": node_id, "steps": steps, "error": why}
+
+        for step in recipe:
+            self.bus.publish("gamego", app=app, node=node_id, step=step)
+            if "goto" in step:
+                r = self._gamego(b, app, step["goto"], _depth + 1)
+                steps.append({"step": step, "ok": r.get("ok"), "detail": r.get("detail", "")})
+                if not r.get("ok"):
+                    return fail(step, r.get("error", "goto failed"))
+            elif "launch" in step:
+                cfg = gametree.apps(tree).get(app, {})
+                if step.get("unless_running") and self._find_win(b.list_targets(), cfg.get("window")):
+                    steps.append({"step": step, "ok": True, "detail": "already running"})
+                    continue
+                from .launch import resolve_launch
+                spec, largs = resolve_launch(step["launch"])
+                if not spec:
+                    return fail(step, "no launcher %r" % step["launch"])
+                r = b.launch(spec, largs)
+                steps.append({"step": step, "ok": r.ok, "detail": r.detail})
+                if not r.ok:
+                    return fail(step, r.error or "launch failed")
+            elif "wait_window" in step:
+                deadline = time.monotonic() + float(step.get("timeout", 30))
+                while self._find_win(b.list_targets(), step["wait_window"]) is None:
+                    if time.monotonic() > deadline:
+                        return fail(step, "window %r never appeared" % step["wait_window"])
+                    time.sleep(1.0)
+                steps.append({"step": step, "ok": True})
+            elif "activate" in step:
+                win = self._find_win(b.list_targets(), step["activate"])
+                if win is None:
+                    return fail(step, "no window %r" % step["activate"])
+                r = b.activate(win.id)
+                steps.append({"step": step, "ok": r.ok})
+                time.sleep(0.6)
+            elif "click_hover" in step or "click" in step:
+                key = "click_hover" if "click_hover" in step else "click"
+                win = self._find_win(b.list_targets(), step.get("window", ""))
+                if win is None:
+                    return fail(step, "no window %r" % step.get("window"))
+                x, y = step[key]
+                kw = {"hover": True} if key == "click_hover" else {}
+                r = b.click(win.id, int(x), int(y), **kw)
+                steps.append({"step": step, "ok": r.ok})
+                if not r.ok:
+                    return fail(step, r.error or "click failed")
+                time.sleep(0.5)
+            elif "key" in step:
+                win = self._find_win(b.list_targets(), step.get("window", ""))
+                if win is None:
+                    return fail(step, "no window %r" % step.get("window"))
+                r = b.key(win.id, step["key"], focus=True)
+                steps.append({"step": step, "ok": r.ok})
+                time.sleep(0.4)
+            elif "sleep" in step:
+                time.sleep(float(step["sleep"]))
+                steps.append({"step": step, "ok": True})
+            elif "assert" in step:
+                a = dict(step["assert"])
+                a.setdefault("app", app)
+                a["timeout"] = step.get("timeout", a.get("timeout", 15))
+                r = self._assert_state(b, a)
+                steps.append({"step": step, "ok": bool(r.get("passed")),
+                              "actual": r.get("actual")})
+                if not r.get("passed"):
+                    return fail(step, "assert failed: wanted %s, got %s"
+                                % (a, (r.get("actual") or {}).get("label")))
+            else:
+                return fail(step, "unknown step %r" % step)
+        st = self._gamestate(b).get("states", {}).get(app)
+        return {"ok": True, "app": app, "node": node_id, "steps": steps,
+                "state": _slim_state(st)}
 
     def _apply_layout(self, b, name):
         from .layouts import load_layouts, placement_rect

@@ -205,6 +205,14 @@ main {
 .gt-bar-na { background: transparent; }
 .gt-num { color: var(--muted); font-size: 10px; width: 20px; text-align: right; }
 .gt-here { color: var(--accent); font-size: 11px; line-height: 1; }
+/* collapse/expand twist: fixed slot so labels align whether or not a node has children */
+.gt-twist { width: 12px; flex: none; text-align: center; color: var(--muted); cursor: pointer;
+  user-select: none; font-size: 10px; line-height: 1; }
+.gt-twist:hover { color: var(--fg); }
+.gt-twist-leaf { cursor: default; }
+/* a cell with a goto recipe is clickable — hover reveals the drive-here affordance */
+.gt-cell.gt-go { cursor: pointer; }
+.gt-cell.gt-go:hover { background: #4ea1ff33; outline: 1px dashed var(--accent); }
 /* option buttons parsed from an ask body: each shows its FULL choice text, stacked per question */
 .pend-opts { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 6px; }
 .pend-answerhint { color: var(--ok); font-size: 11px; }

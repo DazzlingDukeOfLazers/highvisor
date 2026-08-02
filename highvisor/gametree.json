@@ -1,15 +1,19 @@
 {
   "version": 1,
-  "note": "Canonical game state-machine tree (one source, three views). done[app] = 0..1, how finished our 1:1 work is on that screen for that app (Qud = reference/how well we detect+drive it; Raves = render/impl fidelity). Edit freely; the cockpit reloads on file change. detect[app] recognises 'we are here' from live signals: game_live (Qud's 48710 bridge pushes a snapshot on connect ONLY when a game is actually running \u2014 the true menu-vs-in-game signal; the raw port is open even at the main menu, so it can't tell them apart), port (raw listener open = modded Qud alive), and ocr_any (case-insensitive substrings in an OCR of the window). A node matches when all its conditions hold; the DEEPEST match wins. Conditions needing OCR only match on an OCR-enabled poll, so cheap polls fall back to the coarsest ancestor.",
+  "note": "Canonical game state-machine tree (one source, three views). done[app] = 0..1, how finished our 1:1 work is on that screen for that app (Qud = reference/how well we detect+drive it; Raves = render/impl fidelity). Edit freely; the cockpit reloads on file change. detect[app] recognises 'we are here' from live signals: game_live (Qud's 48710 bridge pushes a snapshot on connect ONLY when a game is actually running — the true menu-vs-in-game signal; the raw port is open even at the main menu, so it can't tell them apart), port (raw listener open = modded Qud alive), and ocr_any (case-insensitive substrings in an OCR of the window). A node matches when all its conditions hold; the DEEPEST match wins. Conditions needing OCR only match on an OCR-enabled poll, so cheap polls fall back to the coarsest ancestor.",
   "apps": {
     "qud": {
       "label": "Qud",
       "window": "CavesOfQud",
-      "port": 48710
+      "port": 48710,
+      "state_file": "~/Library/Application Support/RavesOfQud/qud_state.json",
+      "launcher": "qud_solo"
     },
     "raves": {
       "label": "Raves",
-      "window": "Raves of Qud"
+      "window": "Raves of Qud",
+      "state_file": "~/Library/Application Support/RavesOfQud/raves_state.json",
+      "launcher": "raves"
     }
   },
   "root": {
@@ -19,7 +23,7 @@
       {
         "id": "freehold",
         "label": "Freehold Games splash",
-        "note": "transient boot splash \u2014 no reliable detector yet",
+        "note": "transient boot splash — no reliable detector yet",
         "done": {
           "qud": 1.0,
           "raves": 0.0
@@ -35,18 +39,65 @@
           "raves": 0.9
         },
         "detect": {
-          "qud": {
-            "game_live": false
-          },
-          "raves": {
-            "ocr_any": [
-              "caves of qud",
-              "new game",
-              "continue",
-              "records",
-              "modding toolkit"
-            ]
-          }
+          "qud": [
+            {
+              "scene": [
+                "MainMenu",
+                "title"
+              ]
+            },
+            {
+              "game_live": false
+            }
+          ],
+          "raves": [
+            {
+              "scene": "title"
+            },
+            {
+              "ocr_any": [
+                "caves of qud",
+                "new game",
+                "continue",
+                "records",
+                "modding toolkit"
+              ]
+            }
+          ]
+        },
+        "goto": {
+          "qud": [
+            {
+              "launch": "qud_solo",
+              "unless_running": true
+            },
+            {
+              "wait_window": "CavesOfQud",
+              "timeout": 60
+            },
+            {
+              "assert": {
+                "node": "title"
+              },
+              "timeout": 40
+            }
+          ],
+          "raves": [
+            {
+              "launch": "raves_solo",
+              "unless_running": true
+            },
+            {
+              "wait_window": "Raves of Qud",
+              "timeout": 30
+            },
+            {
+              "assert": {
+                "node": "title"
+              },
+              "timeout": 20
+            }
+          ]
         },
         "children": [
           {
@@ -78,7 +129,7 @@
             "children": [
               {
                 "id": "new_game",
-                "label": "New Game \u2192 Character Creation",
+                "label": "New Game → Character Creation",
                 "done": {
                   "qud": 0.6,
                   "raves": 0.4
@@ -95,14 +146,23 @@
                     ],
                     "game_live": false
                   },
-                  "raves": {
-                    "ocr_any": [
-                      "character creation",
-                      "choose genotype",
-                      "choose preset",
-                      "genotype"
-                    ]
-                  }
+                  "raves": [
+                    {
+                      "scene": [
+                        "chargen_game_mode",
+                        "chargen_genotype",
+                        "chargen_subtype"
+                      ]
+                    },
+                    {
+                      "ocr_any": [
+                        "character creation",
+                        "choose genotype",
+                        "choose preset",
+                        "genotype"
+                      ]
+                    }
+                  ]
                 },
                 "children": [
                   {
@@ -112,7 +172,13 @@
                       "qud": 0.7,
                       "raves": 0.85
                     },
-                    "detect": {}
+                    "detect": {
+                      "raves": [
+                        {
+                          "scene": "chargen_game_mode"
+                        }
+                      ]
+                    }
                   },
                   {
                     "id": "genotype",
@@ -121,7 +187,13 @@
                       "qud": 0.6,
                       "raves": 0.75
                     },
-                    "detect": {}
+                    "detect": {
+                      "raves": [
+                        {
+                          "scene": "chargen_genotype"
+                        }
+                      ]
+                    }
                   },
                   {
                     "id": "calling",
@@ -130,7 +202,13 @@
                       "qud": 0.5,
                       "raves": 0.2
                     },
-                    "detect": {}
+                    "detect": {
+                      "raves": [
+                        {
+                          "scene": "chargen_subtype"
+                        }
+                      ]
+                    }
                   },
                   {
                     "id": "attributes",
@@ -154,7 +232,7 @@
               },
               {
                 "id": "continue",
-                "label": "Continue \u2192 Load Game",
+                "label": "Continue → Load Game",
                 "done": {
                   "qud": 0.9,
                   "raves": 0.2
@@ -191,7 +269,13 @@
                   "qud": 0.3,
                   "raves": 0.0
                 },
-                "detect": {}
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "records"
+                    }
+                  ]
+                }
               },
               {
                 "id": "options",
@@ -200,7 +284,13 @@
                   "qud": 0.4,
                   "raves": 0.2
                 },
-                "detect": {}
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "options"
+                    }
+                  ]
+                }
               },
               {
                 "id": "mods",
@@ -209,13 +299,19 @@
                   "qud": 0.3,
                   "raves": 0.0
                 },
-                "detect": {}
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "mods"
+                    }
+                  ]
+                }
               }
             ]
           },
           {
             "id": "secondary_links",
-            "label": "Secondary List (Redeem Code \u2026 Help)",
+            "label": "Secondary List (Redeem Code … Help)",
             "done": {
               "qud": 1.0,
               "raves": 1.0
@@ -263,11 +359,16 @@
                 ],
                 "game_live": false
               },
-              "raves": {
-                "ocr_any": [
-                  "are you sure you want to quit"
-                ]
-              }
+              "raves": [
+                {
+                  "scene": "quit_dialog"
+                },
+                {
+                  "ocr_any": [
+                    "are you sure you want to quit"
+                  ]
+                }
+              ]
             }
           }
         ]
@@ -280,18 +381,101 @@
           "raves": 0.5
         },
         "detect": {
-          "qud": {
-            "game_live": true
-          },
-          "raves": {
-            "ocr_any": [
-              "make camp",
-              "abilities",
-              "active effects",
-              "message log",
-              "sprint"
-            ]
-          }
+          "qud": [
+            {
+              "scene": [
+                "play",
+                "Stage",
+                "in_game"
+              ]
+            },
+            {
+              "game_live": true
+            }
+          ],
+          "raves": [
+            {
+              "scene": "in_game"
+            },
+            {
+              "ocr_any": [
+                "make camp",
+                "abilities",
+                "active effects",
+                "message log",
+                "sprint"
+              ]
+            }
+          ]
+        },
+        "goto": {
+          "qud": [
+            {
+              "goto": "title"
+            },
+            {
+              "activate": "CavesOfQud"
+            },
+            {
+              "click_hover": [
+                958,
+                608
+              ],
+              "window": "CavesOfQud",
+              "note": "Continue on the title menu"
+            },
+            {
+              "sleep": 1.0
+            },
+            {
+              "click_hover": [
+                900,
+                198
+              ],
+              "window": "CavesOfQud",
+              "note": "top save row in the Load Game picker"
+            },
+            {
+              "assert": {
+                "node": "in_game"
+              },
+              "timeout": 30
+            }
+          ],
+          "raves": [
+            {
+              "goto": "title"
+            },
+            {
+              "assert": {
+                "app": "qud",
+                "node": "in_game"
+              },
+              "timeout": 5,
+              "note": "Raves' Continue needs a live Qud game (bridge heartbeat) — go Qud to in_game first if this fails"
+            },
+            {
+              "activate": "Raves of Qud"
+            },
+            {
+              "click_hover": [
+                945,
+                580
+              ],
+              "window": "Raves of Qud",
+              "note": "hover-select Continue"
+            },
+            {
+              "key": "space",
+              "window": "Raves of Qud"
+            },
+            {
+              "assert": {
+                "node": "in_game"
+              },
+              "timeout": 20
+            }
+          ]
         },
         "children": [
           {

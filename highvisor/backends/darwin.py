@@ -470,11 +470,30 @@ class MacBackend(PlatformBackend):
         # True -> raise it now (best-effort, NOT sticky); False/None -> leave z-order.
         if topmost is True:
             AXUIElementPerformAction(ax, _RAISE)
+        # VERIFY BY READBACK, not by the raw AX error codes: Godot's borderless window
+        # returns kAXErrorFailure (-25200) from an AXSize set that actually LANDS (and
+        # sometimes the reverse), so the codes alone both false-fail and false-pass.
+        # The window frame in the CG window list is the ground truth — give the async
+        # AX pipeline a beat, then compare requested vs actual (small tolerance).
         ok = (e1 == 0 and e2 == 0)
+        actual = None
+        for _ in range(6):                      # ~0.9s worst case
+            time.sleep(0.15)
+            cur = self._resolve(target)
+            if cur is not None:
+                actual = (int(cur.x), int(cur.y), int(cur.w), int(cur.h))
+                if (abs(cur.x - x) <= 2 and abs(cur.y - y) <= 2
+                        and abs(cur.w - w) <= 2 and abs(cur.h - h) <= 2):
+                    ok = True
+                    break
+                ok = False
         note = "" if topmost is not True else " (topmost=raise-once; AX can't pin sticky)"
-        return ActionResult(ok=ok, tier=1,
-                            detail="AXPosition/AXSize %d,%d %dx%d%s" % (x, y, w, h, note),
-                            error=None if ok else "AX set failed (pos=%s size=%s)" % (e1, e2))
+        detail = "AXPosition/AXSize %d,%d %dx%d%s" % (x, y, w, h, note)
+        if ok:
+            return ActionResult(ok=True, tier=1, detail=detail)
+        return ActionResult(ok=False, tier=1, detail=detail,
+                            error="move did not land (ax pos=%s size=%s, actual=%s)"
+                                  % (e1, e2, actual))
 
     def text(self, target: str, text: str) -> ActionResult:
         w = self._resolve(target)

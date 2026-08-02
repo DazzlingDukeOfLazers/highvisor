@@ -499,12 +499,74 @@ async function startRavesLatest() {
   }
 }
 
+// The standard pair slots at W×H on the roomiest display (shared by the pair launch, the
+// resolution buttons, and the solo launches — a solo window lands EXACTLY where the pair
+// layout would put it, so adding the second app later never moves the first).
+async function standardSlots(W, H) {
+  const disps = await rpc("displays");
+  const displays = (disps.ok && disps.displays && disps.displays.length)
+    ? disps.displays : [{ x: 0, y: 0, w: 2 * W, h: 2 * H }];
+  const byArea = displays.slice().sort((a, b) => b.w * b.h - a.w * a.h);
+  const d = byArea.find(x => x.w >= W && x.h >= 2 * H) || byArea[0];
+  const MARGIN_X = 50, MARGIN_Y = 4;   // overscan nudge — the monitor clips edge pixels
+  const x = d.x + Math.max(0, d.w - W) - MARGIN_X;
+  return { ravesRect: { x, y: d.y - MARGIN_Y, w: W, h: H },
+           qudRect:   { x, y: d.y + Math.floor(d.h / 2) - MARGIN_Y, w: W, h: H } };
+}
+
+// Launch ONE app of the pair and place it in its standard slot. Qud solo uses the
+// `qud_solo` launcher (the CoQ binary with the same borderless args Raves would pass);
+// Raves solo launches the .app with NO args, so it does NOT spawn Qud.
+async function startSolo(which) {
+  const btn = $(which === "qud" ? "start-qud-solo" : "start-raves-solo");
+  const status = $("uttest-status");
+  const setStatus = (cls, txt) => {
+    if (status) { status.className = "uttest-status " + cls; status.textContent = txt; }
+  };
+  btn.disabled = true;
+  try {
+    const first = await rpc("list_targets");
+    const cur = classifyRavesQud(first.ok ? first.targets : []);
+    const have = which === "qud" ? cur.qud : cur.raves;
+    if (have.length > 1) { alert(_dupMessage(cur.raves, cur.qud)); return; }
+    if (have.length === 0) {
+      setStatus("muted", `launching ${which} (solo)…`);
+      let launchName = which === "qud" ? "qud_solo" : "raves_solo";
+      let r = await rpc("launch", { name: launchName });
+      if (!r.ok && which === "qud") r = await rpc("launch", { name: "qud" });  // fallback: steam launcher
+      if (!r.ok) { alert("launch failed: " + (r.error || "?")); return; }
+    }
+    const deadline = Date.now() + 90000;
+    for (;;) {
+      const t = await rpc("list_targets");
+      const c = classifyRavesQud(t.ok ? t.targets : []);
+      await refreshWindows();
+      const now = which === "qud" ? c.qud : c.raves;
+      if (now.length > 1) { alert(_dupMessage(c.raves, c.qud)); return; }
+      if (now.length === 1) {
+        const slots = await standardSlots(1920, 1080);
+        const rect = which === "qud" ? slots.qudRect : slots.ravesRect;
+        await rpc("move", { target: now[0].id, ...rect, topmost: false });
+        setStatus("ok", `${which} up · standard slot`);
+        return;
+      }
+      if (Date.now() > deadline) { setStatus("warn", `timed out waiting for ${which}`); return; }
+      setStatus("muted", `waiting for ${which}…`);
+      await new Promise(res => setTimeout(res, 1500));
+    }
+  } catch (e) {
+    alert(`start ${which} failed: ` + (e.message || e));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // One-click user-testing setup at a chosen resolution: Raves in the UPPER-RIGHT
 // quadrant, Caves of Qud in the LOWER-RIGHT, W×H each (right-edge aligned in the
 // right half — the same placement the responsive parity test uses). Refuses to
 // run on duplicates.
 async function userTestLayout(W, H) {
-  const [wins, disps] = await Promise.all([rpc("list_targets"), rpc("displays")]);
+  const wins = await rpc("list_targets");
   if (!wins.ok) { alert("list_targets failed: " + (wins.error || "?")); return; }
   const { raves, qud } = classifyRavesQud(wins.targets);
   if (raves.length !== 1 || qud.length !== 1) {
@@ -515,21 +577,10 @@ async function userTestLayout(W, H) {
   const btns = document.querySelectorAll(".ut");
   btns.forEach(b => (b.disabled = true));
   try {
-    const displays = (disps.ok && disps.displays && disps.displays.length)
-      ? disps.displays : [{ x: 0, y: 0, w: 2 * W, h: 2 * H }];
-    // A stacked right-half pair needs a full-height column: width >= W and
-    // height >= 2H. Prefer the roomiest such display; else the largest overall.
-    const byArea = displays.slice().sort((a, b) => b.w * b.h - a.w * a.h);
-    const d = byArea.find(x => x.w >= W && x.h >= 2 * H) || byArea[0];
-    // Overscan nudge: the monitor clips edge pixels. Shift both LEFT off the right edge, and the
-    // whole right-half column DOWN a touch so Raves' top clears the edge — splitting the ~8px the
-    // windows currently spill past the top. Both windows end flush at their shared centre line.
-    const MARGIN_X = 50, MARGIN_Y = 4;
-    const x = d.x + Math.max(0, d.w - W) - MARGIN_X;     // right-edge aligned, shifted left
-    const yTop = d.y - MARGIN_Y;                         // Raves ▲  (down off the current top spill)
-    const yBot = d.y + Math.floor(d.h / 2) - MARGIN_Y;   // Qud ▼    (up off the bottom edge)
-    await rpc("move", { target: raves[0].id, x, y: yTop, w: W, h: H, topmost: false });
-    await rpc("move", { target: qud[0].id, x, y: yBot, w: W, h: H, topmost: false });
+    // Same slot math as the solo launches (standardSlots) — one source for the placement.
+    const slots = await standardSlots(W, H);
+    await rpc("move", { target: raves[0].id, ...slots.ravesRect, topmost: false });
+    await rpc("move", { target: qud[0].id, ...slots.qudRect, topmost: false });
     await refreshWindows();
   } catch (e) {
     alert("user-test layout failed: " + (e.message || e));
@@ -699,6 +750,9 @@ function renderEvent(ev) {
     return `<span class="${cls}">${escapeHtml(st)}</span> <b>${escapeHtml(ev.verb || "")}</b> → `
       + `${escapeHtml(ev.target || "")} <span class="muted">${escapeHtml((ev.body || "").slice(0, 60))}</span>`;
   }
+  if (ev.kind === "gamego")
+    return `<b>goto</b> ${escapeHtml(ev.app || "")} → ${escapeHtml(ev.node || "")} `
+      + `<span class="muted">${escapeHtml(JSON.stringify(ev.step || {}))}</span>`;
   if (ev.kind === "peer") return `${escapeHtml(ev.event || "")} <b>${escapeHtml(ev.name || "")}</b> <span class="muted">${escapeHtml(ev.host || "")}</span>`;
   if (ev.kind === "pick") return `<span class="k-peer">picked</span> <b>${escapeHtml(ev.q || "")}</b> = (${escapeHtml(ev.opt || "")}) <span class="muted">${escapeHtml((ev.label || "").slice(0, 70))}</span>`;
   if (ev.msg) return escapeHtml(ev.msg);
@@ -803,8 +857,40 @@ async function pollGameState(ocr) {
   renderGameTree();
 }
 
+// Collapsed node ids persist across reloads; a node collapses to its row (children hidden).
+const gtCollapsed = new Set(JSON.parse(localStorage.getItem("hv-gt-collapsed") || "[]"));
+function gtSaveCollapsed() {
+  localStorage.setItem("hv-gt-collapsed", JSON.stringify([...gtCollapsed]));
+}
+function gtToggle(id) {
+  if (gtCollapsed.has(id)) gtCollapsed.delete(id); else gtCollapsed.add(id);
+  gtSaveCollapsed(); renderGameTree();
+}
+function gtSetAll(collapse) {
+  gtCollapsed.clear();
+  if (collapse && gtTree) {
+    const walk = (n) => { if ((n.children || []).length && n.id !== "root") gtCollapsed.add(n.id); (n.children || []).forEach(walk); };
+    walk(gtTree.root);
+  }
+  gtSaveCollapsed(); renderGameTree();
+}
+window.gtToggle = gtToggle;
+
+// Click an app's cell on a row whose node carries a goto recipe for that app → drive the app
+// there (the engine's gamego op runs the recipe; progress streams into the log).
+async function gtGo(app, nodeId) {
+  const r = await rpc("gamego", { app, node: nodeId });
+  if (!r.ok) alert(`goto ${app} → ${nodeId} failed: ` + (r.error || "?"));
+}
+window.gtGo = gtGo;
+
 function gtRow(node, depth, appIds, cur) {
   const pad = 6 + depth * 14;
+  const kids = (node.children || []).length > 0;
+  const closed = gtCollapsed.has(node.id);
+  const twist = kids
+    ? `<span class="gt-twist" onclick="gtToggle('${escapeHtml(node.id)}')" title="${closed ? "expand" : "collapse"}">${closed ? "▸" : "▾"}</span>`
+    : `<span class="gt-twist gt-twist-leaf"></span>`;
   let cells = "";
   for (const app of appIds) {
     const st = cur[app];
@@ -814,10 +900,16 @@ function gtRow(node, depth, appIds, cur) {
     const bar = done == null
       ? `<span class="gt-bar gt-bar-na"></span><span class="gt-num"></span>`
       : `<span class="gt-bar"><span class="gt-bar-fill" style="width:${Math.round(done * 100)}%"></span></span><span class="gt-num">${done.toFixed(1)}</span>`;
-    cells += `<span class="gt-cell${isCur ? " cur" : ""}${onPath ? " onpath" : ""}">${bar}${isCur ? '<span class="gt-here">●</span>' : ""}</span>`;
+    const canGo = !!(node.goto && node.goto[app]);
+    const cls = `gt-cell${isCur ? " cur" : ""}${onPath ? " onpath" : ""}${canGo ? " gt-go" : ""}`;
+    const attrs = canGo
+      ? ` onclick="gtGo('${app}','${escapeHtml(node.id)}')" title="click: drive ${escapeHtml(gtTree.apps[app].label || app)} to ${escapeHtml(node.label || node.id)}"`
+      : "";
+    cells += `<span class="${cls}"${attrs}>${bar}${isCur ? '<span class="gt-here">●</span>' : ""}</span>`;
   }
   const anyCur = appIds.some(a => cur[a] && cur[a].node === node.id);
-  return `<div class="gt-row${anyCur ? " rowcur" : ""}"><span class="gt-label" style="padding-left:${pad}px" title="${escapeHtml(node.id)}">${escapeHtml(node.label || node.id)}</span>${cells}</div>`;
+  const hiddenCur = closed && appIds.some(a => cur[a] && Array.isArray(cur[a].path) && cur[a].path.includes(node.id) && cur[a].node !== node.id);
+  return `<div class="gt-row${anyCur ? " rowcur" : ""}">${twist}<span class="gt-label" style="padding-left:${pad}px" title="${escapeHtml(node.id)}">${escapeHtml(node.label || node.id)}${hiddenCur ? ' <span class="gt-here">●</span>' : ""}</span>${cells}</div>`;
 }
 
 function renderGameTree() {
@@ -831,17 +923,20 @@ function renderGameTree() {
     const st = gtCurrent(app);
     cur[app] = st;
     const lbl = (gtTree.apps[app].label || app);
-    legend.push(`${lbl}: ${st ? (st.off ? "off" : (st.label || "…")) : "—"}`);
+    const extra = st && st.extra ? Object.entries(st.extra).filter(([k]) => k === "popup" || k === "mode")
+      .map(([k, v]) => `${k}=${v}`).join(" ") : "";
+    legend.push(`${lbl}: ${st ? (st.off ? "off" : (st.label || "…")) : "—"}${extra ? " · " + extra : ""}`);
   }
   const leg = $("gt-legend"); if (leg) leg.textContent = legend.join("   ·   ");
-  let html = '<div class="gt-row gt-head"><span class="gt-label">screen</span>';
+  let html = '<div class="gt-row gt-head"><span class="gt-twist gt-twist-leaf"></span><span class="gt-label">screen</span>';
   for (const app of appIds) html += `<span class="gt-cell gt-head-cell">${escapeHtml(gtTree.apps[app].label || app)}</span>`;
   html += "</div>";
   const rows = [];
   const walk = (node, depth) => {
     if (node.id === "root") { for (const ch of node.children || []) walk(ch, 0); return; }
     rows.push(gtRow(node, depth, appIds, cur));
-    for (const ch of node.children || []) walk(ch, depth + 1);
+    if (!gtCollapsed.has(node.id))
+      for (const ch of node.children || []) walk(ch, depth + 1);
   };
   walk(gtTree.root, 0);
   host.innerHTML = html + rows.join("");
@@ -884,12 +979,16 @@ async function init() {
     _buildSimilarity();
   };
   $("start-raves").onclick = startRavesLatest;
+  $("start-qud-solo").onclick = () => startSolo("qud");
+  $("start-raves-solo").onclick = () => startSolo("raves");
   document.querySelectorAll(".ut").forEach(b =>
     (b.onclick = () => userTestLayout(+b.dataset.w, +b.dataset.h)));
   $("raves-1to1").onclick = toggleRaves1to1;
   $("layoutsel").onchange = showLayoutDesc;
   $("clearlog").onclick = () => (logEl().innerHTML = "");
   $("gt-ocr").onclick = () => pollGameState(true);
+  $("gt-expand").onclick = () => gtSetAll(false);
+  $("gt-collapse").onclick = () => gtSetAll(true);
   document.querySelectorAll(".bgn-b").forEach(b =>
     (b.onclick = () => bgnStep(b.dataset.bgn, parseFloat(b.dataset.d))));
   $("bgn-reset").onclick = () => { bgNudge.dx = 0; bgNudge.dy = 0; bgNudge.sx = 1.0; bgNudge.sy = 1.0; bgnRender(); bgnWrite(); };
