@@ -405,8 +405,8 @@ class Engine:
         wish = (wish or "").strip()
         if not wish:
             return {"ok": False, "error": "empty wish"}
-        from .apps import APPS
-        port = APPS.get("qud", {}).get("port", 48710)
+        from .apps import PROFILES
+        port = PROFILES.get("qud", {}).get("port", 48710)
 
         def _frame(obj):
             payload = _json.dumps(obj).encode("utf-8")
