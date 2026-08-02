@@ -123,7 +123,16 @@ class WindowsBackend(PlatformBackend):
         # Must run before creating windows/UIA on this thread.
         _dpi_aware()
         _configure_win32()
-        # Touch UIA once so comtypes initializes COM on THIS (worker) thread.
+        # Initialize COM on THIS worker thread before any UIA call. comtypes' lazy
+        # init doesn't always fire when the daemon is spawned via subprocess (vs a
+        # shell), surfacing as "CoInitialize has not been called" from
+        # UIAutomationCore. Do it explicitly so the daemon starts either way.
+        try:
+            import comtypes
+            comtypes.CoInitialize()
+        except Exception:
+            pass
+        # Touch UIA once so comtypes finishes initializing on THIS (worker) thread.
         auto.GetRootControl()
 
     # ---------------------------------------------------------------- helpers
@@ -298,7 +307,10 @@ class WindowsBackend(PlatformBackend):
         hwnd = self._resolve(target)
         if hwnd is None:
             return ActionResult.fail("move needs a window target")
-        if user32.IsIconic(hwnd):
+        # A minimized *or* maximized window ignores SetWindowPos geometry (the
+        # zoom/iconic state wins), so clear it first — otherwise "tile to a half"
+        # silently leaves a maximized window full-screen.
+        if user32.IsIconic(hwnd) or user32.IsZoomed(hwnd):
             user32.ShowWindow(hwnd, SW_RESTORE)
         # Tri-state z-order: True pins topmost, False explicitly clears the
         # topmost bit, None just raises (HWND_TOP leaves an existing topmost
