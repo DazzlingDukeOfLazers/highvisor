@@ -46,6 +46,7 @@ OP_GAMESTATE = "gamestate"        # [ocr] -> {ok, states:{app:{node,label,path,o
 OP_GAMEGO = "gamego"              # app, node -> drive the app to that tree state via its goto recipe
 OP_ASSERT = "assert_state"        # app, [node|scene|popup|ocr_contains|present], timeout -> {ok, pass, actual, elapsed}
 OP_WRITE_TEXT = "write_text"      # path (under $HOME), content -> {ok, path, bytes} (small config writes)
+OP_QUDWISH = "qudwish"            # wish -> {ok, wish} — run a Caves of Qud wish via the Raves mod bridge
 
 MAX_FRAME = 64 * 1024 * 1024  # 64 MiB guard (a 4k screenshot fits easily)
 

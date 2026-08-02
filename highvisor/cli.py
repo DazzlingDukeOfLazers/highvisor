@@ -200,6 +200,13 @@ def _cmd_goto(a):
     raise SystemExit(0 if res.get("ok") else 1)
 
 
+def _cmd_wish(a):
+    """Run a Caves of Qud wish through the Raves mod bridge (godmode, item:..., xp:...)."""
+    res = _call({"op": P.OP_QUDWISH, "wish": " ".join(a.text)})
+    _print_json(res)
+    raise SystemExit(0 if res.get("ok") else 1)
+
+
 def _cmd_diff(a):
     # Local image analysis — no daemon round-trip.
     from . import imageops
@@ -710,6 +717,10 @@ def build_parser():
     s.add_argument("app", help="qud | raves")
     s.add_argument("node", help="tree node id, e.g. title | in_game")
     s.set_defaults(fn=_cmd_goto)
+
+    s = sub.add_parser("wish", help="run a Caves of Qud wish via the Raves bridge, e.g. hv wish godmode")
+    s.add_argument("text", nargs="+", help="the wish text (godmode | item:<Blueprint> | xp:<n> | ...)")
+    s.set_defaults(fn=_cmd_wish)
 
     s = sub.add_parser("probe", help="is an app up, and in what state? (e.g. hv probe --app qud)")
     s.add_argument("--app", help="known app profile (see apps.py): qud")

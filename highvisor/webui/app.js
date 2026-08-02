@@ -454,6 +454,23 @@ async function toggleRaves1to1() {
   }
 }
 
+// Toggle Qud godmode: runs the "godmode" wish through the Raves mod bridge (the daemon's
+// qudwish op speaks Qud's 48710 socket directly — no window focus or key injection needed).
+// Godmode is a toggle in Qud with no cheap state readback, so the button is stateless; the
+// wish result ("Godmode now True/False") lands in the game's own message log.
+async function qudGodmode() {
+  const btn = $("qud-godmode");
+  btn.disabled = true;
+  try {
+    const r = await rpc("qudwish", { wish: "godmode" });
+    if (!r.ok) alert("godmode failed: " + (r.error || "?"));
+  } catch (e) {
+    alert("godmode failed: " + (e.message || e));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // Start the latest Raves build and arrange it. Launches via the `raves` launcher
 // (which itself spawns Caves of Qud borderless — see launch.json / QudLauncher),
 // waits for BOTH windows to appear (Qud's takes ~20s), then tiles at 1920×1080.
@@ -984,6 +1001,7 @@ async function init() {
   document.querySelectorAll(".ut").forEach(b =>
     (b.onclick = () => userTestLayout(+b.dataset.w, +b.dataset.h)));
   $("raves-1to1").onclick = toggleRaves1to1;
+  $("qud-godmode").onclick = qudGodmode;
   $("layoutsel").onchange = showLayoutDesc;
   $("clearlog").onclick = () => (logEl().innerHTML = "");
   $("gt-ocr").onclick = () => pollGameState(true);

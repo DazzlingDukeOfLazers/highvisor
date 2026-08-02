@@ -214,6 +214,9 @@ class Engine:
         if op == P.OP_WRITE_TEXT:
             return self._write_text(req.get("path"), req.get("content", ""))
 
+        if op == P.OP_QUDWISH:
+            return self._qudwish(req.get("wish", ""))
+
         if op == P.OP_LAYOUT_LIST:
             from .layouts import load_layouts
             return {"ok": True, "layouts": [
@@ -387,6 +390,36 @@ class Engine:
             return {"ok": True, "path": full, "bytes": len(str(content))}
         except OSError as e:
             return {"ok": False, "error": str(e)}
+
+    # ------------------------------------------------------- qudwish (Qud bridge wish)
+    def _qudwish(self, wish):
+        """Execute a Caves of Qud wish (godmode, item:<blueprint>, xp:<n>, ...) through the
+        Raves mod bridge (127.0.0.1:48710, same 4-byte-BE-length JSON framing as ours).
+        The wish is chased with a "wait": the mod drains wishes on Qud's game thread,
+        which sleeps while Qud is unfocused with no turn passing — the wait wakes the
+        parked input loop so the wish applies immediately instead of pending silently.
+        (Costs one game turn; the cockpit's use cases — godmode, test gear — don't care.)"""
+        import json as _json
+        import socket as _socket
+        import struct as _struct
+        wish = (wish or "").strip()
+        if not wish:
+            return {"ok": False, "error": "empty wish"}
+        from .apps import APPS
+        port = APPS.get("qud", {}).get("port", 48710)
+
+        def _frame(obj):
+            payload = _json.dumps(obj).encode("utf-8")
+            return _struct.pack(">I", len(payload)) + payload
+
+        try:
+            with _socket.create_connection(("127.0.0.1", port), timeout=3) as s:
+                s.sendall(_frame({"type": "command", "name": "wish", "wish": wish}))
+                s.sendall(_frame({"type": "command", "name": "wait"}))
+            return {"ok": True, "wish": wish}
+        except OSError as e:
+            return {"ok": False,
+                    "error": "Qud bridge :%s unreachable (%s) — is Qud in-game?" % (port, e)}
 
     def _gamestate(self, b, ocr=False):
         """Evaluate the game state-machine tree against live signals for each app.
