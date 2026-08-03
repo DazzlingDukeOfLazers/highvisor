@@ -337,9 +337,40 @@ class Engine:
             return {"ok": False, "error": "%r not found" % top_label}
         x, w, h = bot.x, bot.w, bot.h            # same column + size as the anchor
         y = bot.y - gap - h                      # stacked directly above it
+        if "raves of qud" in (top.title or "").lower():
+            # Godot's borderless window can't be moved via AX (sets land at wild
+            # coords or fail) — ask Raves to place ITSELF: write window_rect.json
+            # (the reverse of its state-report contract), verify by CG readback.
+            r2 = self._move_raves_file(b, top.id, int(x), int(y), int(w), int(h))
+            if r2.get("ok"):
+                return {"ok": True, "top": top.id, "bottom": bot.id,
+                        "rect": [int(x), int(y), int(w), int(h)], "via": "file"}
+            # fall through to the AX attempt as a last resort
         r = b.move(top.id, int(x), int(y), int(w), int(h), None)
         return {"ok": r.ok, "top": top.id, "bottom": bot.id,
                 "rect": [int(x), int(y), int(w), int(h)], "error": r.error}
+
+    def _move_raves_file(self, b, win_id, x, y, w, h, timeout_s=6.0):
+        """Placement via Raves' window_rect.json poll (Settings.gd applies it with
+        DisplayServer within ~0.5s). Verified by CG frame readback, ±3px."""
+        import json as _json
+        import os as _os
+        import time as _time
+        path = _os.path.expanduser(
+            "~/Library/Application Support/RavesOfQud/window_rect.json")
+        try:
+            with open(path, "w") as f:
+                _json.dump({"x": x, "y": y, "w": w, "h": h, "ts": _time.time()}, f)
+        except OSError as e:
+            return {"ok": False, "error": "window_rect write failed: %s" % e}
+        end = _time.monotonic() + timeout_s
+        while _time.monotonic() < end:
+            _time.sleep(0.5)
+            t = next((t for t in b.list_targets() if t.id == win_id), None)
+            if t and all(abs(a - b_) <= 3 for a, b_ in
+                         ((t.x, x), (t.y, y), (t.w, w), (t.h, h))):
+                return {"ok": True}
+        return {"ok": False, "error": "raves did not land on the rect (file channel)"}
 
     def _dock(self, b, target):
         """Apply the standing dock rule for ``target`` (id or title substring)."""
