@@ -172,7 +172,36 @@ def serve_forever(host=P.HOST, port=P.PORT, backend=None, web=True):
         engine.stop()
 
 
+def _watch_sources_and_reexec():
+    """Self-restart on code change: when any highvisor .py changes on disk, re-exec
+    the daemon in place (sockets close; clients are one-shot and reconnect). Ends the
+    'edit engine.py, ask Daniel to restart the daemon' loop. Crash-restart is the
+    launchd KeepAlive plist's job (`hv install-daemon`)."""
+    import glob
+    import os
+    import sys
+    import time
+    root = os.path.dirname(os.path.abspath(__file__))
+    paths = (glob.glob(os.path.join(root, "*.py"))
+             + glob.glob(os.path.join(root, "backends", "*.py")))
+    baseline = {p: os.path.getmtime(p) for p in paths}
+    while True:
+        time.sleep(2.0)
+        for p, m0 in list(baseline.items()):
+            try:
+                m = os.path.getmtime(p)
+            except OSError:
+                continue
+            if m != m0:
+                print("[hv] source changed: %s — re-exec" % os.path.basename(p), flush=True)
+                os.chdir(os.path.dirname(root))   # repo root, so -m resolves
+                os.execv(sys.executable, [sys.executable, "-m", "highvisor.server"] + sys.argv[1:])
+
+
 def main():
+    import threading
+    threading.Thread(target=_watch_sources_and_reexec, daemon=True,
+                     name="hv-source-watch").start()
     serve_forever()
 
 

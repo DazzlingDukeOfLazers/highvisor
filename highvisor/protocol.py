@@ -47,6 +47,10 @@ OP_GAMEGO = "gamego"              # app, node -> drive the app to that tree stat
 OP_ASSERT = "assert_state"        # app, [node|scene|popup|ocr_contains|present], timeout -> {ok, pass, actual, elapsed}
 OP_WRITE_TEXT = "write_text"      # path (under $HOME), content -> {ok, path, bytes} (small config writes)
 OP_QUDWISH = "qudwish"            # wish -> {ok, wish} — run a Caves of Qud wish via the Raves mod bridge
+OP_QUD_SAVES = "qud_saves"        # -> {ok, saves:[{row,name,guid,location,mode,saved}]} (from DISK, no game needed)
+OP_LOAD_SAVE = "load_save"        # name -> restart-to-title if needed, click Continue + the row BY NAME -> {ok,row}
+OP_RESTART = "restart_app"        # app (qud|raves) -> kill ALL instances, launch solo, wait for the window
+OP_ABORT = "abort_control"        # -> release focus/mouse NOW + refuse control ops for 30s (the panic path)
 
 MAX_FRAME = 64 * 1024 * 1024  # 64 MiB guard (a 4k screenshot fits easily)
 

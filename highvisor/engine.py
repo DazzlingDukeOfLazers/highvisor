@@ -51,6 +51,8 @@ class Engine:
     def __init__(self, backend, bus=None):
         self.backend = backend
         self.bus = bus  # optional EventBus: each op is published for the onscreen log
+        from .guard import ControlGuard
+        self.guard = ControlGuard(bus)   # the timeshare guard (focus/mouse save-restore + abort)
         self.bridge = None  # optional Bridge: set by the server for peer_* ops
         self._q: "queue.Queue[_Job]" = queue.Queue()
         self._thread = threading.Thread(target=self._run, name="hv-engine",
@@ -141,6 +143,12 @@ class Engine:
 
         # For actions, the response IS the ActionResult dict: its ``ok`` reports
         # whether the action landed (RPC-level failures come back as exceptions).
+        # Focus/mouse-stealing ops go through the TIMESHARE GUARD (audio countdown,
+        # focus+mouse save/restore, abort channels, 20s cap — see guard.py).
+        if op in (P.OP_ACTIVATE, P.OP_TEXT, P.OP_KEY, P.OP_CLICK):
+            _gerr = self.guard.begin()
+            if _gerr:
+                return {"ok": False, "error": _gerr}
         if op == P.OP_ACTIVATE:
             return b.activate(req["target"]).to_dict()
 
@@ -216,6 +224,18 @@ class Engine:
 
         if op == P.OP_QUDWISH:
             return self._qudwish(req.get("wish", ""))
+
+        if op == P.OP_QUD_SAVES:
+            return self._qud_saves()
+
+        if op == P.OP_LOAD_SAVE:
+            return self._load_save(b, req.get("name", ""))
+
+        if op == P.OP_RESTART:
+            return self._restart_app(b, req.get("app", ""))
+
+        if op == P.OP_ABORT:
+            return self.guard.abort("op")
 
         if op == P.OP_LAYOUT_LIST:
             from .layouts import load_layouts
@@ -420,6 +440,112 @@ class Engine:
         except OSError as e:
             return {"ok": False,
                     "error": "Qud bridge :%s unreachable (%s) — is Qud in-game?" % (port, e)}
+
+    # ------------------------------------------------------- qud saves (from DISK)
+    def _qud_saves(self):
+        """The save list AND the Load Game picker's row order, read from disk —
+        Qud writes Primary.json (name/location/mode/SaveTime) into each save dir at
+        SAVE TIME, so no game launch is needed to know what the picker will show.
+        Row order = mtime desc, matching the picker (verified against it)."""
+        import json as _json
+        import os as _os
+        root = _os.path.expanduser(
+            "~/Library/Application Support/com.FreeholdGames.CavesOfQud/Synced/Saves")
+        out = []
+        try:
+            for guid in _os.listdir(root):
+                pj = _os.path.join(root, guid, "Primary.json")
+                if not _os.path.isfile(pj):
+                    continue
+                try:
+                    meta = _json.load(open(pj))
+                except Exception:
+                    meta = {}
+                out.append({"guid": guid, "name": meta.get("Name", "?"),
+                            "location": meta.get("Location", "?"),
+                            "mode": meta.get("GameMode", "?"),
+                            "saved": meta.get("SaveTime", "?"),
+                            "mtime": _os.path.getmtime(pj)})
+        except OSError as e:
+            return {"ok": False, "error": str(e)}
+        out.sort(key=lambda s: -s["mtime"])
+        for i, s in enumerate(out):
+            s["row"] = i
+        return {"ok": True, "saves": out}
+
+    # ------------------------------------------------------- clean restart
+    def _restart_app(self, b, app):
+        """Kill EVERY instance of the app (duplicates included — the double-launch
+        class), launch its solo launcher, wait for the window. The one true restart."""
+        import subprocess as _sp
+        import time as _t
+        from .apps import PROFILES
+        prof = PROFILES.get(app) or {}
+        proc, launcher, win = prof.get("proc"), prof.get("launcher"), prof.get("window", "")
+        if not proc or not launcher:
+            return {"ok": False, "error": "no proc/launcher profile for app %r" % app}
+        _sp.run(["pkill", "-9", "-f", proc], capture_output=True)
+        deadline = _t.time() + 10
+        while _t.time() < deadline:
+            if not any(win in (t.to_dict().get("title") or "") for t in b.list_targets()):
+                break
+            _t.sleep(0.5)
+        from .launch import resolve_launch
+        spec, largs = resolve_launch(launcher)
+        if not spec:
+            return {"ok": False, "error": "no launcher %r" % launcher}
+        b.launch(spec, largs)
+        deadline = _t.time() + 45
+        appeared = False
+        while _t.time() < deadline:
+            if any(win in (t.to_dict().get("title") or "") for t in b.list_targets()):
+                appeared = True
+                break
+            _t.sleep(1.0)
+        if appeared:
+            try:
+                self._dock(b, win)   # standing slot rule, best-effort
+            except Exception:
+                pass
+        return {"ok": appeared, "launched": spec,
+                "window": win if appeared else None,
+                "error": None if appeared else "window never appeared"}
+
+    # ------------------------------------------------------- load save BY NAME
+    def _load_save(self, b, name):
+        """Drive Qud to load a NAMED save — no top-row roulette. Row computed from the
+        disk metadata (see _qud_saves); restarts Qud to the title first if needed."""
+        import time as _t
+        saves = self._qud_saves()
+        if not saves.get("ok"):
+            return saves
+        row = next((s["row"] for s in saves["saves"] if s["name"] == name), None)
+        if row is None:
+            return {"ok": False, "error": "no save named %r" % name,
+                    "have": [s["name"] for s in saves["saves"]]}
+        st = (self._gamestate(b).get("states", {}).get("qud") or {})
+        if st.get("node") != "title":
+            r = self._restart_app(b, "qud")
+            if not r.get("ok"):
+                return {"ok": False, "error": "restart failed", "detail": r}
+            _t.sleep(8)   # title settle after the window appears
+        gerr = self.guard.begin()
+        if gerr:
+            return {"ok": False, "error": gerr}
+        win = "CavesOfQud"
+        b.activate(win)
+        _t.sleep(1.0)
+        b.click(win, 958, 580, hover=True)              # Continue
+        _t.sleep(2.5)
+        self.guard.begin()                               # keep the session alive
+        b.click(win, 975, 193 + row * 124, hover=True)   # the named save's row
+        deadline = _t.time() + 40
+        while _t.time() < deadline:
+            stq = (self._gamestate(b).get("states", {}).get("qud") or {})
+            if stq.get("node") == "in_game":
+                return {"ok": True, "name": name, "row": row}
+            _t.sleep(1.5)
+        return {"ok": False, "error": "load did not reach in_game", "name": name, "row": row}
 
     def _gamestate(self, b, ocr=False):
         """Evaluate the game state-machine tree against live signals for each app.

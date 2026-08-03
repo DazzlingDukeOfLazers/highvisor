@@ -1002,6 +1002,9 @@ async function init() {
     (b.onclick = () => userTestLayout(+b.dataset.w, +b.dataset.h)));
   $("raves-1to1").onclick = toggleRaves1to1;
   $("qud-godmode").onclick = qudGodmode;
+  $("hv-abort").onclick = async () => {
+    try { await rpc("abort_control", {}); } catch (e) { alert("abort failed: " + (e.message || e)); }
+  };
   $("layoutsel").onchange = showLayoutDesc;
   $("clearlog").onclick = () => (logEl().innerHTML = "");
   $("gt-ocr").onclick = () => pollGameState(true);
