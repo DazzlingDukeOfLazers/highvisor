@@ -82,9 +82,26 @@ def _serve_conn(conn, addr, engine):
                 break
 
 
+def _write_version_file():
+    """Publish the daemon's version where Raves can read it (the reverse of Raves'
+    state files): the 1:1 title version corner shows raves + hv versions."""
+    try:
+        import re
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        m = re.search(r'^version = "([^"]+)"', open(os.path.join(root, "pyproject.toml")).read(), re.M)
+        v = m.group(1) if m else "?"
+        p = os.path.expanduser("~/Library/Application Support/RavesOfQud")
+        os.makedirs(p, exist_ok=True)
+        with open(os.path.join(p, "hv_version.txt"), "w") as f:
+            f.write(v)
+    except Exception:
+        pass
+
+
 def serve_forever(host=P.HOST, port=P.PORT, backend=None, web=True):
     from .events import EventBus
     _crash_fp = _install_crash_guards()
+    _write_version_file()
     backend = backend or make_backend()
     bus = EventBus()
     engine = Engine(backend, bus=bus)
