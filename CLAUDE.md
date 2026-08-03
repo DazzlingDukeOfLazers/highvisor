@@ -83,5 +83,17 @@ action instead of screenshot-guess loops:
 - Qud's window FREEZES when unfocused (Unity doesn't repaint) — `hv activate` + ~2s before a
   shot, or you'll diff a stale frame. The mod/bridge still runs unfocused; only pixels freeze.
 - Shot scale = the display's backing (Retina 2× / 4K 1×) — see the ops quickref memory.
+- Qud's MODERN menu screens (Records/Options/Mods) ignore ALL OS-synthesized keys —
+  HID-sourced or not. Exit them with the mod's first-party `uiback` bridge command
+  (gametree `{"bridge": "uiback"}` step / `{"dismiss": {..., "bridge": "uiback"}}`),
+  never key injection. Clicks DO land (warp + HID button pair).
+- Menu recipes click by LABEL, not coords: `{"click_text": "Records", "window": ...}` —
+  fixed coords started stray games twice when the menu reflowed / the window sat
+  off-slot. OCR matching is space-insensitive (Vision reads 'Opti ons' on Raves'
+  Source Code Pro); optional `"offset": [dx,dy]` when the hit-area sits away from
+  the caption (Qud Records' Back chevron is 40px above its "[Esc] Back" label).
+- A dismiss step FAILS the recipe if the affordance is missing or the scene doesn't
+  change — silent "dismissed" was how a stray Cancel reached the main menu (where
+  Cancel == quit confirm). Fire ONE cancel and verify; never a fallback shotgun.
 - Commit + push after each verified round; author guard before push:
   `git log --all --format='%ae' | grep -i allspice` must print nothing.

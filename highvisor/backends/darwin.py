@@ -573,14 +573,20 @@ class MacBackend(PlatformBackend):
         return _US_KEYCODES.get(ch.lower())
 
     def _post_key(self, keycode: int, flags: int, pid: Optional[int] = None):
+        # HID-system source, same as click(): Unity's input system IGNORES keyboard
+        # events synthesized with a None source (Qud's modern menus dropped every
+        # injected Escape until this matched the known-good click path). Small gap
+        # between down and up so per-frame pollers can't miss the pair.
+        src = Quartz.CGEventSourceCreate(Quartz.kCGEventSourceStateHIDSystemState)
         for down in (True, False):
-            ev = Quartz.CGEventCreateKeyboardEvent(None, keycode, down)
+            ev = Quartz.CGEventCreateKeyboardEvent(src, keycode, down)
             if flags:
                 Quartz.CGEventSetFlags(ev, flags)
             if pid:
                 Quartz.CGEventPostToPid(pid, ev)
             else:
                 Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+            time.sleep(0.03)
 
     def _post_char(self, ch: str, pid: Optional[int] = None):
         """Type one character by its unicode (keycode 0 + a unicode payload) so any

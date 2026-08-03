@@ -76,10 +76,45 @@
        "timeout": 60
       },
       {
+       "dismiss": {
+        "scene": "DynamicPopupMessage",
+        "bridge": "uiback"
+       },
+       "note": "self-heal: cancel a stray popup (quit-confirm etc.)"
+      },
+      {
+       "dismiss": {
+        "scene": "ModernHighScores",
+        "bridge": "uiback"
+       },
+       "note": "self-heal: back out of a submenu left open"
+      },
+      {
+       "dismiss": {
+        "scene": "ModernOptionsMenu",
+        "bridge": "uiback"
+       },
+       "note": "self-heal: back out of a submenu left open"
+      },
+      {
+       "dismiss": {
+        "scene": "ModManager",
+        "bridge": "uiback"
+       },
+       "note": "self-heal: back out of a submenu left open"
+      },
+      {
+       "dismiss": {
+        "scene": "ModernSaveManagement",
+        "bridge": "uiback"
+       },
+       "note": "self-heal: back out of a submenu left open"
+      },
+      {
        "assert": {
         "scene": "MainMenu"
        },
-       "timeout": 90
+       "timeout": 20
       }
      ],
      "raves": [
@@ -94,6 +129,27 @@
       {
        "dock": "Raves of Qud",
        "note": "stack into the standard slot above Qud (fresh launches land off-slot)"
+      },
+      {
+       "dismiss": {
+        "scene": "mods",
+        "key": "Escape"
+       },
+       "note": "self-heal: back out of a submenu left open"
+      },
+      {
+       "dismiss": {
+        "scene": "options",
+        "key": "Escape"
+       },
+       "note": "self-heal: back out of a submenu left open"
+      },
+      {
+       "dismiss": {
+        "scene": "records",
+        "key": "Escape"
+       },
+       "note": "self-heal: back out of a submenu left open"
       },
       {
        "dismiss": {
@@ -198,12 +254,8 @@
              "activate": "Raves of Qud"
             },
             {
-             "click_hover": [
-              945,
-              536
-             ],
-             "window": "Raves of Qud",
-             "note": "New Game (needs Qud running, else it launches Qud instead)"
+             "click_text": "New Game",
+             "window": "Raves of Qud"
             },
             {
              "assert": {
@@ -220,12 +272,8 @@
              "activate": "CavesOfQud"
             },
             {
-             "click_hover": [
-              958,
-              534
-             ],
-             "window": "CavesOfQud",
-             "note": "New Game on the title menu"
+             "click_text": "New Game",
+             "window": "CavesOfQud"
             },
             {
              "sleep": 1.0
@@ -338,12 +386,8 @@
            "activate": "CavesOfQud"
           },
           {
-           "click_hover": [
-            958,
-            534
-           ],
-           "window": "CavesOfQud",
-           "note": "New Game on the title menu"
+           "click_text": "New Game",
+           "window": "CavesOfQud"
           },
           {
            "sleep": 1.0
@@ -409,6 +453,13 @@
           {
            "scene": "records"
           }
+         ],
+         "qud": [
+          {
+           "scene": [
+            "ModernHighScores"
+           ]
+          }
          ]
         },
         "goto": {
@@ -420,10 +471,7 @@
            "activate": "Raves of Qud"
           },
           {
-           "click_hover": [
-            945,
-            628
-           ],
+           "click_text": "Records",
            "window": "Raves of Qud"
           },
           {
@@ -441,19 +489,15 @@
            "activate": "CavesOfQud"
           },
           {
-           "click_hover": [
-            958,
-            626
-           ],
-           "window": "CavesOfQud",
-           "note": "Records on the title menu"
+           "click_text": "Records",
+           "window": "CavesOfQud"
           },
           {
            "sleep": 1.0
           },
           {
            "assert": {
-            "ocr_contains": "records"
+            "scene": "ModernHighScores"
            },
            "timeout": 15
           }
@@ -472,6 +516,13 @@
           {
            "scene": "options"
           }
+         ],
+         "qud": [
+          {
+           "scene": [
+            "ModernOptionsMenu"
+           ]
+          }
          ]
         },
         "goto": {
@@ -483,10 +534,7 @@
            "activate": "Raves of Qud"
           },
           {
-           "click_hover": [
-            945,
-            674
-           ],
+           "click_text": "Options",
            "window": "Raves of Qud"
           },
           {
@@ -504,19 +552,15 @@
            "activate": "CavesOfQud"
           },
           {
-           "click_hover": [
-            958,
-            672
-           ],
-           "window": "CavesOfQud",
-           "note": "Options on the title menu"
+           "click_text": "Options",
+           "window": "CavesOfQud"
           },
           {
            "sleep": 1.0
           },
           {
            "assert": {
-            "ocr_contains": "options"
+            "scene": "ModernOptionsMenu"
            },
            "timeout": 15
           }
@@ -535,6 +579,13 @@
           {
            "scene": "mods"
           }
+         ],
+         "qud": [
+          {
+           "scene": [
+            "ModManager"
+           ]
+          }
          ]
         },
         "goto": {
@@ -546,10 +597,7 @@
            "activate": "Raves of Qud"
           },
           {
-           "click_hover": [
-            945,
-            720
-           ],
+           "click_text": "Mods",
            "window": "Raves of Qud"
           },
           {
@@ -567,19 +615,15 @@
            "activate": "CavesOfQud"
           },
           {
-           "click_hover": [
-            958,
-            718
-           ],
-           "window": "CavesOfQud",
-           "note": "Mods on the title menu"
+           "click_text": "Mods",
+           "window": "CavesOfQud"
           },
           {
            "sleep": 1.0
           },
           {
            "assert": {
-            "ocr_contains": "mods"
+            "scene": "ModManager"
            },
            "timeout": 15
           }
@@ -699,12 +743,8 @@
        "activate": "CavesOfQud"
       },
       {
-       "click_hover": [
-        958,
-        580
-       ],
-       "window": "CavesOfQud",
-       "note": "Continue on the title menu"
+       "click_text": "Continue",
+       "window": "CavesOfQud"
       },
       {
        "sleep": 1.0
@@ -736,12 +776,8 @@
        "note": "let Continue enable (heartbeat poll) after a fresh launch"
       },
       {
-       "click_hover": [
-        945,
-        580
-       ],
-       "window": "Raves of Qud",
-       "note": "hover-select Continue"
+       "click_text": "Continue",
+       "window": "Raves of Qud"
       },
       {
        "assert": {
