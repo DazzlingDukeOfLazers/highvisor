@@ -227,8 +227,19 @@ class WindowsBackend(PlatformBackend):
             return ActionResult.fail("launch failed: %s" % e)
         return ActionResult(ok=True, detail="launch %s" % " ".join([spec] + args))
 
+    def _move_abs(self, gx: int, gy: int) -> None:
+        # SetCursorPos warps the pointer, but some UIs (Qud's legacy console popups)
+        # only track a REAL move event's hover — post an absolute MOUSEEVENTF_MOVE
+        # (0..65535 normalized virtual-screen coords) on top of the warp.
+        user32.SetCursorPos(gx, gy)
+        sw = user32.GetSystemMetrics(0)
+        sh = user32.GetSystemMetrics(1)
+        nx = int(gx * 65535 / max(1, sw - 1))
+        ny = int(gy * 65535 / max(1, sh - 1))
+        user32.mouse_event(0x0001 | 0x8000, nx, ny, 0, 0)  # MOVE | ABSOLUTE
+
     def click(self, target: str, x: int, y: int, button: str = "left",
-              double: bool = False) -> ActionResult:
+              double: bool = False, hover: bool = False) -> ActionResult:
         hwnd = self._resolve(target)
         if hwnd is None:
             return ActionResult.fail("click needs a window target")
@@ -237,16 +248,27 @@ class WindowsBackend(PlatformBackend):
         gx, gy = rect.left + int(x), rect.top + int(y)   # window-relative -> screen px
         self.activate(target)
         time.sleep(0.06)
-        user32.SetCursorPos(gx, gy)
-        time.sleep(0.02)
+        # `hover=True`: same per-surface contract as darwin.py — legacy popups
+        # activate the item under the hovered position, so approach + settle with
+        # real move events before the click. OFF by default: a pre-move BREAKS
+        # world-cell clicks (Qud hovers-but-never-selects the tile).
+        if hover:
+            self._move_abs(gx, gy - 24)
+            time.sleep(0.08)
+            self._move_abs(gx, gy)
+            time.sleep(0.2)
+        else:
+            user32.SetCursorPos(gx, gy)
+            time.sleep(0.02)
         dn, up = (0x0008, 0x0010) if button == "right" else (0x0002, 0x0004)
         for _ in range(2 if double else 1):
             user32.mouse_event(dn, 0, 0, 0, 0)
             user32.mouse_event(up, 0, 0, 0, 0)
             time.sleep(0.02)
         return ActionResult(ok=True, tier=4,
-                            detail="%s%s click @ (%d,%d)"
-                                   % ("double " if double else "", button, gx, gy))
+                            detail="%s%s%s click @ (%d,%d)"
+                                   % ("hover+" if hover else "", "double " if double else "",
+                                      button, gx, gy))
 
     def screenshot(self, target: Optional[str], native: bool = False) -> bytes:
         # `native` is a macOS/ScreenCaptureKit distinction; the Windows path is
