@@ -25,6 +25,7 @@ OP_ACTIVATE = "activate"    # target -> ActionResult
 OP_TEXT = "text"            # target, text -> ActionResult
 OP_KEY = "key"              # target, keys -> ActionResult
 OP_CLICK = "click"          # target, x, y (window-relative), [button, double] -> ActionResult
+OP_MOUSE = "mouse"          # target, x, y (window-relative) -> warp+move ONLY, no click — hover-state capture
 OP_INSPECT = "inspect"      # target, depth -> {ok, tree}
 OP_OCR = "ocr"              # target -> {ok, w, h, text, boxes:[{text,bbox}]} (Vision)
 OP_MOVE = "move"            # target, (zone | x,y,w,h), [topmost] -> ActionResult

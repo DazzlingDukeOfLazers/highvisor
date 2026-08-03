@@ -158,7 +158,7 @@ class Engine:
         # whether the action landed (RPC-level failures come back as exceptions).
         # Focus/mouse-stealing ops go through the TIMESHARE GUARD (audio countdown,
         # focus+mouse save/restore, abort channels, 20s cap — see guard.py).
-        if op in (P.OP_ACTIVATE, P.OP_TEXT, P.OP_KEY, P.OP_CLICK):
+        if op in (P.OP_ACTIVATE, P.OP_TEXT, P.OP_KEY, P.OP_CLICK, P.OP_MOUSE):
             _gerr = self.guard.begin()
             if _gerr:
                 return {"ok": False, "error": _gerr}
@@ -179,6 +179,13 @@ class Engine:
                 kw["hover"] = True
             return b.click(req["target"], int(req.get("x", 0)), int(req.get("y", 0)),
                            **kw).to_dict()
+
+        if op == P.OP_MOUSE:
+            # pure hover: warp + a real mouseMoved so engines that read
+            # Input.mousePosition (Unity) see it — no button events. THE tool for
+            # capturing hover/highlight states without changing app state.
+            return b.mouse_move(req["target"], int(req.get("x", 0)),
+                                int(req.get("y", 0))).to_dict()
 
         if op == P.OP_INSPECT:
             tree = b.inspect(req["target"], int(req.get("depth", 3)))

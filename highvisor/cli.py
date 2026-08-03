@@ -113,6 +113,10 @@ def _cmd_click(a):
                        "hover": a.hover}))
 
 
+def _cmd_mouse(a):
+    _print_json(_call({"op": P.OP_MOUSE, "target": a.target, "x": a.x, "y": a.y}))
+
+
 def _cmd_activate(a):
     _print_json(_call({"op": P.OP_ACTIVATE, "target": a.target}))
 
@@ -719,6 +723,12 @@ def build_parser():
     s.add_argument("--focus", action="store_true",
                    help="activate + HID-tap delivery (for Unity/games that ignore background keys)")
     s.set_defaults(fn=_cmd_key)
+
+    s = sub.add_parser("mouse", help="move the mouse to window-relative x y — no click (hover-state capture)")
+    s.add_argument("target")
+    s.add_argument("x", type=int)
+    s.add_argument("y", type=int)
+    s.set_defaults(fn=_cmd_mouse)
 
     s = sub.add_parser("click", help="click at window-relative x y (points)")
     s.add_argument("target")

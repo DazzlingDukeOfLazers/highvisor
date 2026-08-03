@@ -371,6 +371,24 @@ class MacBackend(PlatformBackend):
                                    % ("hover+" if hover else "", "double " if double else "",
                                       button, gx, gy))
 
+    def mouse_move(self, target: str, x: int, y: int) -> ActionResult:
+        """Warp + post a real mouseMoved at a window point — NO buttons. Activates
+        the target first (Unity apps freeze/skip hover rendering when unfocused)."""
+        w = self._resolve(target)
+        if w is None:
+            return ActionResult.fail("mouse needs a window target")
+        wx, wy, ww, wh = self._bounds(w)
+        gx, gy = wx + int(x), wy + int(y)
+        self.activate(target)
+        time.sleep(0.06)
+        src = Quartz.CGEventSourceCreate(Quartz.kCGEventSourceStateHIDSystemState)
+        pt = Quartz.CGPointMake(gx, gy)
+        Quartz.CGWarpMouseCursorPosition(pt)
+        Quartz.CGEventPost(Quartz.kCGHIDEventTap,
+            Quartz.CGEventCreateMouseEvent(src, Quartz.kCGEventMouseMoved, pt,
+                                           Quartz.kCGMouseButtonLeft))
+        return ActionResult(ok=True, tier=4, detail="mouse @ global (%d,%d)" % (gx, gy))
+
     def inspect(self, target: str, depth: int = 3) -> Element:
         w = self._resolve(target)
         if w is None:
