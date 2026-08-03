@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>highvisor</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <span class="logo">highvisor</span>
+    <span id="self" class="muted">…</span>
+    <span class="spacer"></span>
+    <span id="backend" class="badge">backend: …</span>
+    <span id="stalemsg" class="stalemsg" hidden>⟳ restart daemon</span>
+    <span id="conn" class="dot" title="event stream">●</span>
+    <button id="off" class="off" title="shut down the highvisor daemon">⏻</button>
+  </header>
+
+  <main>
+    <section class="col left">
+      <div class="panel">
+        <div class="panel-hd">windows <button id="refresh" title="refresh">⟳</button></div>
+        <ul id="windows" class="list"></ul>
+      </div>
+      <div class="panel">
+        <div class="panel-hd">game controls</div>
+        <div class="layout">
+          <div class="uttest-hd muted">▶ launch · standard slots (Raves ▲ / Qud ▼)</div>
+          <div class="layout-row">
+            <button id="start-raves" class="full primary"
+                    title="launch the latest Raves build (it starts Caves of Qud borderless), then place both at 1920×1080 — Raves ▲ / Qud ▼">▶ Start Raves + Qud · 1920×1080</button>
+          </div>
+          <div class="layout-row uttest-btns">
+            <button id="start-qud-solo"
+                    title="launch ONLY Caves of Qud (borderless) and place it in its standard lower-right slot">▶ Qud only</button>
+            <button id="start-raves-solo"
+                    title="launch ONLY Raves (no Qud spawn) and place it in its standard upper-right slot">▶ Raves only</button>
+          </div>
+          <div id="uttest-status" class="uttest-status muted"></div>
+          <div class="uttest-hd muted">⊞ place at resolution</div>
+          <div class="layout-row uttest-btns">
+            <button class="ut" data-w="1920" data-h="1080"
+                    title="1920×1080 — Raves upper-right, Caves of Qud lower-right">1920×1080</button>
+            <button class="ut" data-w="1600" data-h="900"
+                    title="1600×900 — Raves upper-right, Caves of Qud lower-right">1600×900</button>
+            <button class="ut" data-w="1280" data-h="720"
+                    title="1280×720 — Raves upper-right, Caves of Qud lower-right">1280×720</button>
+          </div>
+          <div class="uttest-hd muted">⚙ tools</div>
+          <div class="layout-row">
+            <button id="raves-1to1" class="full"
+                    title="toggle Raves between user mode and 1:1 (parity) mode — injects Ctrl+M into the Raves window">⇄ Raves: user ⇄ 1:1</button>
+          </div>
+          <div class="layout-row">
+            <button id="qud-godmode" class="full"
+                    title="toggle Qud godmode (the 'godmode' wish via the Raves bridge) — invulnerable for roam-and-test; click again to turn off. Qud must be in-game. Costs one game turn.">⚡ Qud: godmode (toggle)</button>
+          </div>
+          <div class="layout-row">
+            <select id="layoutsel"></select>
+            <button id="applylayout">apply</button>
+          </div>
+          <div class="layout-row">
+            <input id="savename" placeholder="save current as…">
+            <button id="savelayout" title="snapshot current window positions">save</button>
+          </div>
+          <div id="layoutdesc" class="muted"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-hd">title bg nudge <button id="bgn-reset" title="reset to identity cover">reset</button></div>
+        <div class="bgnudge" title="pan/zoom Raves' title background live (writes title_bg.json; Raves polls it — no rebuild)">
+          <div class="bgn-row"><span class="bgn-lbl">X</span>
+            <button class="bgn-b" data-bgn="dx" data-d="-5">−5</button>
+            <button class="bgn-b" data-bgn="dx" data-d="-1">−1</button>
+            <span id="bgn-dx" class="bgn-val">0</span>
+            <button class="bgn-b" data-bgn="dx" data-d="1">+1</button>
+            <button class="bgn-b" data-bgn="dx" data-d="5">+5</button></div>
+          <div class="bgn-row"><span class="bgn-lbl">Y</span>
+            <button class="bgn-b" data-bgn="dy" data-d="-5">−5</button>
+            <button class="bgn-b" data-bgn="dy" data-d="-1">−1</button>
+            <span id="bgn-dy" class="bgn-val">0</span>
+            <button class="bgn-b" data-bgn="dy" data-d="1">+1</button>
+            <button class="bgn-b" data-bgn="dy" data-d="5">+5</button></div>
+          <div class="bgn-row"><span class="bgn-lbl">scale X</span>
+            <button class="bgn-b" data-bgn="sx" data-d="-0.01">−.01</button>
+            <button class="bgn-b" data-bgn="sx" data-d="-0.002">−</button>
+            <span id="bgn-sx" class="bgn-val">1.000</span>
+            <button class="bgn-b" data-bgn="sx" data-d="0.002">+</button>
+            <button class="bgn-b" data-bgn="sx" data-d="0.01">+.01</button></div>
+          <div class="bgn-row"><span class="bgn-lbl">scale Y</span>
+            <button class="bgn-b" data-bgn="sy" data-d="-0.01">−.01</button>
+            <button class="bgn-b" data-bgn="sy" data-d="-0.002">−</button>
+            <span id="bgn-sy" class="bgn-val">1.000</span>
+            <button class="bgn-b" data-bgn="sy" data-d="0.002">+</button>
+            <button class="bgn-b" data-bgn="sy" data-d="0.01">+.01</button></div>
+          <div id="bgn-readout" class="bgn-readout muted" title="click to copy — bake into MainMenu _bg_nudge when dialed in">{"dx":0,"dy":0,"scale":1}</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-hd">peers</div>
+        <ul id="peers" class="list"><li class="muted">no bridge / no peers</li></ul>
+      </div>
+    </section>
+
+    <div class="gutter" data-resize="left" title="drag to resize columns"></div>
+
+    <section class="col mid">
+      <div class="panel resizable">
+        <div class="panel-hd">pending — agent loop (gated) <span id="lanes" class="muted"></span></div>
+        <div id="pending" class="pending"><div class="muted">nothing pending</div></div>
+      </div>
+      <div class="hgutter" data-resize="pending" title="drag to resize pending / preview"></div>
+      <div class="panel grow">
+        <div class="panel-hd">
+          <span class="tabs">
+            <button class="tab active" data-tab="preview">preview</button>
+            <button class="tab" data-tab="congruence">congruence</button>
+          </span>
+          <span id="shotlabel" class="muted"></span>
+        </div>
+        <div id="shotwrap" class="shotwrap"><span class="muted">click a window to capture</span></div>
+        <div id="congruence" class="cong" hidden>
+          <div class="cong-bar">
+            <button id="cong-capture" class="primary">⧉ Capture Raves + Qud</button>
+            <span id="cong-status" class="muted"></span>
+          </div>
+          <div class="cong-bar">
+            <span class="cong-fade-lbl">Qud</span>
+            <input id="cong-fade" class="cong-slider" type="range" min="0" max="100" value="50"
+                   title="cross-fade between Qud and Raves">
+            <span class="cong-fade-lbl">Raves</span>
+            <label class="cong-check" title="show the Qud/Raves capture — uncheck to see the similarity map on its own"><input id="cong-sources-toggle" type="checkbox" checked> sources</label>
+          </div>
+          <div class="cong-bar">
+            <label class="cong-check"><input id="cong-sim-toggle" type="checkbox"> similarity map</label>
+            <span class="cong-thresh" hidden>tol
+              <input id="cong-thresh" class="cong-slider" type="range" min="0" max="64" value="10"
+                     title="per-channel tolerance — pixels within this count as the same">
+              <span id="cong-thresh-val" class="muted">10</span>
+            </span>
+          </div>
+          <div id="cong-stage" class="cong-stage"
+               title="scroll to zoom · drag to pan · double-click to fit · right-click to capture a position">
+            <span class="muted cong-empty">capture Raves + Qud to compare them</span>
+            <div id="cong-frame" class="cong-frame" hidden>
+              <canvas id="cong-qud"></canvas>
+              <canvas id="cong-raves"></canvas>
+              <canvas id="cong-sim" hidden></canvas>
+            </div>
+            <div id="cong-marker" class="cong-marker" hidden></div>
+            <div id="cong-zoom" class="cong-zoom" hidden></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-hd">context handoff <span class="muted">→ peers</span></div>
+        <div class="handoff">
+          <textarea id="ctx" placeholder="type or paste context to send to the other machine…"></textarea>
+          <button id="send">send</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="gutter" data-resize="mid" title="drag to resize columns"></div>
+
+    <section class="col right">
+      <div class="panel gt-resizable" id="gt-panel">
+        <div class="panel-hd">
+          state tree
+          <span id="gt-legend" class="gt-legend muted"></span>
+          <button id="gt-expand" title="expand all">⊞</button>
+          <button id="gt-collapse" title="collapse all">⊟</button>
+          <button id="gt-ocr" title="refine menu-side screens (title / load / chargen) with an OCR read now">ocr</button>
+        </div>
+        <div id="gametree" class="gametree"><div class="muted" style="padding:8px">loading…</div></div>
+      </div>
+      <div class="hgutter" data-resize="gametree" title="drag to resize state tree / log"></div>
+      <div class="panel grow">
+        <div class="panel-hd">log <button id="clearlog" title="clear">clear</button></div>
+        <div id="log" class="log"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="downmsg">highvisor stopped — restart it from a terminal, then reload.</div>
+
+  <div id="cong-menu" class="cong-menu" hidden>
+    <div id="cong-menu-pos" class="cong-menu-pos"></div>
+    <button data-copy="px">Copy x,y (pixels)</button>
+    <button data-copy="uv">Copy u,v (0–1)</button>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+# Spike capture artifacts (binary, regenerated on each run)
+spike/slice0_*_shot.png
+shot.png
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Local automation transcript dropped by desktop-automation runs
+@AutomationLog.txt

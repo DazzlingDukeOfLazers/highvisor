@@ -67,18 +67,26 @@ For a given target+action, try in order and record which tier succeeded:
    highvisor command channel (file/socket) and executes actions itself. This is
    the generalized `godot_cmd` pattern; 100% reliable but requires target buy-in.
 4. **Activate + global input** — last resort: `activate(target)` then `SendInput`
-   / `CGEventPost`. Steals focus, serializes the loop, but always works.
+   / `CGEventPost`. Steals focus and serializes the loop; **broadest compatibility but
+   still target-dependent** (e.g. Unity/Qud ignores synthetic *keyboard* even after focus —
+   see [`05-driving-input.md`](./05-driving-input.md)), so verify delivery, don't assume it.
 
-Screenshots have their own background story: Win `PrintWindow`/DWM thumbnail or
-Graphics.Capture; Mac `CGWindowListCreateImage` / ScreenCaptureKit can grab an
-unfocused window. (The raves loop already proved Qud's own render-to-file works
-while unfocused — that's tier-3 for observation.)
+Screenshots have their own background story. **Implemented today:** macOS
+`CGWindowListCreateImage` (a specific window even when unfocused); Windows `PrintWindow`.
+The researched modern alternatives (ScreenCaptureKit on macOS; `Windows.Graphics.Capture` /
+DWM thumbnails for GPU-accelerated or occluded windows) are **not yet wired** — swap-in points
+behind the backend seam. (The raves loop also proved Qud's own render-to-file works while
+unfocused — tier-3 for observation.)
 
 ## 2. Core engine (the daemon)
 
-- **Transport:** localhost RPC. Leaning framed JSON over TCP (exactly the raves
-  bridge frame: `[4-byte BE len][UTF-8 JSON]`) or local HTTP+JSON. Pick in
-  research; the vocabulary below is transport-agnostic.
+> **Status:** this page began as a design sketch. **Framed JSON over TCP is implemented** (control
+> daemon on `127.0.0.1:48720`), as is the core CLI vocabulary below. Items still described as design
+> (sessions/replay, policy/limits, brain adapters, automatic tier fallback) are **planned** unless a
+> later doc or the README capability table says otherwise.
+
+- **Transport:** localhost RPC — **framed JSON over TCP, implemented** (exactly the raves bridge frame:
+  `[4-byte BE len][UTF-8 JSON]`). The vocabulary below is transport-agnostic.
 - **Target registry:** resolve stable target ids from `list_targets()`; cache
   handles; detect when a window dies.
 - **Action queue:** serialize actions per target; timestamp; return an
@@ -89,19 +97,21 @@ while unfocused — that's tier-3 for observation.)
 - **Policy/limits:** rate limits, an allow-list of target apps, a dry-run mode.
   Safety rail so a runaway brain can't thrash the whole desktop.
 
-### RPC vocabulary (draft)
+### RPC vocabulary (the implemented `hv` verbs; abstract names map to the CLI, e.g. `screenshot`→`shot`, `list_targets`→`ls`, `mouse`→`click`)
 
 ```jsonc
-// request:  {"op":"screenshot","target":{"window":"godot#1"},"region":null}
-// response: {"ok":true,"png_b64":"...","meta":{"w":1600,"h":900,"tier":"capture"}}
+// Targets are a window-ref STRING (win:<id> / pid:<n> / a title substring), NOT an object.
+// request:  {"op":"shot","target":"CavesOfQud"}
+// request:  {"op":"click","target":"win:38599","x":894,"y":550,"hover":false}
+// request:  {"op":"text","target":"win:38599","text":"hello"}
+// request:  {"op":"key","target":"win:38599","keys":"return","focus":true}
+// request:  {"op":"ls"}   ·   {"op":"inspect","target":"Claude","depth":45}   ·   {"op":"ocr","target":"ChatGPT"}
+// response (an ACT): {"ok":true,"tier":4,"detail":"activate + CGEvent typing"}  — every act
+//   reports which delivery TIER actually worked, so the loop learns what a given app supports.
 
-// request:  {"op":"key","target":{"window":"godot#1"},"press":"Return","mode":"auto"}
-// response: {"ok":true,"delivered":"post-message","tier":2}
-
-// ops: list_targets, activate, screenshot, inspect, mouse, key, text,
-//      session.open, session.close, session.replay
-// every act response reports which delivery TIER actually worked — so the loop
-// (and we) learn what a given app supports.
+// implemented ops: ping · ls · shot · click · text · key · activate · inspect · move ·
+//                  dock · stack · layout · launch · ocr · probe · screen · peers · peer
+// Sessions / replay and automatic tier-fallback are DESIGN (see the status banner above), not implemented.
 ```
 
 ## 3. Client surface

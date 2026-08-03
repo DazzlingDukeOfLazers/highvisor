@@ -1,0 +1,820 @@
+{
+  "version": 1,
+  "note": "Canonical game state-machine tree (one source, three views). done[app] = 0..1, how finished our 1:1 work is on that screen for that app (Qud = reference/how well we detect+drive it; Raves = render/impl fidelity). Edit freely; the cockpit reloads on file change. detect[app] recognises 'we are here' from live signals: game_live (Qud's 48710 bridge pushes a snapshot on connect ONLY when a game is actually running — the true menu-vs-in-game signal; the raw port is open even at the main menu, so it can't tell them apart), port (raw listener open = modded Qud alive), and ocr_any (case-insensitive substrings in an OCR of the window). A node matches when all its conditions hold; the DEEPEST match wins. Conditions needing OCR only match on an OCR-enabled poll, so cheap polls fall back to the coarsest ancestor.",
+  "apps": {
+    "qud": {
+      "label": "Qud",
+      "window": "CavesOfQud",
+      "port": 48710,
+      "state_file": "~/Library/Application Support/RavesOfQud/qud_state.json",
+      "launcher": "qud_solo"
+    },
+    "raves": {
+      "label": "Raves",
+      "window": "Raves of Qud",
+      "state_file": "~/Library/Application Support/RavesOfQud/raves_state.json",
+      "launcher": "raves"
+    }
+  },
+  "root": {
+    "id": "root",
+    "label": "Game",
+    "children": [
+      {
+        "id": "freehold",
+        "label": "Freehold Games splash",
+        "note": "transient boot splash — no reliable detector yet",
+        "done": {
+          "qud": 1.0,
+          "raves": 0.0
+        },
+        "detect": {}
+      },
+      {
+        "id": "title",
+        "label": "Title Screen",
+        "note": "children are the SCENE CONTAINERS (each scored individually for 1:1 fidelity); the menu options nest under menu_box (they're both its contents and the nav edges to other scenes).",
+        "done": {
+          "qud": 1.0,
+          "raves": 0.9
+        },
+        "detect": {
+          "qud": [
+            {
+              "scene": [
+                "MainMenu",
+                "title"
+              ]
+            },
+            {
+              "game_live": false
+            }
+          ],
+          "raves": [
+            {
+              "scene": "title"
+            },
+            {
+              "ocr_any": [
+                "caves of qud",
+                "new game",
+                "continue",
+                "records",
+                "modding toolkit"
+              ]
+            }
+          ]
+        },
+        "goto": {
+          "qud": [
+            {
+              "launch": "qud_solo",
+              "unless_running": true
+            },
+            {
+              "wait_window": "CavesOfQud",
+              "timeout": 60
+            },
+            {
+              "assert": {
+                "scene": "MainMenu"
+              },
+              "timeout": 90
+            }
+          ],
+          "raves": [
+            {
+              "launch": "raves_solo",
+              "unless_running": true
+            },
+            {
+              "wait_window": "Raves of Qud",
+              "timeout": 30
+            },
+            {
+              "dock": "Raves of Qud",
+              "note": "stack into the standard slot above Qud (fresh launches land off-slot)"
+            },
+            {
+              "dismiss": {
+                "scene": "quit_dialog",
+                "key": "Escape"
+              }
+            },
+            {
+              "assert": {
+                "node": "title"
+              },
+              "timeout": 20
+            }
+          ]
+        },
+        "children": [
+          {
+            "id": "background",
+            "label": "Background (cave art)",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.85
+            },
+            "detect": {}
+          },
+          {
+            "id": "logo",
+            "label": "Logo (CAVES OF QUD wordmark)",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.8
+            },
+            "detect": {}
+          },
+          {
+            "id": "menu_box",
+            "label": "Option Box (frame + hieroglyph header)",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.9
+            },
+            "detect": {},
+            "children": [
+              {
+                "id": "new_game",
+                "label": "New Game → Character Creation",
+                "done": {
+                  "qud": 0.6,
+                  "raves": 0.4
+                },
+                "detect": {
+                  "qud": {
+                    "ocr_any": [
+                      "character creation",
+                      "choose genotype",
+                      "choose preset",
+                      "choose calling",
+                      "mutations",
+                      "pregens"
+                    ],
+                    "game_live": false
+                  },
+                  "raves": [
+                    {
+                      "scene": [
+                        "chargen_game_mode",
+                        "chargen_genotype",
+                        "chargen_subtype"
+                      ]
+                    },
+                    {
+                      "ocr_any": [
+                        "character creation",
+                        "choose genotype",
+                        "choose preset",
+                        "genotype"
+                      ]
+                    }
+                  ]
+                },
+                "children": [
+                  {
+                    "id": "game_mode",
+                    "label": "Choose Game Mode",
+                    "done": {
+                      "qud": 0.7,
+                      "raves": 0.85
+                    },
+                    "detect": {
+                      "raves": [
+                        {
+                          "scene": "chargen_game_mode"
+                        }
+                      ]
+                    },
+                    "goto": {
+                      "raves": [
+                        {
+                          "goto": "title"
+                        },
+                        {
+                          "activate": "Raves of Qud"
+                        },
+                        {
+                          "click_hover": [
+                            945,
+                            536
+                          ],
+                          "window": "Raves of Qud",
+                          "note": "New Game (needs Qud running, else it launches Qud instead)"
+                        },
+                        {
+                          "assert": {
+                            "scene": "chargen_game_mode"
+                          },
+                          "timeout": 12
+                        }
+                      ],
+                      "qud": [
+                        {
+                          "goto": "title"
+                        },
+                        {
+                          "activate": "CavesOfQud"
+                        },
+                        {
+                          "click_hover": [
+                            958,
+                            534
+                          ],
+                          "window": "CavesOfQud",
+                          "note": "New Game on the title menu"
+                        },
+                        {
+                          "sleep": 1.0
+                        },
+                        {
+                          "assert": {
+                            "ocr_contains": "game mode"
+                          },
+                          "timeout": 15
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "genotype",
+                    "label": "Choose Genotype",
+                    "done": {
+                      "qud": 0.6,
+                      "raves": 0.75
+                    },
+                    "detect": {
+                      "raves": [
+                        {
+                          "scene": "chargen_genotype"
+                        }
+                      ]
+                    },
+                    "goto": {
+                      "raves": [
+                        {
+                          "goto": "game_mode"
+                        },
+                        {
+                          "key": "enter",
+                          "window": "Raves of Qud",
+                          "note": "confirm the default card (Classic)"
+                        },
+                        {
+                          "assert": {
+                            "scene": "chargen_genotype"
+                          },
+                          "timeout": 10
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "calling",
+                    "label": "Calling / Subtype",
+                    "done": {
+                      "qud": 0.5,
+                      "raves": 0.2
+                    },
+                    "detect": {
+                      "raves": [
+                        {
+                          "scene": "chargen_subtype"
+                        }
+                      ]
+                    },
+                    "goto": {
+                      "raves": [
+                        {
+                          "goto": "genotype"
+                        },
+                        {
+                          "key": "enter",
+                          "window": "Raves of Qud",
+                          "note": "confirm the default genotype"
+                        },
+                        {
+                          "assert": {
+                            "scene": "chargen_subtype"
+                          },
+                          "timeout": 10
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "attributes",
+                    "label": "Attributes",
+                    "done": {
+                      "qud": 0.4,
+                      "raves": 0.1
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "embark",
+                    "label": "Embark",
+                    "done": {
+                      "qud": 0.5,
+                      "raves": 0.1
+                    },
+                    "detect": {}
+                  }
+                ],
+                "goto": {
+                  "raves": [
+                    {
+                      "goto": "game_mode"
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "goto": "title"
+                    },
+                    {
+                      "activate": "CavesOfQud"
+                    },
+                    {
+                      "click_hover": [
+                        958,
+                        534
+                      ],
+                      "window": "CavesOfQud",
+                      "note": "New Game on the title menu"
+                    },
+                    {
+                      "sleep": 1.0
+                    },
+                    {
+                      "assert": {
+                        "ocr_contains": "game mode"
+                      },
+                      "timeout": 15
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "continue",
+                "label": "Continue → Load Game",
+                "done": {
+                  "qud": 0.9,
+                  "raves": 0.2
+                },
+                "detect": {
+                  "qud": {
+                    "ocr_any": [
+                      "load game"
+                    ],
+                    "game_live": false
+                  },
+                  "raves": {
+                    "ocr_any": [
+                      "load game"
+                    ]
+                  }
+                },
+                "children": [
+                  {
+                    "id": "load_game",
+                    "label": "Load Game (save picker)",
+                    "done": {
+                      "qud": 0.9,
+                      "raves": 0.2
+                    },
+                    "detect": {}
+                  }
+                ]
+              },
+              {
+                "id": "records",
+                "label": "Records",
+                "done": {
+                  "qud": 0.3,
+                  "raves": 0.0
+                },
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "records"
+                    }
+                  ]
+                },
+                "goto": {
+                  "raves": [
+                    {
+                      "goto": "title"
+                    },
+                    {
+                      "activate": "Raves of Qud"
+                    },
+                    {
+                      "click_hover": [
+                        945,
+                        628
+                      ],
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "assert": {
+                        "scene": "records"
+                      },
+                      "timeout": 12
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "goto": "title"
+                    },
+                    {
+                      "activate": "CavesOfQud"
+                    },
+                    {
+                      "click_hover": [
+                        958,
+                        626
+                      ],
+                      "window": "CavesOfQud",
+                      "note": "Records on the title menu"
+                    },
+                    {
+                      "sleep": 1.0
+                    },
+                    {
+                      "assert": {
+                        "ocr_contains": "records"
+                      },
+                      "timeout": 15
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "options",
+                "label": "Options",
+                "done": {
+                  "qud": 0.4,
+                  "raves": 0.2
+                },
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "options"
+                    }
+                  ]
+                },
+                "goto": {
+                  "raves": [
+                    {
+                      "goto": "title"
+                    },
+                    {
+                      "activate": "Raves of Qud"
+                    },
+                    {
+                      "click_hover": [
+                        945,
+                        674
+                      ],
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "assert": {
+                        "scene": "options"
+                      },
+                      "timeout": 12
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "goto": "title"
+                    },
+                    {
+                      "activate": "CavesOfQud"
+                    },
+                    {
+                      "click_hover": [
+                        958,
+                        672
+                      ],
+                      "window": "CavesOfQud",
+                      "note": "Options on the title menu"
+                    },
+                    {
+                      "sleep": 1.0
+                    },
+                    {
+                      "assert": {
+                        "ocr_contains": "options"
+                      },
+                      "timeout": 15
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mods",
+                "label": "Mods",
+                "done": {
+                  "qud": 0.3,
+                  "raves": 0.0
+                },
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "mods"
+                    }
+                  ]
+                },
+                "goto": {
+                  "raves": [
+                    {
+                      "goto": "title"
+                    },
+                    {
+                      "activate": "Raves of Qud"
+                    },
+                    {
+                      "click_hover": [
+                        945,
+                        720
+                      ],
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "assert": {
+                        "scene": "mods"
+                      },
+                      "timeout": 12
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "goto": "title"
+                    },
+                    {
+                      "activate": "CavesOfQud"
+                    },
+                    {
+                      "click_hover": [
+                        958,
+                        718
+                      ],
+                      "window": "CavesOfQud",
+                      "note": "Mods on the title menu"
+                    },
+                    {
+                      "sleep": 1.0
+                    },
+                    {
+                      "assert": {
+                        "ocr_contains": "mods"
+                      },
+                      "timeout": 15
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "secondary_links",
+            "label": "Secondary List (Redeem Code … Help)",
+            "done": {
+              "qud": 1.0,
+              "raves": 1.0
+            },
+            "detect": {}
+          },
+          {
+            "id": "version",
+            "label": "Version Corner (1.0.5 / build)",
+            "done": {
+              "qud": 1.0,
+              "raves": 1.0
+            },
+            "detect": {}
+          },
+          {
+            "id": "hint_bar",
+            "label": "Hint Bar (nav-icon / Space / Esc)",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.95
+            },
+            "detect": {}
+          },
+          {
+            "id": "quit_button",
+            "label": "Quit X (upper-left)",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.9
+            },
+            "detect": {}
+          },
+          {
+            "id": "quit_dialog",
+            "label": "Quit Confirm (Are you sure? Yes/No)",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.92
+            },
+            "detect": {
+              "qud": {
+                "ocr_any": [
+                  "are you sure you want to quit"
+                ],
+                "game_live": false
+              },
+              "raves": [
+                {
+                  "scene": "quit_dialog"
+                },
+                {
+                  "ocr_any": [
+                    "are you sure you want to quit"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "in_game",
+        "label": "In-Game",
+        "done": {
+          "qud": 1.0,
+          "raves": 0.5
+        },
+        "detect": {
+          "qud": [
+            {
+              "scene": [
+                "play",
+                "Stage",
+                "in_game"
+              ]
+            },
+            {
+              "game_live": true
+            }
+          ],
+          "raves": [
+            {
+              "scene": "in_game"
+            },
+            {
+              "ocr_any": [
+                "make camp",
+                "abilities",
+                "active effects",
+                "message log",
+                "sprint"
+              ]
+            }
+          ]
+        },
+        "goto": {
+          "qud": [
+            {
+              "goto": "title"
+            },
+            {
+              "activate": "CavesOfQud"
+            },
+            {
+              "click_hover": [
+                958,
+                580
+              ],
+              "window": "CavesOfQud",
+              "note": "Continue on the title menu"
+            },
+            {
+              "sleep": 1.0
+            },
+            {
+              "click_hover": [
+                900,
+                190
+              ],
+              "window": "CavesOfQud",
+              "note": "top save row in the Load Game picker"
+            },
+            {
+              "assert": {
+                "node": "in_game"
+              },
+              "timeout": 30
+            }
+          ],
+          "raves": [
+            {
+              "goto": "title"
+            },
+            {
+              "activate": "Raves of Qud"
+            },
+            {
+              "sleep": 2.5,
+              "note": "let Continue enable (heartbeat poll) after a fresh launch"
+            },
+            {
+              "click_hover": [
+                945,
+                580
+              ],
+              "window": "Raves of Qud",
+              "note": "hover-select Continue"
+            },
+            {
+              "assert": {
+                "node": "in_game"
+              },
+              "timeout": 20
+            }
+          ]
+        },
+        "children": [
+          {
+            "id": "world",
+            "label": "Play Field / Holodeck",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.5
+            },
+            "detect": {}
+          },
+          {
+            "id": "top_bar",
+            "label": "Top Status Bar",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.7
+            },
+            "detect": {}
+          },
+          {
+            "id": "ability_bar",
+            "label": "Ability / Command Bar",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.3
+            },
+            "detect": {}
+          },
+          {
+            "id": "message_log",
+            "label": "Message Log",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.3
+            },
+            "detect": {}
+          },
+          {
+            "id": "inventory",
+            "label": "Inventory / Equipment",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.1
+            },
+            "detect": {}
+          },
+          {
+            "id": "character_sheet",
+            "label": "Character Sheet",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.1
+            },
+            "detect": {}
+          },
+          {
+            "id": "look",
+            "label": "Look / Examine",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.2
+            },
+            "detect": {}
+          },
+          {
+            "id": "direction_pick",
+            "label": "Direction Picker",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.4
+            },
+            "detect": {}
+          }
+        ]
+      }
+    ]
+  }
+}

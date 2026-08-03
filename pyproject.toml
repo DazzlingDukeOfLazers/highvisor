@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "highvisor"
+version = "0.0.1"
+description = "A local supervisor for the desktop UI layer: observe and control native apps over a small, brain-agnostic RPC."
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{ name = "DazzlingDukeOfLazers" }]
+license = { text = "MIT" }
+dependencies = [
+    "pillow>=9",
+    "zeroconf>=0.130",
+    "uiautomation>=2.0 ; sys_platform == 'win32'",
+    "pyobjc-framework-Cocoa>=9 ; sys_platform == 'darwin'",
+    "pyobjc-framework-Quartz>=9 ; sys_platform == 'darwin'",
+    "pyobjc-framework-ApplicationServices>=9 ; sys_platform == 'darwin'",
+    "pyobjc-framework-Vision>=9 ; sys_platform == 'darwin'",
+    "pyobjc-framework-ScreenCaptureKit>=9 ; sys_platform == 'darwin'",
+]
+
+[project.scripts]
+hv = "highvisor.cli:main"
+hvd = "highvisor.server:main"
+
+[tool.setuptools.packages.find]
+include = ["highvisor*"]
+
+[tool.setuptools.package-data]
+highvisor = ["webui/*"]

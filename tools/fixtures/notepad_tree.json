@@ -1,0 +1,910 @@
+{
+  "ok": true,
+  "tree": {
+    "role": "WindowControl",
+    "name": "Untitled - Notepad",
+    "value": "",
+    "bounds": [
+      1894,
+      198,
+      1992,
+      1212
+    ],
+    "actions": [],
+    "children": [
+      {
+        "role": "PaneControl",
+        "name": "",
+        "value": "",
+        "bounds": [
+          1906,
+          346,
+          1968,
+          988
+        ],
+        "actions": [],
+        "children": [
+          {
+            "role": "DocumentControl",
+            "name": "Text editor",
+            "value": "",
+            "bounds": [
+              1906,
+              346,
+              1968,
+              988
+            ],
+            "actions": [
+              "SetValue"
+            ],
+            "children": []
+          }
+        ]
+      },
+      {
+        "role": "PaneControl",
+        "name": "",
+        "value": "",
+        "bounds": [
+          1986,
+          216,
+          574,
+          64
+        ],
+        "actions": [],
+        "children": [
+          {
+            "role": "PaneControl",
+            "name": "",
+            "value": "",
+            "bounds": [
+              1986,
+              216,
+              574,
+              64
+            ],
+            "actions": [],
+            "children": [
+              {
+                "role": "TabControl",
+                "name": "",
+                "value": "",
+                "bounds": [
+                  1986,
+                  216,
+                  574,
+                  64
+                ],
+                "actions": [],
+                "children": [
+                  {
+                    "role": "ListControl",
+                    "name": "",
+                    "value": "",
+                    "bounds": [
+                      1990,
+                      216,
+                      496,
+                      64
+                    ],
+                    "actions": [],
+                    "children": [
+                      {
+                        "role": "TabItemControl",
+                        "name": "Untitled. Unmodified.",
+                        "value": "",
+                        "bounds": [
+                          1994,
+                          216,
+                          492,
+                          64
+                        ],
+                        "actions": [],
+                        "children": [
+                          {
+                            "role": "TextControl",
+                            "name": "Untitled",
+                            "value": "",
+                            "bounds": [
+                              2020,
+                              232,
+                              89,
+                              31
+                            ],
+                            "actions": [],
+                            "children": []
+                          },
+                          {
+                            "role": "ButtonControl",
+                            "name": "Close Tab",
+                            "value": "",
+                            "bounds": [
+                              2404,
+                              224,
+                              64,
+                              48
+                            ],
+                            "actions": [],
+                            "children": []
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "role": "ButtonControl",
+                    "name": "Add New Tab",
+                    "value": "",
+                    "bounds": [
+                      2492,
+                      228,
+                      64,
+                      48
+                    ],
+                    "actions": [],
+                    "children": [
+                      {
+                        "role": "TextControl",
+                        "name": "",
+                        "value": "",
+                        "bounds": [
+                          2512,
+                          240,
+                          24,
+                          24
+                        ],
+                        "actions": [],
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "role": "PaneControl",
+        "name": "",
+        "value": "",
+        "bounds": [
+          1906,
+          280,
+          1968,
+          66
+        ],
+        "actions": [],
+        "children": [
+          {
+            "role": "PaneControl",
+            "name": "",
+            "value": "",
+            "bounds": [
+              1906,
+              280,
+              1968,
+              66
+            ],
+            "actions": [],
+            "children": [
+              {
+                "role": "MenuBarControl",
+                "name": "",
+                "value": "",
+                "bounds": [
+                  1906,
+                  280,
+                  317,
+                  64
+                ],
+                "actions": [],
+                "children": [
+                  {
+                    "role": "MenuItemControl",
+                    "name": "File",
+                    "value": "",
+                    "bounds": [
+                      1914,
+                      280,
+                      82,
+                      64
+                    ],
+                    "actions": [],
+                    "children": [
+                      {
+                        "role": "ButtonControl",
+                        "name": "File",
+                        "value": "",
+                        "bounds": [
+                          1914,
+                          280,
+                          82,
+                          64
+                        ],
+                        "actions": [],
+                        "children": [
+                          {
+                            "role": "TextControl",
+                            "name": "File",
+                            "value": "",
+                            "bounds": [
+                              1934,
+                              293,
+                              42,
+                              38
+                            ],
+                            "actions": [],
+                            "children": []
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "role": "MenuItemControl",
+                    "name": "Edit",
+                    "value": "",
+                    "bounds": [
+                      2012,
+                      280,
+                      87,
+                      64
+                    ],
+                    "actions": [],
+                    "children": [
+                      {
+                        "role": "ButtonControl",
+                        "name": "Edit",
+                        "value": "",
+                        "bounds": [
+                          2012,
+                          280,
+                          87,
+                          64
+                        ],
+                        "actions": [],
+                        "children": [
+                          {
+                            "role": "TextControl",
+                            "name": "Edit",
+                            "value": "",
+                            "bounds": [
+                              2032,
+                              293,
+                              47,
+                              38
+                            ],
+                            "actions": [],
+                            "children": []
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "role": "MenuItemControl",
+                    "name": "View",
+                    "value": "",
+                    "bounds": [
+                      2115,
+                      280,
+                      100,
+                      64
+                    ],
+                    "actions": [],
+                    "children": [
+                      {
+                        "role": "ButtonControl",
+                        "name": "View",
+                        "value": "",
+                        "bounds": [
+                          2115,
+                          280,
+                          100,
+                          64
+                        ],
+                        "actions": [],
+                        "children": [
+                          {
+                            "role": "TextControl",
+                            "name": "View",
+                            "value": "",
+                            "bounds": [
+                              2135,
+                              293,
+                              60,
+                              38
+                            ],
+                            "actions": [],
+                            "children": []
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "ButtonControl",
+                "name": "Headings",
+                "value": "",
+                "bounds": [
+                  2562,
+                  280,
+                  112,
+                  64
+                ],
+                "actions": [],
+                "children": [
+                  {
+                    "role": "TextControl",
+                    "name": "",
+                    "value": "",
+                    "bounds": [
+                      2584,
+                      297,
+                      28,
+                      28
+                    ],
+                    "actions": [],
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "role": "ButtonControl",
+                "name": "Lists",
+                "value": "",
+                "bounds": [
+                  2674,
+                  280,
+                  112,
+                  64
+                ],
+                "actions": [],
+                "children": [
+                  {
+                    "role": "TextControl",
+                    "name": "",
+                    "value": "",
+                    "bounds": [
+                      2696,
+                      297,
+                      28,
+                      28
+                    ],
+                    "actions": [],
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "role": "ButtonControl",
+                "name": "Bold (Ctrl+B)",
+                "value": "",
+                "bounds": [
+                  2786,
+                  280,
+                  64,
+                  64
+                ],
+                "actions": [],
+                "children": [
+                  {
+                    "role": "TextControl",
+                    "name": "",
+                    "value": "",
+                    "bounds": [
+                      2804,
+                      298,
+                      28,
+                      28
+                    ],
+                    "actions": [],
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "role": "ButtonControl",
+                "name": "Italic (Ctrl+I)",
+                "value": "",
+                "bounds": [
+                  2850,
+                  280,
+                  64,
+                  64
+                ],
+                "actions": [],
+                "children": [
+                  {
+                    "role": "TextControl",
+                    "name": "",
+                    "value": "",
+                    "bounds": [
+                      2868,
+                      298,
+                      28,
+                      28
+                    ],
+                    "actions": [],
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "role": "ButtonControl",
+                "name": "Strikethrough (Ctrl+Shift+X)",
+                "value": "",
+                "bounds": [
+                  2914,
+                  280,
+                  64,
+                  64
+                ],
+                "actions": [],
+                "children": [
+                  {
+                    "role": "TextControl",
+                    "name": "",
+                    "value": "",
+                    "bounds": [
+                      2932,
+                      298,
+                      28,
+                      28
+                    ],
+                    "actions": [],
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "role": "ButtonControl",
+                "name": "Link (Ctrl+K)",
+                "value": "",
+                "bounds": [
+                  2978,
+                  280,
+                  64,
+                  64
+                ],
+                "actions": [],
+                "children": [
+                  {
+                    "role": "TextControl",
+                    "name": "",
+                    "value": "",
+                    "bounds": [
+                      2996,
+                      298,
+                      28,
+                      28
+                    ],
+                    "actions": [],
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "role": "ButtonControl",
+                "name": "Table",
+                "value": "",
+                "bounds": [
+                  3042,
+                  280,
+                  112,
+                  64
+                ],
+                "actions": [],
+                "children": [
+                  {
+                    "role": "TextControl",
+                    "name": "",
+                    "value": "",
+                    "bounds": [
+                      3064,
+                      297,
+                      28,
+                      28
+                    ],
+                    "actions": [],
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "role": "ButtonControl",
+                "name": "Clear formatting (Ctrl+Space)",
+                "value": "",
+                "bounds": [
+                  3154,
+                  280,
+                  64,
+                  64
+                ],
+                "actions": [],
+                "children": [
+                  {
+                    "role": "TextControl",
+                    "name": "",
+                    "value": "",
+                    "bounds": [
+                      3172,
+                      298,
+                      28,
+                      28
+                    ],
+                    "actions": [],
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "role": "ButtonControl",
+                "name": "Writing tools",
+                "value": "",
+                "bounds": [
+                  3542,
+                  280,
+                  112,
+                  64
+                ],
+                "actions": [],
+                "children": [
+                  {
+                    "role": "TextControl",
+                    "name": "",
+                    "value": "",
+                    "bounds": [
+                      3564,
+                      297,
+                      28,
+                      28
+                    ],
+                    "actions": [],
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "role": "ButtonControl",
+                "name": "What's new",
+                "value": "",
+                "bounds": [
+                  3662,
+                  282,
+                  60,
+                  60
+                ],
+                "actions": [],
+                "children": [
+                  {
+                    "role": "TextControl",
+                    "name": "",
+                    "value": "",
+                    "bounds": [
+                      3678,
+                      298,
+                      28,
+                      28
+                    ],
+                    "actions": [],
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "role": "ButtonControl",
+                "name": "User avatar",
+                "value": "",
+                "bounds": [
+                  3730,
+                  280,
+                  60,
+                  64
+                ],
+                "actions": [],
+                "children": [
+                  {
+                    "role": "TextControl",
+                    "name": "Person",
+                    "value": "",
+                    "bounds": [
+                      3740,
+                      292,
+                      40,
+                      40
+                    ],
+                    "actions": [],
+                    "children": [
+                      {
+                        "role": "TextControl",
+                        "name": "",
+                        "value": "",
+                        "bounds": [
+                          0,
+                          0,
+                          0,
+                          0
+                        ],
+                        "actions": [],
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "ProgressBarControl",
+                "name": "",
+                "value": "",
+                "bounds": [
+                  3740,
+                  292,
+                  40,
+                  40
+                ],
+                "actions": [],
+                "children": [
+                  {
+                    "role": "ImageControl",
+                    "name": "",
+                    "value": "",
+                    "bounds": [
+                      3740,
+                      292,
+                      40,
+                      40
+                    ],
+                    "actions": [],
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "role": "ButtonControl",
+                "name": "Settings",
+                "value": "",
+                "bounds": [
+                  3798,
+                  280,
+                  60,
+                  64
+                ],
+                "actions": [],
+                "children": []
+              },
+              {
+                "role": "WindowControl",
+                "name": "",
+                "value": "",
+                "bounds": [
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "actions": [],
+                "children": []
+              },
+              {
+                "role": "PaneControl",
+                "name": "",
+                "value": "",
+                "bounds": [
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "actions": [],
+                "children": []
+              },
+              {
+                "role": "PaneControl",
+                "name": "Local AI model must complete downloading to use this feature while signed out.",
+                "value": "",
+                "bounds": [
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "actions": [],
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "role": "PaneControl",
+        "name": "",
+        "value": "",
+        "bounds": [
+          1906,
+          1334,
+          1968,
+          64
+        ],
+        "actions": [],
+        "children": [
+          {
+            "role": "PaneControl",
+            "name": "",
+            "value": "",
+            "bounds": [
+              1906,
+              1334,
+              1968,
+              64
+            ],
+            "actions": [],
+            "children": [
+              {
+                "role": "TextControl",
+                "name": "Line 1,\nColumn 1",
+                "value": "",
+                "bounds": [
+                  1938,
+                  1350,
+                  118,
+                  32
+                ],
+                "actions": [],
+                "children": []
+              },
+              {
+                "role": "TextControl",
+                "name": "0 characters",
+                "value": "",
+                "bounds": [
+                  2116,
+                  1350,
+                  131,
+                  32
+                ],
+                "actions": [],
+                "children": []
+              },
+              {
+                "role": "TextControl",
+                "name": "Plain text",
+                "value": "",
+                "bounds": [
+                  2520,
+                  1334,
+                  124,
+                  64
+                ],
+                "actions": [],
+                "children": []
+              },
+              {
+                "role": "TextControl",
+                "name": "Zoom",
+                "value": "",
+                "bounds": [
+                  3132,
+                  1350,
+                  63,
+                  32
+                ],
+                "actions": [],
+                "children": []
+              },
+              {
+                "role": "TextControl",
+                "name": " Windows (CRLF)",
+                "value": "",
+                "bounds": [
+                  3268,
+                  1350,
+                  181,
+                  32
+                ],
+                "actions": [],
+                "children": []
+              },
+              {
+                "role": "TextControl",
+                "name": " UTF-8",
+                "value": "",
+                "bounds": [
+                  3604,
+                  1350,
+                  71,
+                  32
+                ],
+                "actions": [],
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "role": "TitleBarControl",
+        "name": "",
+        "value": "",
+        "bounds": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "actions": [],
+        "children": [
+          {
+            "role": "MenuBarControl",
+            "name": "System",
+            "value": "",
+            "bounds": [
+              1907,
+              211,
+              44,
+              44
+            ],
+            "actions": [],
+            "children": [
+              {
+                "role": "MenuItemControl",
+                "name": "System",
+                "value": "",
+                "bounds": [
+                  1907,
+                  211,
+                  44,
+                  44
+                ],
+                "actions": [],
+                "children": []
+              }
+            ]
+          },
+          {
+            "role": "ButtonControl",
+            "name": "Minimize",
+            "value": "",
+            "bounds": [
+              3595,
+              199,
+              94,
+              57
+            ],
+            "actions": [],
+            "children": []
+          },
+          {
+            "role": "ButtonControl",
+            "name": "Maximize",
+            "value": "",
+            "bounds": [
+              3689,
+              199,
+              92,
+              57
+            ],
+            "actions": [],
+            "children": []
+          },
+          {
+            "role": "ButtonControl",
+            "name": "Close",
+            "value": "",
+            "bounds": [
+              3781,
+              199,
+              94,
+              57
+            ],
+            "actions": [],
+            "children": []
+          }
+        ]
+      }
+    ]
+  }
+}

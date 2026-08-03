@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "highvisor",
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": ["-m", "highvisor.server"],
+      "port": 48721,
+      "url": "http://localhost:48721"
+    }
+  ]
+}
