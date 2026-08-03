@@ -11,3 +11,6 @@ dist/
 .venv/
 venv/
 env/
+
+# Local automation transcript dropped by desktop-automation runs
+@AutomationLog.txt
