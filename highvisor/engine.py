@@ -484,7 +484,13 @@ class Engine:
         proc, launcher, win = prof.get("proc"), prof.get("launcher"), prof.get("window", "")
         if not proc or not launcher:
             return {"ok": False, "error": "no proc/launcher profile for app %r" % app}
-        _sp.run(["pkill", "-9", "-f", proc], capture_output=True)
+        import os as _os
+        if _os.name == "nt":
+            # taskkill matches the IMAGE NAME, not a command-line pattern —
+            # profiles carry the pkill -f stem, so append .exe (CoQ -> CoQ.exe).
+            _sp.run(["taskkill", "/F", "/IM", proc + ".exe"], capture_output=True)
+        else:
+            _sp.run(["pkill", "-9", "-f", proc], capture_output=True)
         deadline = _t.time() + 10
         while _t.time() < deadline:
             if not any(win in (t.to_dict().get("title") or "") for t in b.list_targets()):
