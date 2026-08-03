@@ -18,10 +18,23 @@ fix compounds. Concretely:
 | screenshot-then-guess "what screen is it on?" | `hv state` (first-party scene reports), `hv probe` |
 | click-drive to a known screen by hand | `hv goto <app> <node>` (gametree recipes) |
 | sleep-and-hope waiting for a state | `hv assert --app qud --node in_game --timeout 20` |
+| pkill/osascript restart seances | `hv restart qud` / `hv restart raves` (kills ALL instances incl. duplicates, relaunches, waits) |
+| blind top-row Continue clicks | `hv loadsave <name>` (row computed from DISK metadata — `hv saves` lists them, no game launch) |
 
-The daemon is started/restarted by **Daniel** — never launch it yourself; if `nc -z 127.0.0.1
-48720` fails or the cockpit shows ⟳ restart daemon, ask. Engine/backend `.py` changes need that
-restart; `webui/` static files only need a browser reload.
+The daemon **self-restarts** (2026-08-03): a source watcher re-execs it when any highvisor `.py`
+changes (edit → it picks itself up in ~2s), and `hv install-daemon` adds a launchd KeepAlive agent
+for crash restart. If `nc -z 127.0.0.1 48720` fails AND the agent isn't installed, ask Daniel.
+`webui/` static files still only need a browser reload.
+
+## THE TIMESHARE GUARD — this machine is shared
+
+Every focus/mouse-stealing op (activate, key --focus, click, text) runs inside a guard session
+(`highvisor/guard.py`): it remembers the frontmost app + mouse position, plays a 3-ping audio
+countdown before taking control (only when interrupting a NON-game app), restores focus + mouse
+and plays a return cue when the session idles out (~8s) or hits the **20s hard cap**. Panic
+channels: the cockpit 🛑 ABORT button, `hv abort`, `touch ~/.config/highvisor/ABORT`, or
+**Ctrl+Opt+Cmd+H** anywhere — all release immediately and refuse control ops for 30s. Disable
+for unattended runs: `touch ~/.config/highvisor/guard_off`.
 
 ## Map
 

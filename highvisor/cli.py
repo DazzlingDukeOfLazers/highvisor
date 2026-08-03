@@ -207,6 +207,68 @@ def _cmd_wish(a):
     raise SystemExit(0 if res.get("ok") else 1)
 
 
+def _cmd_saves(a):
+    """The save list + picker row order, read from DISK (no game launch)."""
+    res = _call({"op": P.OP_QUD_SAVES})
+    if not res.get("ok"):
+        _print_json(res)
+        raise SystemExit(1)
+    for s in res["saves"]:
+        print("row %d: %-26r %-8s %-24s saved %s" % (
+            s["row"], s["name"], s["mode"], s["location"], s["saved"]))
+
+
+def _cmd_loadsave(a):
+    """Load a NAMED save (row computed from disk metadata — no top-row roulette)."""
+    res = _call({"op": P.OP_LOAD_SAVE, "name": " ".join(a.name)}, timeout=180.0)
+    _print_json(res)
+    raise SystemExit(0 if res.get("ok") else 1)
+
+
+def _cmd_restart(a):
+    """Clean restart: kill EVERY instance (duplicates too), launch solo, wait for the window."""
+    res = _call({"op": P.OP_RESTART, "app": a.app}, timeout=120.0)
+    _print_json(res)
+    raise SystemExit(0 if res.get("ok") else 1)
+
+
+def _cmd_abort(a):
+    """Panic: release focus/mouse NOW; refuse control ops for 30s."""
+    _print_json(_call({"op": P.OP_ABORT}))
+
+
+def _cmd_install_daemon(a):
+    """Write + bootstrap the launchd KeepAlive agent so the daemon restarts itself on
+    crash (code changes already re-exec in place). Stops any manually-run daemon first."""
+    import os
+    import plistlib
+    import subprocess
+    import sys
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    label = "com.highvisor.daemon"
+    plist = {
+        "Label": label,
+        "ProgramArguments": [sys.executable, "-m", "highvisor.server"],
+        "WorkingDirectory": repo,
+        "KeepAlive": True,
+        "RunAtLoad": True,
+        "StandardOutPath": os.path.expanduser("~/Library/Logs/highvisor.log"),
+        "StandardErrorPath": os.path.expanduser("~/Library/Logs/highvisor.log"),
+    }
+    path = os.path.expanduser("~/Library/LaunchAgents/%s.plist" % label)
+    with open(path, "wb") as fh:
+        plistlib.dump(plist, fh)
+    uid = os.getuid()
+    subprocess.run(["launchctl", "bootout", "gui/%d/%s" % (uid, label)],
+                   capture_output=True)
+    r = subprocess.run(["launchctl", "bootstrap", "gui/%d" % uid, path],
+                       capture_output=True, text=True)
+    print("plist: %s" % path)
+    print("interpreter: %s" % sys.executable)
+    print("bootstrap: %s" % ("ok" if r.returncode == 0 else (r.stderr.strip() or "failed")))
+    print("NOTE: stop any manually-run daemon first (port clash); logs -> ~/Library/Logs/highvisor.log")
+
+
 def _cmd_diff(a):
     # Local image analysis — no daemon round-trip.
     from . import imageops
@@ -721,6 +783,20 @@ def build_parser():
     s = sub.add_parser("wish", help="run a Caves of Qud wish via the Raves bridge, e.g. hv wish godmode")
     s.add_argument("text", nargs="+", help="the wish text (godmode | item:<Blueprint> | xp:<n> | ...)")
     s.set_defaults(fn=_cmd_wish)
+
+    sub.add_parser("saves", help="Qud's save list + picker row order, from DISK (no game launch)").set_defaults(fn=_cmd_saves)
+
+    s = sub.add_parser("loadsave", help="load a NAMED Qud save (restarts to title if needed), e.g. hv loadsave meta")
+    s.add_argument("name", nargs="+", help="the save's character name, exactly as the picker shows it")
+    s.set_defaults(fn=_cmd_loadsave)
+
+    s = sub.add_parser("restart", help="clean restart: kill ALL instances, launch solo, wait for the window")
+    s.add_argument("app", help="qud | raves")
+    s.set_defaults(fn=_cmd_restart)
+
+    sub.add_parser("abort", help="PANIC: release focus/mouse now; refuse control ops for 30s").set_defaults(fn=_cmd_abort)
+
+    sub.add_parser("install-daemon", help="launchd KeepAlive agent: the daemon restarts itself on crash").set_defaults(fn=_cmd_install_daemon)
 
     s = sub.add_parser("probe", help="is an app up, and in what state? (e.g. hv probe --app qud)")
     s.add_argument("--app", help="known app profile (see apps.py): qud")
