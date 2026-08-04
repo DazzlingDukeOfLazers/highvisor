@@ -38,6 +38,19 @@ def _slim_state(st):
             "extra": st.get("extra")}
 
 
+def _ocr_find(boxes, want):
+    """Find the OCR line for a UI label. Space-insensitive: Vision splits tight
+    monospace ('Options' -> 'Opti ons' on Raves' Source Code Pro), so compare with
+    all whitespace stripped. Exact (normalized) match beats substring; among
+    substrings the shortest line wins (long lines are prose, not buttons)."""
+    wn = "".join(str(want).lower().split())
+    norm = lambda t: "".join(t.lower().split())
+    exact = [x for x in boxes if norm(x["text"]) == wn]
+    subs = sorted((x for x in boxes if wn in norm(x["text"])),
+                  key=lambda x: len(x["text"]))
+    return (exact or subs or [None])[0]
+
+
 class _Job:
     __slots__ = ("request", "event", "result")
 
@@ -145,7 +158,7 @@ class Engine:
         # whether the action landed (RPC-level failures come back as exceptions).
         # Focus/mouse-stealing ops go through the TIMESHARE GUARD (audio countdown,
         # focus+mouse save/restore, abort channels, 20s cap — see guard.py).
-        if op in (P.OP_ACTIVATE, P.OP_TEXT, P.OP_KEY, P.OP_CLICK):
+        if op in (P.OP_ACTIVATE, P.OP_TEXT, P.OP_KEY, P.OP_CLICK, P.OP_MOUSE):
             _gerr = self.guard.begin()
             if _gerr:
                 return {"ok": False, "error": _gerr}
@@ -166,6 +179,13 @@ class Engine:
                 kw["hover"] = True
             return b.click(req["target"], int(req.get("x", 0)), int(req.get("y", 0)),
                            **kw).to_dict()
+
+        if op == P.OP_MOUSE:
+            # pure hover: warp + a real mouseMoved so engines that read
+            # Input.mousePosition (Unity) see it — no button events. THE tool for
+            # capturing hover/highlight states without changing app state.
+            return b.mouse_move(req["target"], int(req.get("x", 0)),
+                                int(req.get("y", 0))).to_dict()
 
         if op == P.OP_INSPECT:
             tree = b.inspect(req["target"], int(req.get("depth", 3)))
@@ -324,9 +344,40 @@ class Engine:
             return {"ok": False, "error": "%r not found" % top_label}
         x, w, h = bot.x, bot.w, bot.h            # same column + size as the anchor
         y = bot.y - gap - h                      # stacked directly above it
+        if "raves of qud" in (top.title or "").lower():
+            # Godot's borderless window can't be moved via AX (sets land at wild
+            # coords or fail) — ask Raves to place ITSELF: write window_rect.json
+            # (the reverse of its state-report contract), verify by CG readback.
+            r2 = self._move_raves_file(b, top.id, int(x), int(y), int(w), int(h))
+            if r2.get("ok"):
+                return {"ok": True, "top": top.id, "bottom": bot.id,
+                        "rect": [int(x), int(y), int(w), int(h)], "via": "file"}
+            # fall through to the AX attempt as a last resort
         r = b.move(top.id, int(x), int(y), int(w), int(h), None)
         return {"ok": r.ok, "top": top.id, "bottom": bot.id,
                 "rect": [int(x), int(y), int(w), int(h)], "error": r.error}
+
+    def _move_raves_file(self, b, win_id, x, y, w, h, timeout_s=6.0):
+        """Placement via Raves' window_rect.json poll (Settings.gd applies it with
+        DisplayServer within ~0.5s). Verified by CG frame readback, ±3px."""
+        import json as _json
+        import os as _os
+        import time as _time
+        path = _os.path.expanduser(
+            "~/Library/Application Support/RavesOfQud/window_rect.json")
+        try:
+            with open(path, "w") as f:
+                _json.dump({"x": x, "y": y, "w": w, "h": h, "ts": _time.time()}, f)
+        except OSError as e:
+            return {"ok": False, "error": "window_rect write failed: %s" % e}
+        end = _time.monotonic() + timeout_s
+        while _time.monotonic() < end:
+            _time.sleep(0.5)
+            t = next((t for t in b.list_targets() if t.id == win_id), None)
+            if t and all(abs(a - b_) <= 3 for a, b_ in
+                         ((t.x, x), (t.y, y), (t.w, w), (t.h, h))):
+                return {"ok": True}
+        return {"ok": False, "error": "raves did not land on the rect (file channel)"}
 
     def _dock(self, b, target):
         """Apply the standing dock rule for ``target`` (id or title substring)."""
@@ -441,6 +492,24 @@ class Engine:
             return {"ok": False,
                     "error": "Qud bridge :%s unreachable (%s) — is Qud in-game?" % (port, e)}
 
+    def _qud_bridge(self, name):
+        """Send a bare {"type":"command","name":...} frame to the Qud mod bridge
+        (listener is up from the main menu on — ModSensitiveCacheInit). First-party
+        UI driving: e.g. "uiback" fires the modern-UI CancelButton, the real Escape
+        for menu screens that ignore every OS-synthesized key."""
+        import json as _json
+        import socket as _socket
+        import struct as _struct
+        from .apps import PROFILES
+        port = PROFILES.get("qud", {}).get("port", 48710)
+        payload = _json.dumps({"type": "command", "name": name}).encode("utf-8")
+        try:
+            with _socket.create_connection(("127.0.0.1", port), timeout=3) as s:
+                s.sendall(_struct.pack(">I", len(payload)) + payload)
+            return {"ok": True, "name": name}
+        except OSError as e:
+            return {"ok": False, "error": "Qud bridge :%s unreachable (%s)" % (port, e)}
+
     # ------------------------------------------------------- qud saves (from DISK)
     def _qud_saves(self):
         """The save list AND the Load Game picker's row order, read from disk —
@@ -462,6 +531,7 @@ class Engine:
                 except Exception:
                     meta = {}
                 out.append({"guid": guid, "name": meta.get("Name", "?"),
+                            "id": meta.get("ID", guid),
                             "location": meta.get("Location", "?"),
                             "mode": meta.get("GameMode", "?"),
                             "saved": meta.get("SaveTime", "?"),
@@ -519,39 +589,46 @@ class Engine:
 
     # ------------------------------------------------------- load save BY NAME
     def _load_save(self, b, name):
-        """Drive Qud to load a NAMED save — no top-row roulette. Row computed from the
-        disk metadata (see _qud_saves); restarts Qud to the title first if needed."""
+        """Load a NAMED Qud save via the mod's `loadsave {id}` bridge command — exact
+        ID match, no coordinate clicks, no focus stealing. (The old row-click drive
+        loaded the wrong save when the picker's order drifted from disk mtime order.)
+        The mod completes Qud's own picker completionSource, opening the picker itself
+        from the title if needed; it REFUSES while a game is live, so restart first."""
+        import json as _json
+        import socket as _socket
+        import struct as _struct
         import time as _t
         saves = self._qud_saves()
         if not saves.get("ok"):
             return saves
-        row = next((s["row"] for s in saves["saves"] if s["name"] == name), None)
-        if row is None:
+        sid = next((s["id"] for s in saves["saves"] if s["name"] == name), None)
+        if sid is None:
             return {"ok": False, "error": "no save named %r" % name,
                     "have": [s["name"] for s in saves["saves"]]}
         st = (self._gamestate(b).get("states", {}).get("qud") or {})
-        if st.get("node") != "title":
+        # Restart on a LIVE GAME even when the tree says title: after an unfocused load
+        # Qud's view (and scene report) can stay "MainMenu" while a game runs — the mod
+        # refuses loadsave mid-game, so trust the game_live probe over the scene.
+        if st.get("node") != "title" or (st.get("signals") or {}).get("game_live"):
             r = self._restart_app(b, "qud")
             if not r.get("ok"):
                 return {"ok": False, "error": "restart failed", "detail": r}
             _t.sleep(8)   # title settle after the window appears
-        gerr = self.guard.begin()
-        if gerr:
-            return {"ok": False, "error": gerr}
-        win = "CavesOfQud"
-        b.activate(win)
-        _t.sleep(1.0)
-        b.click(win, 958, 580, hover=True)              # Continue
-        _t.sleep(2.5)
-        self.guard.begin()                               # keep the session alive
-        b.click(win, 975, 193 + row * 124, hover=True)   # the named save's row
+        from .apps import PROFILES
+        port = PROFILES.get("qud", {}).get("port", 48710)
+        payload = _json.dumps({"type": "command", "name": "loadsave", "id": sid}).encode("utf-8")
+        try:
+            with _socket.create_connection(("127.0.0.1", port), timeout=3) as s:
+                s.sendall(_struct.pack(">I", len(payload)) + payload)
+        except OSError as e:
+            return {"ok": False, "error": "Qud bridge :%s unreachable (%s)" % (port, e)}
         deadline = _t.time() + 40
         while _t.time() < deadline:
             stq = (self._gamestate(b).get("states", {}).get("qud") or {})
             if stq.get("node") == "in_game":
-                return {"ok": True, "name": name, "row": row}
+                return {"ok": True, "name": name, "id": sid, "via": "bridge loadsave"}
             _t.sleep(1.5)
-        return {"ok": False, "error": "load did not reach in_game", "name": name, "row": row}
+        return {"ok": False, "error": "load did not reach in_game", "name": name, "id": sid}
 
     def _gamestate(self, b, ocr=False):
         """Evaluate the game state-machine tree against live signals for each app.
@@ -720,6 +797,9 @@ class Engine:
           {"activate": label}             front the window
           {"click_hover": [x,y], "window": label}    hover-click (menus need the hover)
           {"click": [x,y], "window": label}          plain click
+          {"click_text": "label", "window": label}   OCR-locate the text, hover-click its
+                                                     center — survives menu reflow (items
+                                                     shift when Continue/Quick Start appear)
           {"key": keys, "window": label}  focused key injection
           {"sleep": s}                    settle pause
           {"assert": {...}, "timeout": s} inline _assert_state (app defaults to this app)
@@ -737,9 +817,11 @@ class Engine:
         recipe = (node.get("goto") or {}).get(app)
         if not recipe:
             return {"ok": False, "error": "node %r has no goto recipe for %s" % (node_id, app)}
-        # already there? (node current or an ancestor of the current node)
+        # already there? EXACT node only — ancestor containment lies here: detection
+        # correctly reports records as title>menu_box>records, but being on the Records
+        # SCREEN is not being on the title screen, and skipping the recipe strands us.
         st = self._gamestate(b).get("states", {}).get(app) or {}
-        if st.get("node") == node_id or node_id in (st.get("path") or []):
+        if st.get("node") == node_id:
             return {"ok": True, "app": app, "node": node_id, "steps": [],
                     "detail": "already at %s" % node_id, "state": _slim_state(st)}
         steps = []
@@ -794,6 +876,33 @@ class Engine:
                 if not r.ok:
                     return fail(step, r.error or "click failed")
                 time.sleep(0.5)
+            elif "click_text" in step:
+                win = self._find_win(b.list_targets(), step.get("window", ""))
+                if win is None:
+                    return fail(step, "no window %r" % step.get("window"))
+                want = str(step["click_text"]).strip().lower()
+                try:
+                    ocr = b.ocr(win.id)
+                except Exception as e:
+                    return fail(step, "ocr failed: %s" % e)
+                boxes = ocr.get("boxes") or []
+                hit = _ocr_find(boxes, want)
+                if hit is None:
+                    return fail(step, "text %r not on screen (%d ocr lines)" % (want, len(boxes)))
+                bx, by, bw, bh = hit["bbox"]
+                # ocr bbox is in CAPTURE px; clicks are window points (Retina shot = 2x)
+                scale = (float(ocr.get("w") or win.w) / float(win.w)) if win.w else 1.0
+                cx, cy = int((bx + bw / 2.0) / scale), int((by + bh / 2.0) / scale)
+                # optional [dx,dy] when the hit-area sits away from the label (Qud's
+                # Back chevron lives ~40px above its "[Esc] Back" caption)
+                ox, oy = step.get("offset") or (0, 0)
+                cx, cy = cx + int(ox), cy + int(oy)
+                r = b.click(win.id, cx, cy, hover=True)
+                steps.append({"step": step, "ok": r.ok,
+                              "detail": "%r @ win(%d,%d)" % (hit["text"], cx, cy)})
+                if not r.ok:
+                    return fail(step, r.error or "click failed")
+                time.sleep(0.5)
             elif "key" in step:
                 win = self._find_win(b.list_targets(), step.get("window", ""))
                 if win is None:
@@ -804,6 +913,13 @@ class Engine:
             elif "sleep" in step:
                 time.sleep(float(step["sleep"]))
                 steps.append({"step": step, "ok": True})
+            elif "bridge" in step:
+                # first-party command over the Qud mod bridge (e.g. "uiback")
+                r = self._qud_bridge(step["bridge"])
+                steps.append({"step": step, "ok": bool(r.get("ok")), "detail": r.get("error", "")})
+                if not r.get("ok"):
+                    return fail(step, r.get("error", "bridge send failed"))
+                time.sleep(0.6)
             elif "dock" in step:
                 # place the window by its standing dock rule (Raves stacks above Qud with the
                 # anchor's size) — a fresh solo launch otherwise lands wherever the OS puts it
@@ -822,9 +938,49 @@ class Engine:
                 if str(scene).lower() == str(want_scene).lower():
                     cfg = gametree.apps(tree).get(app, {})
                     win = self._find_win(b.list_targets(), cfg.get("window"))
-                    if win is not None:
+                    if win is None:
+                        return fail(step, "dismiss: no window for %s" % app)
+                    if cond.get("bridge"):
+                        # first-party dismissal — no OCR, no coords, no focus steal
+                        r = self._qud_bridge(cond["bridge"])
+                        if not r.get("ok"):
+                            return fail(step, "dismiss bridge: %s" % r.get("error"))
+                    elif cond.get("click_text"):
+                        # Qud's modern UI screens IGNORE OS-synthesized keys (the
+                        # GameSummaryScreen gotcha generalizes) — but synthesized
+                        # clicks land, so exit via the screen's clickable affordance.
+                        # A miss here MUST fail the recipe: a fuzzy match that clicks
+                        # the wrong thing on the wrong screen is how stray games get
+                        # started (the Shwubas incident).
+                        want = str(cond["click_text"]).strip().lower()
+                        try:
+                            ocr = b.ocr(win.id)
+                        except Exception as e:
+                            return fail(step, "dismiss ocr failed: %s" % e)
+                        boxes = ocr.get("boxes") or []
+                        hit = _ocr_find(boxes, want)
+                        if hit is None:
+                            return fail(step, "dismiss: text %r not on the %s screen"
+                                        % (cond["click_text"], scene))
+                        bx, by, bw, bh = hit["bbox"]
+                        sc = (float(ocr.get("w") or win.w) / float(win.w)) if win.w else 1.0
+                        ox, oy = cond.get("offset") or (0, 0)
+                        b.click(win.id, int((bx + bw / 2.0) / sc) + int(ox),
+                                int((by + bh / 2.0) / sc) + int(oy), hover=True)
+                    else:
                         b.key(win.id, cond.get("key", "Escape"), focus=True)
-                        time.sleep(0.6)
+                    # verify we actually LEFT the scene — a dismiss that didn't take
+                    # must stop the recipe, or later clicks land on the wrong screen
+                    left = False
+                    for _ in range(6):
+                        time.sleep(0.7)
+                        cur2 = (self._gamestate(b).get("states", {}).get(app) or {})
+                        now_scene = (cur2.get("signals") or {}).get("scene") or ""
+                        if str(now_scene).lower() != str(want_scene).lower():
+                            left = True
+                            break
+                    if not left:
+                        return fail(step, "dismiss clicked but still on %s" % scene)
                     steps.append({"step": step, "ok": True, "detail": "dismissed %s" % scene})
                 else:
                     steps.append({"step": step, "ok": True, "detail": "not present"})

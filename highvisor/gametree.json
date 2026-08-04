@@ -76,10 +76,45 @@
        "timeout": 60
       },
       {
+       "dismiss": {
+        "scene": "DynamicPopupMessage",
+        "bridge": "uiback"
+       },
+       "note": "self-heal: cancel a stray popup (quit-confirm etc.)"
+      },
+      {
+       "dismiss": {
+        "scene": "ModernHighScores",
+        "bridge": "uiback"
+       },
+       "note": "self-heal: back out of a submenu left open"
+      },
+      {
+       "dismiss": {
+        "scene": "ModernOptionsMenu",
+        "bridge": "uiback"
+       },
+       "note": "self-heal: back out of a submenu left open"
+      },
+      {
+       "dismiss": {
+        "scene": "ModManager",
+        "bridge": "uiback"
+       },
+       "note": "self-heal: back out of a submenu left open"
+      },
+      {
+       "dismiss": {
+        "scene": "ModernSaveManagement",
+        "bridge": "uiback"
+       },
+       "note": "self-heal: back out of a submenu left open"
+      },
+      {
        "assert": {
         "scene": "MainMenu"
        },
-       "timeout": 90
+       "timeout": 20
       }
      ],
      "raves": [
@@ -94,6 +129,27 @@
       {
        "dock": "Raves of Qud",
        "note": "stack into the standard slot above Qud (fresh launches land off-slot)"
+      },
+      {
+       "dismiss": {
+        "scene": "mods",
+        "key": "Escape"
+       },
+       "note": "self-heal: back out of a submenu left open"
+      },
+      {
+       "dismiss": {
+        "scene": "options",
+        "key": "Escape"
+       },
+       "note": "self-heal: back out of a submenu left open"
+      },
+      {
+       "dismiss": {
+        "scene": "records",
+        "key": "Escape"
+       },
+       "note": "self-heal: back out of a submenu left open"
       },
       {
        "dismiss": {
@@ -198,12 +254,8 @@
              "activate": "Raves of Qud"
             },
             {
-             "click_hover": [
-              945,
-              536
-             ],
-             "window": "Raves of Qud",
-             "note": "New Game (needs Qud running, else it launches Qud instead)"
+             "click_text": "New Game",
+             "window": "Raves of Qud"
             },
             {
              "assert": {
@@ -220,12 +272,8 @@
              "activate": "CavesOfQud"
             },
             {
-             "click_hover": [
-              958,
-              534
-             ],
-             "window": "CavesOfQud",
-             "note": "New Game on the title menu"
+             "click_text": "New Game",
+             "window": "CavesOfQud"
             },
             {
              "sleep": 1.0
@@ -338,12 +386,8 @@
            "activate": "CavesOfQud"
           },
           {
-           "click_hover": [
-            958,
-            534
-           ],
-           "window": "CavesOfQud",
-           "note": "New Game on the title menu"
+           "click_text": "New Game",
+           "window": "CavesOfQud"
           },
           {
            "sleep": 1.0
@@ -362,7 +406,7 @@
         "label": "Continue \u2192 Load Game",
         "done": {
          "qud": 0.9,
-         "raves": 0.2
+         "raves": 0.6
         },
         "detect": {
          "qud": [
@@ -378,11 +422,11 @@
            "game_live": false
           }
          ],
-         "raves": {
-          "ocr_any": [
-           "load game"
-          ]
-         }
+         "raves": [
+          {
+           "scene": "loadgame"
+          }
+         ]
         },
         "children": [
          {
@@ -395,7 +439,48 @@
           "detect": {}
          }
         ],
-        "note": "the Load Game picker; qud reports scene=ModernSaveManagement first-party (OCR fallback kept)"
+        "note": "the Load Game picker; qud reports scene=ModernSaveManagement first-party (OCR fallback kept)",
+        "goto": {
+         "qud": [
+          {
+           "goto": "title"
+          },
+          {
+           "activate": "CavesOfQud"
+          },
+          {
+           "click_text": "Continue",
+           "window": "CavesOfQud"
+          },
+          {
+           "sleep": 1.0
+          },
+          {
+           "assert": {
+            "scene": "ModernSaveManagement"
+           },
+           "timeout": 15
+          }
+         ],
+         "raves": [
+          {
+           "goto": "title"
+          },
+          {
+           "activate": "Raves of Qud"
+          },
+          {
+           "click_text": "Continue",
+           "window": "Raves of Qud"
+          },
+          {
+           "assert": {
+            "scene": "loadgame"
+           },
+           "timeout": 12
+          }
+         ]
+        }
        },
        {
         "id": "records",
@@ -409,6 +494,13 @@
           {
            "scene": "records"
           }
+         ],
+         "qud": [
+          {
+           "scene": [
+            "ModernHighScores"
+           ]
+          }
          ]
         },
         "goto": {
@@ -420,10 +512,7 @@
            "activate": "Raves of Qud"
           },
           {
-           "click_hover": [
-            945,
-            628
-           ],
+           "click_text": "Records",
            "window": "Raves of Qud"
           },
           {
@@ -441,19 +530,15 @@
            "activate": "CavesOfQud"
           },
           {
-           "click_hover": [
-            958,
-            626
-           ],
-           "window": "CavesOfQud",
-           "note": "Records on the title menu"
+           "click_text": "Records",
+           "window": "CavesOfQud"
           },
           {
            "sleep": 1.0
           },
           {
            "assert": {
-            "ocr_contains": "records"
+            "scene": "ModernHighScores"
            },
            "timeout": 15
           }
@@ -472,6 +557,13 @@
           {
            "scene": "options"
           }
+         ],
+         "qud": [
+          {
+           "scene": [
+            "ModernOptionsMenu"
+           ]
+          }
          ]
         },
         "goto": {
@@ -483,10 +575,7 @@
            "activate": "Raves of Qud"
           },
           {
-           "click_hover": [
-            945,
-            674
-           ],
+           "click_text": "Options",
            "window": "Raves of Qud"
           },
           {
@@ -504,19 +593,15 @@
            "activate": "CavesOfQud"
           },
           {
-           "click_hover": [
-            958,
-            672
-           ],
-           "window": "CavesOfQud",
-           "note": "Options on the title menu"
+           "click_text": "Options",
+           "window": "CavesOfQud"
           },
           {
            "sleep": 1.0
           },
           {
            "assert": {
-            "ocr_contains": "options"
+            "scene": "ModernOptionsMenu"
            },
            "timeout": 15
           }
@@ -535,6 +620,13 @@
           {
            "scene": "mods"
           }
+         ],
+         "qud": [
+          {
+           "scene": [
+            "ModManager"
+           ]
+          }
          ]
         },
         "goto": {
@@ -546,10 +638,7 @@
            "activate": "Raves of Qud"
           },
           {
-           "click_hover": [
-            945,
-            720
-           ],
+           "click_text": "Mods",
            "window": "Raves of Qud"
           },
           {
@@ -567,19 +656,15 @@
            "activate": "CavesOfQud"
           },
           {
-           "click_hover": [
-            958,
-            718
-           ],
-           "window": "CavesOfQud",
-           "note": "Mods on the title menu"
+           "click_text": "Mods",
+           "window": "CavesOfQud"
           },
           {
            "sleep": 1.0
           },
           {
            "assert": {
-            "ocr_contains": "mods"
+            "scene": "ModManager"
            },
            "timeout": 15
           }
@@ -699,12 +784,8 @@
        "activate": "CavesOfQud"
       },
       {
-       "click_hover": [
-        958,
-        580
-       ],
-       "window": "CavesOfQud",
-       "note": "Continue on the title menu"
+       "click_text": "Continue",
+       "window": "CavesOfQud"
       },
       {
        "sleep": 1.0
@@ -736,12 +817,8 @@
        "note": "let Continue enable (heartbeat poll) after a fresh launch"
       },
       {
-       "click_hover": [
-        945,
-        580
-       ],
-       "window": "Raves of Qud",
-       "note": "hover-select Continue"
+       "click_text": "Continue",
+       "window": "Raves of Qud"
       },
       {
        "assert": {
@@ -823,6 +900,628 @@
        "raves": 0.4
       },
       "detect": {}
+     },
+     {
+      "id": "status_screens",
+      "label": "Status screens (8-tab in-game menu)",
+      "note": "Qud: ONE scene (StatusScreensScreen) for all tabs; per-tab detection needs the planned heartbeat statusTab export. Tab clicks REQUIRE hover-first (hv click --hover) \u2014 plain clicks only hover-select. Plan: raves docs/status-screens-plan.md Qud opener: hover-click the person icon (1729,70).",
+      "done": {
+       "qud": 0.5,
+       "raves": 0.0
+      },
+      "detect": {
+       "qud": [
+        {
+         "scene": [
+          "StatusScreensScreen"
+         ]
+        }
+       ],
+       "raves": [
+        {
+         "scene": [
+          "status_skills",
+          "status_attributes",
+          "status_equipment",
+          "status_tinkering",
+          "status_journal",
+          "status_quests",
+          "status_reputation",
+          "status_messagelog"
+         ]
+        }
+       ]
+      },
+      "children": [
+       {
+        "id": "status_skills",
+        "label": "skills",
+        "done": {
+         "qud": 0.5,
+         "raves": 0.0
+        },
+        "detect": {
+         "raves": [
+          {
+           "scene": "status_skills"
+          }
+         ]
+        },
+        "goto": {
+         "qud": [
+          {
+           "assert": {
+            "scene": "StatusScreensScreen",
+            "app": "qud"
+           },
+           "timeout": 5,
+           "note": "open the status screen first (opener recipe TBD)"
+          },
+          {
+           "activate": "CavesOfQud"
+          },
+          {
+           "click": {
+            "window": "CavesOfQud",
+            "x": 277,
+            "y": 136,
+            "hover": true
+           }
+          },
+          {
+           "sleep": 1.0
+          }
+         ],
+         "raves": [
+          {
+           "goto": "in_game"
+          },
+          {
+           "activate": "Raves of Qud"
+          },
+          {
+           "key": "f2",
+           "window": "Raves of Qud"
+          },
+          {
+           "sleep": 0.8
+          },
+          {
+           "click": {
+            "window": "Raves of Qud",
+            "x": 277,
+            "y": 136
+           }
+          },
+          {
+           "assert": {
+            "scene": "status_skills",
+            "app": "raves"
+           },
+           "timeout": 8
+          }
+         ]
+        }
+       },
+       {
+        "id": "status_attributes",
+        "label": "attributes",
+        "done": {
+         "qud": 0.5,
+         "raves": 0.0
+        },
+        "detect": {
+         "raves": [
+          {
+           "scene": "status_attributes"
+          }
+         ]
+        },
+        "goto": {
+         "qud": [
+          {
+           "assert": {
+            "scene": "StatusScreensScreen",
+            "app": "qud"
+           },
+           "timeout": 5,
+           "note": "open the status screen first (opener recipe TBD)"
+          },
+          {
+           "activate": "CavesOfQud"
+          },
+          {
+           "click": {
+            "window": "CavesOfQud",
+            "x": 500,
+            "y": 136,
+            "hover": true
+           }
+          },
+          {
+           "sleep": 1.0
+          }
+         ],
+         "raves": [
+          {
+           "goto": "in_game"
+          },
+          {
+           "activate": "Raves of Qud"
+          },
+          {
+           "key": "f2",
+           "window": "Raves of Qud"
+          },
+          {
+           "sleep": 0.8
+          },
+          {
+           "click": {
+            "window": "Raves of Qud",
+            "x": 500,
+            "y": 136
+           }
+          },
+          {
+           "assert": {
+            "scene": "status_attributes",
+            "app": "raves"
+           },
+           "timeout": 8
+          }
+         ]
+        }
+       },
+       {
+        "id": "status_equipment",
+        "label": "equipment",
+        "done": {
+         "qud": 0.5,
+         "raves": 0.0
+        },
+        "detect": {
+         "raves": [
+          {
+           "scene": "status_equipment"
+          }
+         ]
+        },
+        "goto": {
+         "qud": [
+          {
+           "assert": {
+            "scene": "StatusScreensScreen",
+            "app": "qud"
+           },
+           "timeout": 5,
+           "note": "open the status screen first (opener recipe TBD)"
+          },
+          {
+           "activate": "CavesOfQud"
+          },
+          {
+           "click": {
+            "window": "CavesOfQud",
+            "x": 745,
+            "y": 136,
+            "hover": true
+           }
+          },
+          {
+           "sleep": 1.0
+          }
+         ],
+         "raves": [
+          {
+           "goto": "in_game"
+          },
+          {
+           "activate": "Raves of Qud"
+          },
+          {
+           "key": "f2",
+           "window": "Raves of Qud"
+          },
+          {
+           "sleep": 0.8
+          },
+          {
+           "click": {
+            "window": "Raves of Qud",
+            "x": 745,
+            "y": 136
+           }
+          },
+          {
+           "assert": {
+            "scene": "status_equipment",
+            "app": "raves"
+           },
+           "timeout": 8
+          }
+         ]
+        }
+       },
+       {
+        "id": "status_tinkering",
+        "label": "tinkering",
+        "done": {
+         "qud": 0.5,
+         "raves": 0.0
+        },
+        "detect": {
+         "raves": [
+          {
+           "scene": "status_tinkering"
+          }
+         ]
+        },
+        "goto": {
+         "qud": [
+          {
+           "assert": {
+            "scene": "StatusScreensScreen",
+            "app": "qud"
+           },
+           "timeout": 5,
+           "note": "open the status screen first (opener recipe TBD)"
+          },
+          {
+           "activate": "CavesOfQud"
+          },
+          {
+           "click": {
+            "window": "CavesOfQud",
+            "x": 925,
+            "y": 136,
+            "hover": true
+           }
+          },
+          {
+           "sleep": 1.0
+          }
+         ],
+         "raves": [
+          {
+           "goto": "in_game"
+          },
+          {
+           "activate": "Raves of Qud"
+          },
+          {
+           "key": "f2",
+           "window": "Raves of Qud"
+          },
+          {
+           "sleep": 0.8
+          },
+          {
+           "click": {
+            "window": "Raves of Qud",
+            "x": 925,
+            "y": 136
+           }
+          },
+          {
+           "assert": {
+            "scene": "status_tinkering",
+            "app": "raves"
+           },
+           "timeout": 8
+          }
+         ]
+        }
+       },
+       {
+        "id": "status_journal",
+        "label": "journal",
+        "done": {
+         "qud": 0.5,
+         "raves": 0.0
+        },
+        "detect": {
+         "raves": [
+          {
+           "scene": "status_journal"
+          }
+         ]
+        },
+        "goto": {
+         "qud": [
+          {
+           "assert": {
+            "scene": "StatusScreensScreen",
+            "app": "qud"
+           },
+           "timeout": 5,
+           "note": "open the status screen first (opener recipe TBD)"
+          },
+          {
+           "activate": "CavesOfQud"
+          },
+          {
+           "click": {
+            "window": "CavesOfQud",
+            "x": 1095,
+            "y": 136,
+            "hover": true
+           }
+          },
+          {
+           "sleep": 1.0
+          }
+         ],
+         "raves": [
+          {
+           "goto": "in_game"
+          },
+          {
+           "activate": "Raves of Qud"
+          },
+          {
+           "key": "f2",
+           "window": "Raves of Qud"
+          },
+          {
+           "sleep": 0.8
+          },
+          {
+           "click": {
+            "window": "Raves of Qud",
+            "x": 1095,
+            "y": 136
+           }
+          },
+          {
+           "assert": {
+            "scene": "status_journal",
+            "app": "raves"
+           },
+           "timeout": 8
+          }
+         ]
+        }
+       },
+       {
+        "id": "status_quests",
+        "label": "quests",
+        "done": {
+         "qud": 0.5,
+         "raves": 0.0
+        },
+        "detect": {
+         "raves": [
+          {
+           "scene": "status_quests"
+          }
+         ]
+        },
+        "goto": {
+         "qud": [
+          {
+           "assert": {
+            "scene": "StatusScreensScreen",
+            "app": "qud"
+           },
+           "timeout": 5,
+           "note": "open the status screen first (opener recipe TBD)"
+          },
+          {
+           "activate": "CavesOfQud"
+          },
+          {
+           "click": {
+            "window": "CavesOfQud",
+            "x": 1250,
+            "y": 136,
+            "hover": true
+           }
+          },
+          {
+           "sleep": 1.0
+          }
+         ],
+         "raves": [
+          {
+           "goto": "in_game"
+          },
+          {
+           "activate": "Raves of Qud"
+          },
+          {
+           "key": "f2",
+           "window": "Raves of Qud"
+          },
+          {
+           "sleep": 0.8
+          },
+          {
+           "click": {
+            "window": "Raves of Qud",
+            "x": 1250,
+            "y": 136
+           }
+          },
+          {
+           "assert": {
+            "scene": "status_quests",
+            "app": "raves"
+           },
+           "timeout": 8
+          }
+         ]
+        }
+       },
+       {
+        "id": "status_reputation",
+        "label": "reputation",
+        "done": {
+         "qud": 0.5,
+         "raves": 0.0
+        },
+        "detect": {
+         "raves": [
+          {
+           "scene": "status_reputation"
+          }
+         ]
+        },
+        "goto": {
+         "qud": [
+          {
+           "assert": {
+            "scene": "StatusScreensScreen",
+            "app": "qud"
+           },
+           "timeout": 5,
+           "note": "open the status screen first (opener recipe TBD)"
+          },
+          {
+           "activate": "CavesOfQud"
+          },
+          {
+           "click": {
+            "window": "CavesOfQud",
+            "x": 1420,
+            "y": 136,
+            "hover": true
+           }
+          },
+          {
+           "sleep": 1.0
+          }
+         ],
+         "raves": [
+          {
+           "goto": "in_game"
+          },
+          {
+           "activate": "Raves of Qud"
+          },
+          {
+           "key": "f2",
+           "window": "Raves of Qud"
+          },
+          {
+           "sleep": 0.8
+          },
+          {
+           "click": {
+            "window": "Raves of Qud",
+            "x": 1420,
+            "y": 136
+           }
+          },
+          {
+           "assert": {
+            "scene": "status_reputation",
+            "app": "raves"
+           },
+           "timeout": 8
+          }
+         ]
+        }
+       },
+       {
+        "id": "status_messagelog",
+        "label": "messagelog",
+        "done": {
+         "qud": 0.9,
+         "raves": 0.8
+        },
+        "detect": {
+         "raves": [
+          {
+           "scene": "status_messagelog"
+          }
+         ]
+        },
+        "goto": {
+         "qud": [
+          {
+           "assert": {
+            "scene": "StatusScreensScreen",
+            "app": "qud"
+           },
+           "timeout": 5,
+           "note": "open the status screen first (opener recipe TBD)"
+          },
+          {
+           "activate": "CavesOfQud"
+          },
+          {
+           "click": {
+            "window": "CavesOfQud",
+            "x": 1615,
+            "y": 136,
+            "hover": true
+           }
+          },
+          {
+           "sleep": 1.0
+          }
+         ],
+         "raves": [
+          {
+           "goto": "in_game"
+          },
+          {
+           "activate": "Raves of Qud"
+          },
+          {
+           "key": "f2",
+           "window": "Raves of Qud"
+          },
+          {
+           "sleep": 0.8
+          },
+          {
+           "click": {
+            "window": "Raves of Qud",
+            "x": 1615,
+            "y": 136
+           }
+          },
+          {
+           "assert": {
+            "scene": "status_messagelog",
+            "app": "raves"
+           },
+           "timeout": 8
+          }
+         ]
+        }
+       }
+      ],
+      "goto": {
+       "qud": [
+        {
+         "goto": "in_game"
+        },
+        {
+         "activate": "CavesOfQud"
+        },
+        {
+         "click": {
+          "window": "CavesOfQud",
+          "x": 1729,
+          "y": 70,
+          "hover": true
+         }
+        },
+        {
+         "sleep": 1.2
+        },
+        {
+         "assert": {
+          "scene": "StatusScreensScreen",
+          "app": "qud"
+         },
+         "timeout": 10
+        }
+       ]
+      }
      }
     ]
    },
