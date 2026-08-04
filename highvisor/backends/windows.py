@@ -167,9 +167,27 @@ class WindowsBackend(PlatformBackend):
             raise BackendError("no window for pid %d" % pid)
         low = ref.lower()
         for w in self._toplevels():
-            if low in (w.Name or "").lower():
+            if low in self._win_title(w).lower():
                 return w.NativeWindowHandle
         raise BackendError("no window matching title ~ %r" % ref)
+
+    @staticmethod
+    def _win_title(w) -> str:
+        """Fresh Win32 caption, falling back to the UIA Name. UIA caches Name at
+        element creation — Godot retitles AFTER creating its window ('Godot Engine'
+        -> 'Raves of Qud (DEBUG)') and UIA never notices, so profile matching by
+        title missed the viewer entirely."""
+        try:
+            hwnd = w.NativeWindowHandle
+            n = user32.GetWindowTextLengthW(hwnd)
+            if n > 0:
+                buf = ctypes.create_unicode_buffer(n + 1)
+                user32.GetWindowTextW(hwnd, buf, n + 1)
+                if buf.value:
+                    return buf.value
+        except Exception:
+            pass
+        return w.Name or ""
 
     def _find_editable(self, ctrl, depth=8):
         """DFS for an edit/document descendant (for text/key delivery)."""
@@ -198,7 +216,7 @@ class WindowsBackend(PlatformBackend):
             try:
                 r = w.BoundingRectangle
                 hwnd = w.NativeWindowHandle
-                title = w.Name or ""
+                title = self._win_title(w)
                 if not title and (r.width() <= 0 or r.height() <= 0):
                     continue
                 out.append(Target(
