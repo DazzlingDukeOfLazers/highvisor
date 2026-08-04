@@ -106,14 +106,42 @@ def _configure_win32():
         fn.restype, fn.argtypes = res, args
 
 
+DPI_STATUS = "unset"
+
+
 def _dpi_aware():
+    """Force physical-pixel coordinates. ctypes does NOT raise on a FALSE return,
+    so the old try/except chain could 'succeed' while leaving the process DPI-
+    virtualized — one daemon generation then reports doubled window rects and
+    captures the wrong desktop area (observed: a 3232x1878 window listed as
+    6954x3912 after a self-restart). Check returns, walk every fallback, and
+    surface the outcome in ping as dpi_status."""
+    global DPI_STATUS
     try:
-        user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))  # PER_MONITOR_V2
+        if user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4)):  # PER_MONITOR_V2
+            DPI_STATUS = "per-monitor-v2"
+            return
     except Exception:
-        try:
-            ctypes.windll.shcore.SetProcessDpiAwareness(2)
-        except Exception:
-            pass
+        pass
+    try:
+        if ctypes.windll.shcore.SetProcessDpiAwareness(2) == 0:  # S_OK
+            DPI_STATUS = "per-monitor"
+            return
+    except Exception:
+        pass
+    try:
+        if user32.SetProcessDPIAware():
+            DPI_STATUS = "system"
+            return
+    except Exception:
+        pass
+    # Setting can legitimately fail when awareness was already fixed (manifest,
+    # or a prior call this process) — report what we actually run under.
+    try:
+        ctx = user32.GetThreadDpiAwarenessContext()
+        DPI_STATUS = "preset(ctx=%s)" % (ctx if isinstance(ctx, int) else "?")
+    except Exception:
+        DPI_STATUS = "unknown"
 
 
 class WindowsBackend(PlatformBackend):

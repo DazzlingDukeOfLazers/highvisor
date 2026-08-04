@@ -140,7 +140,13 @@ class Engine:
         b = self.backend
 
         if op == P.OP_PING:
-            return {"ok": True, "backend": b.name, "version": __version__}
+            resp = {"ok": True, "backend": b.name, "version": __version__}
+            try:                       # windows: DPI awareness the daemon runs under
+                from .backends import windows as _w
+                resp["dpi_status"] = _w.DPI_STATUS
+            except Exception:
+                pass
+            return resp
 
         if op == P.OP_LIST:
             return {"ok": True, "targets": [t.to_dict() for t in b.list_targets()]}
