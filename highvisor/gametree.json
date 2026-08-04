@@ -1452,6 +1452,67 @@
         }
        ]
       }
+     },
+     {
+      "id": "control_mapping",
+      "label": "Control Mapping",
+      "note": "system menu -> Control Mapping. QUD DETECTION GAP: KeybindsScreen never updates _ActiveGameView (scene stays 'play'), so qud detect leans on OCR only.",
+      "done": {
+       "qud": 0.8,
+       "raves": 0.3
+      },
+      "detect": {
+       "raves": [
+        {
+         "scene": "control_mapping"
+        }
+       ],
+       "qud": [
+        {
+         "ocr_any": [
+          "control mapping",
+          "configuring controller"
+         ]
+        }
+       ]
+      },
+      "goto": {
+       "raves": [
+        {
+         "goto": "in_game"
+        },
+        {
+         "activate": "Raves of Qud"
+        },
+        {
+         "sleep": 2.0,
+         "note": "post-restart settle \u2014 the bridge client needs a beat before Esc lands as CmdSystemMenu"
+        },
+        {
+         "key": "escape",
+         "window": "Raves of Qud",
+         "note": "1:1 Esc = CmdSystemMenu; the popup mirrors back"
+        },
+        {
+         "assert": {
+          "popup": "menu",
+          "app": "raves"
+         },
+         "timeout": 8
+        },
+        {
+         "click_text": "Control Mapping",
+         "window": "Raves of Qud"
+        },
+        {
+         "assert": {
+          "scene": "control_mapping",
+          "app": "raves"
+         },
+         "timeout": 8
+        }
+       ]
+      }
      }
     ]
    },
