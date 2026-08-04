@@ -406,7 +406,7 @@
         "label": "Continue \u2192 Load Game",
         "done": {
          "qud": 0.9,
-         "raves": 0.2
+         "raves": 0.6
         },
         "detect": {
          "qud": [
@@ -422,11 +422,11 @@
            "game_live": false
           }
          ],
-         "raves": {
-          "ocr_any": [
-           "load game"
-          ]
-         }
+         "raves": [
+          {
+           "scene": "loadgame"
+          }
+         ]
         },
         "children": [
          {
@@ -439,7 +439,48 @@
           "detect": {}
          }
         ],
-        "note": "the Load Game picker; qud reports scene=ModernSaveManagement first-party (OCR fallback kept)"
+        "note": "the Load Game picker; qud reports scene=ModernSaveManagement first-party (OCR fallback kept)",
+        "goto": {
+         "qud": [
+          {
+           "goto": "title"
+          },
+          {
+           "activate": "CavesOfQud"
+          },
+          {
+           "click_text": "Continue",
+           "window": "CavesOfQud"
+          },
+          {
+           "sleep": 1.0
+          },
+          {
+           "assert": {
+            "scene": "ModernSaveManagement"
+           },
+           "timeout": 15
+          }
+         ],
+         "raves": [
+          {
+           "goto": "title"
+          },
+          {
+           "activate": "Raves of Qud"
+          },
+          {
+           "click_text": "Continue",
+           "window": "Raves of Qud"
+          },
+          {
+           "assert": {
+            "scene": "loadgame"
+           },
+           "timeout": 12
+          }
+         ]
+        }
        },
        {
         "id": "records",
