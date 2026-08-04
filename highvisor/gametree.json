@@ -904,7 +904,7 @@
      {
       "id": "status_screens",
       "label": "Status screens (8-tab in-game menu)",
-      "note": "Qud: ONE scene (StatusScreensScreen) for all tabs; per-tab detection needs the planned heartbeat statusTab export. Tab clicks REQUIRE hover-first (hv click --hover) \u2014 plain clicks only hover-select. Plan: raves docs/status-screens-plan.md",
+      "note": "Qud: ONE scene (StatusScreensScreen) for all tabs; per-tab detection needs the planned heartbeat statusTab export. Tab clicks REQUIRE hover-first (hv click --hover) \u2014 plain clicks only hover-select. Plan: raves docs/status-screens-plan.md Qud opener: hover-click the person icon (1729,70).",
       "done": {
        "qud": 0.5,
        "raves": 0.0
@@ -914,6 +914,20 @@
         {
          "scene": [
           "StatusScreensScreen"
+         ]
+        }
+       ],
+       "raves": [
+        {
+         "scene": [
+          "status_skills",
+          "status_attributes",
+          "status_equipment",
+          "status_tinkering",
+          "status_journal",
+          "status_quests",
+          "status_reputation",
+          "status_messagelog"
          ]
         }
        ]
@@ -926,7 +940,13 @@
          "qud": 0.5,
          "raves": 0.0
         },
-        "detect": {},
+        "detect": {
+         "raves": [
+          {
+           "scene": "status_skills"
+          }
+         ]
+        },
         "goto": {
          "qud": [
           {
@@ -951,6 +971,35 @@
           {
            "sleep": 1.0
           }
+         ],
+         "raves": [
+          {
+           "goto": "in_game"
+          },
+          {
+           "activate": "Raves of Qud"
+          },
+          {
+           "key": "f2",
+           "window": "Raves of Qud"
+          },
+          {
+           "sleep": 0.8
+          },
+          {
+           "click": {
+            "window": "Raves of Qud",
+            "x": 277,
+            "y": 136
+           }
+          },
+          {
+           "assert": {
+            "scene": "status_skills",
+            "app": "raves"
+           },
+           "timeout": 8
+          }
          ]
         }
        },
@@ -961,7 +1010,13 @@
          "qud": 0.5,
          "raves": 0.0
         },
-        "detect": {},
+        "detect": {
+         "raves": [
+          {
+           "scene": "status_attributes"
+          }
+         ]
+        },
         "goto": {
          "qud": [
           {
@@ -986,6 +1041,35 @@
           {
            "sleep": 1.0
           }
+         ],
+         "raves": [
+          {
+           "goto": "in_game"
+          },
+          {
+           "activate": "Raves of Qud"
+          },
+          {
+           "key": "f2",
+           "window": "Raves of Qud"
+          },
+          {
+           "sleep": 0.8
+          },
+          {
+           "click": {
+            "window": "Raves of Qud",
+            "x": 500,
+            "y": 136
+           }
+          },
+          {
+           "assert": {
+            "scene": "status_attributes",
+            "app": "raves"
+           },
+           "timeout": 8
+          }
          ]
         }
        },
@@ -996,7 +1080,13 @@
          "qud": 0.5,
          "raves": 0.0
         },
-        "detect": {},
+        "detect": {
+         "raves": [
+          {
+           "scene": "status_equipment"
+          }
+         ]
+        },
         "goto": {
          "qud": [
           {
@@ -1021,6 +1111,35 @@
           {
            "sleep": 1.0
           }
+         ],
+         "raves": [
+          {
+           "goto": "in_game"
+          },
+          {
+           "activate": "Raves of Qud"
+          },
+          {
+           "key": "f2",
+           "window": "Raves of Qud"
+          },
+          {
+           "sleep": 0.8
+          },
+          {
+           "click": {
+            "window": "Raves of Qud",
+            "x": 745,
+            "y": 136
+           }
+          },
+          {
+           "assert": {
+            "scene": "status_equipment",
+            "app": "raves"
+           },
+           "timeout": 8
+          }
          ]
         }
        },
@@ -1031,7 +1150,13 @@
          "qud": 0.5,
          "raves": 0.0
         },
-        "detect": {},
+        "detect": {
+         "raves": [
+          {
+           "scene": "status_tinkering"
+          }
+         ]
+        },
         "goto": {
          "qud": [
           {
@@ -1056,6 +1181,35 @@
           {
            "sleep": 1.0
           }
+         ],
+         "raves": [
+          {
+           "goto": "in_game"
+          },
+          {
+           "activate": "Raves of Qud"
+          },
+          {
+           "key": "f2",
+           "window": "Raves of Qud"
+          },
+          {
+           "sleep": 0.8
+          },
+          {
+           "click": {
+            "window": "Raves of Qud",
+            "x": 925,
+            "y": 136
+           }
+          },
+          {
+           "assert": {
+            "scene": "status_tinkering",
+            "app": "raves"
+           },
+           "timeout": 8
+          }
          ]
         }
        },
@@ -1066,7 +1220,13 @@
          "qud": 0.5,
          "raves": 0.0
         },
-        "detect": {},
+        "detect": {
+         "raves": [
+          {
+           "scene": "status_journal"
+          }
+         ]
+        },
         "goto": {
          "qud": [
           {
@@ -1091,6 +1251,35 @@
           {
            "sleep": 1.0
           }
+         ],
+         "raves": [
+          {
+           "goto": "in_game"
+          },
+          {
+           "activate": "Raves of Qud"
+          },
+          {
+           "key": "f2",
+           "window": "Raves of Qud"
+          },
+          {
+           "sleep": 0.8
+          },
+          {
+           "click": {
+            "window": "Raves of Qud",
+            "x": 1095,
+            "y": 136
+           }
+          },
+          {
+           "assert": {
+            "scene": "status_journal",
+            "app": "raves"
+           },
+           "timeout": 8
+          }
          ]
         }
        },
@@ -1101,7 +1290,13 @@
          "qud": 0.5,
          "raves": 0.0
         },
-        "detect": {},
+        "detect": {
+         "raves": [
+          {
+           "scene": "status_quests"
+          }
+         ]
+        },
         "goto": {
          "qud": [
           {
@@ -1126,6 +1321,35 @@
           {
            "sleep": 1.0
           }
+         ],
+         "raves": [
+          {
+           "goto": "in_game"
+          },
+          {
+           "activate": "Raves of Qud"
+          },
+          {
+           "key": "f2",
+           "window": "Raves of Qud"
+          },
+          {
+           "sleep": 0.8
+          },
+          {
+           "click": {
+            "window": "Raves of Qud",
+            "x": 1250,
+            "y": 136
+           }
+          },
+          {
+           "assert": {
+            "scene": "status_quests",
+            "app": "raves"
+           },
+           "timeout": 8
+          }
          ]
         }
        },
@@ -1136,7 +1360,13 @@
          "qud": 0.5,
          "raves": 0.0
         },
-        "detect": {},
+        "detect": {
+         "raves": [
+          {
+           "scene": "status_reputation"
+          }
+         ]
+        },
         "goto": {
          "qud": [
           {
@@ -1161,6 +1391,35 @@
           {
            "sleep": 1.0
           }
+         ],
+         "raves": [
+          {
+           "goto": "in_game"
+          },
+          {
+           "activate": "Raves of Qud"
+          },
+          {
+           "key": "f2",
+           "window": "Raves of Qud"
+          },
+          {
+           "sleep": 0.8
+          },
+          {
+           "click": {
+            "window": "Raves of Qud",
+            "x": 1420,
+            "y": 136
+           }
+          },
+          {
+           "assert": {
+            "scene": "status_reputation",
+            "app": "raves"
+           },
+           "timeout": 8
+          }
          ]
         }
        },
@@ -1168,10 +1427,16 @@
         "id": "status_messagelog",
         "label": "messagelog",
         "done": {
-         "qud": 0.5,
-         "raves": 0.0
+         "qud": 0.9,
+         "raves": 0.8
         },
-        "detect": {},
+        "detect": {
+         "raves": [
+          {
+           "scene": "status_messagelog"
+          }
+         ]
+        },
         "goto": {
          "qud": [
           {
@@ -1196,10 +1461,67 @@
           {
            "sleep": 1.0
           }
+         ],
+         "raves": [
+          {
+           "goto": "in_game"
+          },
+          {
+           "activate": "Raves of Qud"
+          },
+          {
+           "key": "f2",
+           "window": "Raves of Qud"
+          },
+          {
+           "sleep": 0.8
+          },
+          {
+           "click": {
+            "window": "Raves of Qud",
+            "x": 1615,
+            "y": 136
+           }
+          },
+          {
+           "assert": {
+            "scene": "status_messagelog",
+            "app": "raves"
+           },
+           "timeout": 8
+          }
          ]
         }
        }
-      ]
+      ],
+      "goto": {
+       "qud": [
+        {
+         "goto": "in_game"
+        },
+        {
+         "activate": "CavesOfQud"
+        },
+        {
+         "click": {
+          "window": "CavesOfQud",
+          "x": 1729,
+          "y": 70,
+          "hover": true
+         }
+        },
+        {
+         "sleep": 1.2
+        },
+        {
+         "assert": {
+          "scene": "StatusScreensScreen",
+          "app": "qud"
+         },
+         "timeout": 10
+        }
+       ]
+      }
      }
     ]
    },
