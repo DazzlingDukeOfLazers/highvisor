@@ -471,6 +471,24 @@ async function qudGodmode() {
   }
 }
 
+// Grant XP through the 'xp:<n>' wish (same bridge path as godmode). Levels the
+// player up so point-spend workflows (mutations/attributes) are testable on a
+// fresh save. The wish result lands in the game's own message log.
+async function qudXp() {
+  const btn = $("qud-xp");
+  const amt = parseInt($("xp-amount").value || "0", 10);
+  if (!(amt > 0)) { alert("enter an XP amount"); return; }
+  btn.disabled = true;
+  try {
+    const r = await rpc("qudwish", { wish: "xp:" + amt });
+    if (!r.ok) alert("xp wish failed: " + (r.error || "?"));
+  } catch (e) {
+    alert("xp wish failed: " + (e.message || e));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // Start the latest Raves build and arrange it. Launches via the `raves` launcher
 // (which itself spawns Caves of Qud borderless — see launch.json / QudLauncher),
 // waits for BOTH windows to appear (Qud's takes ~20s), then tiles at 1920×1080.
@@ -1002,6 +1020,7 @@ async function init() {
     (b.onclick = () => userTestLayout(+b.dataset.w, +b.dataset.h)));
   $("raves-1to1").onclick = toggleRaves1to1;
   $("qud-godmode").onclick = qudGodmode;
+  $("qud-xp").onclick = qudXp;
   $("hv-abort").onclick = async () => {
     try { await rpc("abort_control", {}); } catch (e) { alert("abort failed: " + (e.message || e)); }
   };

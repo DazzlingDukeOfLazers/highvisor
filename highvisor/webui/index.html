@@ -61,6 +61,12 @@
                     title="toggle Qud godmode (the 'godmode' wish via the Raves bridge) — invulnerable for roam-and-test; click again to turn off. Qud must be in-game. Costs one game turn.">⚡ Qud: godmode (toggle)</button>
           </div>
           <div class="layout-row">
+            <input id="xp-amount" type="number" value="1000" min="1"
+                   title="XP to grant (level 1→2 needs 220; 1000 ≈ 3 levels = 3 mutation points on a mutant)">
+            <button id="qud-xp"
+                    title="grant XP (the 'xp:&lt;n&gt;' wish via the Raves bridge) — levels the player for testing mutation/attribute-point flows. Qud must be in-game. Costs one game turn.">✨ Qud: +XP</button>
+          </div>
+          <div class="layout-row">
             <select id="layoutsel"></select>
             <button id="applylayout">apply</button>
           </div>
