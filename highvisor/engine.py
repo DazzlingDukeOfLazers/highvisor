@@ -531,6 +531,7 @@ class Engine:
                 except Exception:
                     meta = {}
                 out.append({"guid": guid, "name": meta.get("Name", "?"),
+                            "id": meta.get("ID", guid),
                             "location": meta.get("Location", "?"),
                             "mode": meta.get("GameMode", "?"),
                             "saved": meta.get("SaveTime", "?"),
@@ -582,39 +583,46 @@ class Engine:
 
     # ------------------------------------------------------- load save BY NAME
     def _load_save(self, b, name):
-        """Drive Qud to load a NAMED save — no top-row roulette. Row computed from the
-        disk metadata (see _qud_saves); restarts Qud to the title first if needed."""
+        """Load a NAMED Qud save via the mod's `loadsave {id}` bridge command — exact
+        ID match, no coordinate clicks, no focus stealing. (The old row-click drive
+        loaded the wrong save when the picker's order drifted from disk mtime order.)
+        The mod completes Qud's own picker completionSource, opening the picker itself
+        from the title if needed; it REFUSES while a game is live, so restart first."""
+        import json as _json
+        import socket as _socket
+        import struct as _struct
         import time as _t
         saves = self._qud_saves()
         if not saves.get("ok"):
             return saves
-        row = next((s["row"] for s in saves["saves"] if s["name"] == name), None)
-        if row is None:
+        sid = next((s["id"] for s in saves["saves"] if s["name"] == name), None)
+        if sid is None:
             return {"ok": False, "error": "no save named %r" % name,
                     "have": [s["name"] for s in saves["saves"]]}
         st = (self._gamestate(b).get("states", {}).get("qud") or {})
-        if st.get("node") != "title":
+        # Restart on a LIVE GAME even when the tree says title: after an unfocused load
+        # Qud's view (and scene report) can stay "MainMenu" while a game runs — the mod
+        # refuses loadsave mid-game, so trust the game_live probe over the scene.
+        if st.get("node") != "title" or (st.get("signals") or {}).get("game_live"):
             r = self._restart_app(b, "qud")
             if not r.get("ok"):
                 return {"ok": False, "error": "restart failed", "detail": r}
             _t.sleep(8)   # title settle after the window appears
-        gerr = self.guard.begin()
-        if gerr:
-            return {"ok": False, "error": gerr}
-        win = "CavesOfQud"
-        b.activate(win)
-        _t.sleep(1.0)
-        b.click(win, 958, 580, hover=True)              # Continue
-        _t.sleep(2.5)
-        self.guard.begin()                               # keep the session alive
-        b.click(win, 975, 193 + row * 124, hover=True)   # the named save's row
+        from .apps import PROFILES
+        port = PROFILES.get("qud", {}).get("port", 48710)
+        payload = _json.dumps({"type": "command", "name": "loadsave", "id": sid}).encode("utf-8")
+        try:
+            with _socket.create_connection(("127.0.0.1", port), timeout=3) as s:
+                s.sendall(_struct.pack(">I", len(payload)) + payload)
+        except OSError as e:
+            return {"ok": False, "error": "Qud bridge :%s unreachable (%s)" % (port, e)}
         deadline = _t.time() + 40
         while _t.time() < deadline:
             stq = (self._gamestate(b).get("states", {}).get("qud") or {})
             if stq.get("node") == "in_game":
-                return {"ok": True, "name": name, "row": row}
+                return {"ok": True, "name": name, "id": sid, "via": "bridge loadsave"}
             _t.sleep(1.5)
-        return {"ok": False, "error": "load did not reach in_game", "name": name, "row": row}
+        return {"ok": False, "error": "load did not reach in_game", "name": name, "id": sid}
 
     def _gamestate(self, b, ocr=False):
         """Evaluate the game state-machine tree against live signals for each app.
