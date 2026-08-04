@@ -245,6 +245,9 @@ class Engine:
         if op == P.OP_QUDWISH:
             return self._qudwish(req.get("wish", ""))
 
+        if op == P.OP_QUDBACK:
+            return self._qud_bridge("uiback")
+
         if op == P.OP_QUD_SAVES:
             return self._qud_saves()
 

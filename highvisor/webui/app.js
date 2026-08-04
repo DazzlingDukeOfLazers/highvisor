@@ -471,6 +471,22 @@ async function qudGodmode() {
   }
 }
 
+// First-party Escape for Qud's modern menus (the mod's uiback bridge command) —
+// closes screens that ignore synthesized keys, including a STUCK status screen
+// whose nav context died (seen after a mutation-buy popup).
+async function qudBack() {
+  const btn = $("qud-back");
+  btn.disabled = true;
+  try {
+    const r = await rpc("qudback", {});
+    if (!r.ok) alert("uiback failed: " + (r.error || "?"));
+  } catch (e) {
+    alert("uiback failed: " + (e.message || e));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // Grant XP through the 'xp:<n>' wish (same bridge path as godmode). Levels the
 // player up so point-spend workflows (mutations/attributes) are testable on a
 // fresh save. The wish result lands in the game's own message log.
@@ -1021,6 +1037,7 @@ async function init() {
   $("raves-1to1").onclick = toggleRaves1to1;
   $("qud-godmode").onclick = qudGodmode;
   $("qud-xp").onclick = qudXp;
+  $("qud-back").onclick = qudBack;
   $("hv-abort").onclick = async () => {
     try { await rpc("abort_control", {}); } catch (e) { alert("abort failed: " + (e.message || e)); }
   };
