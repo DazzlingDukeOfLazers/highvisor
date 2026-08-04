@@ -518,8 +518,15 @@ class Engine:
         Row order = mtime desc, matching the picker (verified against it)."""
         import json as _json
         import os as _os
-        root = _os.path.expanduser(
-            "~/Library/Application Support/com.FreeholdGames.CavesOfQud/Synced/Saves")
+        # Qud's data dir differs per OS (Unity persistentDataPath): the Mac uses
+        # the bundle-id Library path, Windows uses AppData/LocalLow/<company>.
+        if _os.name == "nt":
+            qroot = _os.path.join(_os.path.expanduser("~"), "AppData", "LocalLow",
+                                  "Freehold Games", "CavesOfQud")
+        else:
+            qroot = _os.path.expanduser(
+                "~/Library/Application Support/com.FreeholdGames.CavesOfQud")
+        root = _os.path.join(qroot, "Synced", "Saves")
         out = []
         try:
             for guid in _os.listdir(root):

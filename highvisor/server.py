@@ -212,6 +212,16 @@ def _watch_sources_and_reexec():
             if m != m0:
                 print("[hv] source changed: %s — re-exec" % os.path.basename(p), flush=True)
                 os.chdir(os.path.dirname(root))   # repo root, so -m resolves
+                if os.name == "nt":
+                    # Windows execv is spawn-and-exit with broken console/redirect
+                    # inheritance — a burst of changes (a git merge) killed the daemon.
+                    # Spawn a DETACHED successor after a settle, then exit hard.
+                    import subprocess
+                    time.sleep(1.0)   # let a multi-file change (merge) finish writing
+                    subprocess.Popen([sys.executable, "-m", "highvisor.server"] + sys.argv[1:],
+                                     creationflags=0x00000008 | 0x00000200,  # DETACHED | NEW_PROCESS_GROUP
+                                     close_fds=True)
+                    os._exit(0)
                 os.execv(sys.executable, [sys.executable, "-m", "highvisor.server"] + sys.argv[1:])
 
 
