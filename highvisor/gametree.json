@@ -904,7 +904,7 @@
      {
       "id": "status_screens",
       "label": "Status screens (8-tab in-game menu)",
-      "note": "Qud: ONE scene (StatusScreensScreen) for all tabs; per-tab detection needs the planned heartbeat statusTab export. Tab clicks REQUIRE hover-first (hv click --hover) \u2014 plain clicks only hover-select. Plan: raves docs/status-screens-plan.md Qud opener: hover-click the person icon (1729,70).",
+      "note": "Qud: ONE scene (StatusScreensScreen) for all tabs; per-tab detection needs the planned heartbeat statusTab export. Tab clicks REQUIRE hover-first (hv click --hover) \u2014 plain clicks only hover-select. Plan: raves docs/status-screens-plan.md Qud opener: hover-click the person icon (1729,70). Raves opener keys = Qud's Commands.xml defaults (k/x/e/i/n/j/q, ctrl+f).",
       "done": {
        "qud": 0.5,
        "raves": 0.0
@@ -980,18 +980,8 @@
            "activate": "Raves of Qud"
           },
           {
-           "key": "f2",
+           "key": "k",
            "window": "Raves of Qud"
-          },
-          {
-           "sleep": 0.8
-          },
-          {
-           "click": {
-            "window": "Raves of Qud",
-            "x": 277,
-            "y": 136
-           }
           },
           {
            "assert": {
@@ -1050,18 +1040,8 @@
            "activate": "Raves of Qud"
           },
           {
-           "key": "f2",
+           "key": "x",
            "window": "Raves of Qud"
-          },
-          {
-           "sleep": 0.8
-          },
-          {
-           "click": {
-            "window": "Raves of Qud",
-            "x": 500,
-            "y": 136
-           }
           },
           {
            "assert": {
@@ -1120,18 +1100,8 @@
            "activate": "Raves of Qud"
           },
           {
-           "key": "f2",
+           "key": "e",
            "window": "Raves of Qud"
-          },
-          {
-           "sleep": 0.8
-          },
-          {
-           "click": {
-            "window": "Raves of Qud",
-            "x": 745,
-            "y": 136
-           }
           },
           {
            "assert": {
@@ -1190,18 +1160,8 @@
            "activate": "Raves of Qud"
           },
           {
-           "key": "f2",
+           "key": "n",
            "window": "Raves of Qud"
-          },
-          {
-           "sleep": 0.8
-          },
-          {
-           "click": {
-            "window": "Raves of Qud",
-            "x": 925,
-            "y": 136
-           }
           },
           {
            "assert": {
@@ -1260,18 +1220,8 @@
            "activate": "Raves of Qud"
           },
           {
-           "key": "f2",
+           "key": "j",
            "window": "Raves of Qud"
-          },
-          {
-           "sleep": 0.8
-          },
-          {
-           "click": {
-            "window": "Raves of Qud",
-            "x": 1095,
-            "y": 136
-           }
           },
           {
            "assert": {
@@ -1330,18 +1280,8 @@
            "activate": "Raves of Qud"
           },
           {
-           "key": "f2",
+           "key": "q",
            "window": "Raves of Qud"
-          },
-          {
-           "sleep": 0.8
-          },
-          {
-           "click": {
-            "window": "Raves of Qud",
-            "x": 1250,
-            "y": 136
-           }
           },
           {
            "assert": {
@@ -1400,18 +1340,8 @@
            "activate": "Raves of Qud"
           },
           {
-           "key": "f2",
+           "key": "ctrl+f",
            "window": "Raves of Qud"
-          },
-          {
-           "sleep": 0.8
-          },
-          {
-           "click": {
-            "window": "Raves of Qud",
-            "x": 1420,
-            "y": 136
-           }
           },
           {
            "assert": {
@@ -1474,7 +1404,7 @@
            "window": "Raves of Qud"
           },
           {
-           "sleep": 0.8
+           "sleep": 0.6
           },
           {
            "click": {
