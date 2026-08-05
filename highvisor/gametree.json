@@ -1173,6 +1173,136 @@
            "raves": 0.6
           },
           "detect": {}
+         },
+         {
+          "id": "equipment_category_image",
+          "label": "Category cell: image",
+          "note": "parity leaf filter_image[*] \u2014 Qud's categoryImageMap sprite, tan two-tone.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.5
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_category_frame",
+          "label": "Category cell: frame",
+          "note": "parity leaf filter_frame[*] \u2014 corner-loop chrome (ported 2026-08-04).",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.8
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_category_hover",
+          "label": "Category cell: hover",
+          "note": "hover highlight on a filter cell \u2014 NOT IMPLEMENTED in Raves yet.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.0
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_category_select",
+          "label": "Category cell: select",
+          "note": "gold frame + list filtering on click; multi-select mirrors enabledCategories.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.8
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_category_order",
+          "label": "Category strip: order",
+          "note": "filterOrder = category of the alphabetically-first item; equipped items included.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.9
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_category_water",
+          "label": "Category header: water/drams",
+          "note": "the $drams figure in the header line (GetFreeDrams).",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.7
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_category_weight",
+          "label": "Category header: weight",
+          "note": "carried/max lbs in the header; the header block placement is still ~2px off.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.6
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_list_categories",
+          "label": "List: categories",
+          "note": "category rows with [-]/[+] and Qud's own name colouring.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.8
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_list_category_weight",
+          "label": "List: category weight",
+          "note": "the |n lbs.| column, right-aligned at x1673.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.9
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_line_icon",
+          "label": "Line item: icon",
+          "note": "per-row item tile from RenderForUI(\"Inventory\").",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.7
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_line_text",
+          "label": "Line item: description text",
+          "note": "row label from GameObject.DisplayName incl. the nameless-item fallback.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.9
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_line_colors",
+          "label": "Line item: description colours",
+          "note": "Qud markup resolved through the palette + CP437 badge glyphs.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.9
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_scrolling",
+          "label": "List: scrolling",
+          "note": "wheel/PageUp/PageDown through the inventory; no capture-diff coverage yet.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.5
+          },
+          "detect": {}
          }
         ]
        },
