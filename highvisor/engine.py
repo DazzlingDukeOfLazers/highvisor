@@ -498,6 +498,27 @@ class Engine:
             return {"ok": False,
                     "error": "Qud bridge :%s unreachable (%s) — is Qud in-game?" % (port, e)}
 
+    def _qud_command(self, command):
+        """Push a named QUD command (CmdQuit, CmdEquipment, …) through the mod bridge.
+
+        Distinct from _qud_bridge, which names a MOD command: this one names a command
+        in Qud's own table, so it runs through Qud's command path and any UI it owns
+        opens for real. Binding-independent -- no key guessing.
+        """
+        import json as _json
+        import socket as _socket
+        import struct as _struct
+        from .apps import PROFILES
+        port = PROFILES.get("qud", {}).get("port", 48710)
+        payload = _json.dumps({"type": "command", "name": "command",
+                               "command": command}).encode("utf-8")
+        try:
+            with _socket.create_connection(("127.0.0.1", port), timeout=3) as s:
+                s.sendall(_struct.pack(">I", len(payload)) + payload)
+            return {"ok": True, "command": command}
+        except OSError as e:
+            return {"ok": False, "error": "qud bridge: %s" % e}
+
     def _qud_bridge(self, name):
         """Send a bare {"type":"command","name":...} frame to the Qud mod bridge
         (listener is up from the main menu on — ModSensitiveCacheInit). First-party
@@ -1047,13 +1068,35 @@ class Engine:
                 cond = step["dismiss"]
                 cur = (self._gamestate(b).get("states", {}).get(app) or {})
                 scene = (cur.get("signals") or {}).get("scene") or ""
-                want_scene = cond.get("scene", "")
-                if str(scene).lower() == str(want_scene).lower():
+                # `popup` conditions on the app's reported MODAL kind rather than its
+                # screen. Leaving a live game means answering a chain of confirms while
+                # the scene stays "in_game" throughout, so scene alone cannot tell the
+                # steps apart.
+                want_popup = cond.get("popup")
+                if want_popup is not None:
+                    have = str(((cur.get("extra") or {}).get("popup")) or "")
+                    hit = have.lower() == str(want_popup).lower()
+                else:
+                    hit = str(scene).lower() == str(cond.get("scene", "")).lower()
+                # What the step must CHANGE. Taking the pair, rather than the scene,
+                # is what lets one branch serve all three shapes: closing a screen
+                # moves the scene, raising a confirm moves the popup, and answering
+                # one moves the popup back -- CmdQuit does the middle, and demanding
+                # a scene change failed it even though it had worked.
+                before = (str(scene).lower(),
+                          str(((cur.get("extra") or {}).get("popup")) or "").lower())
+                if hit:
                     cfg = gametree.apps(tree).get(app, {})
                     win = self._find_win(b.list_targets(), cfg.get("window"))
                     if win is None:
                         return fail(step, "dismiss: no window for %s" % app)
-                    if cond.get("bridge"):
+                    if cond.get("command"):
+                        # a named QUD command through the mod (CmdQuit &c) -- the
+                        # binding-independent way to start a flow the UI owns
+                        r = self._qud_command(cond["command"])
+                        if not r.get("ok"):
+                            return fail(step, "dismiss command: %s" % r.get("error"))
+                    elif cond.get("bridge"):
                         # first-party dismissal — no OCR, no coords, no focus steal
                         r = self._qud_bridge(cond["bridge"])
                         if not r.get("ok"):
@@ -1080,21 +1123,33 @@ class Engine:
                         ox, oy = cond.get("offset") or (0, 0)
                         b.click(win.id, int((bx + bw / 2.0) / sc) + int(ox),
                                 int((by + bh / 2.0) / sc) + int(oy), hover=True)
+                    elif cond.get("keys"):
+                        # A SEQUENCE, verified once at the end. Needed because some keys
+                        # move a selection INSIDE a modal rather than answering it: the
+                        # Right that shifts a confirm from Yes to No changes nothing
+                        # observable, so verifying after it fails a step that worked.
+                        for k in cond["keys"]:
+                            b.key(win.id, k, focus=True)
+                            time.sleep(0.5)
                     else:
                         b.key(win.id, cond.get("key", "Escape"), focus=True)
-                    # verify we actually LEFT the scene — a dismiss that didn't take
-                    # must stop the recipe, or later clicks land on the wrong screen
+                    # verify the dismissal actually TOOK -- one that did not must stop
+                    # the recipe, or later steps land on the wrong screen. For a popup
+                    # condition the thing that must change is the modal, not the scene:
+                    # answering a quit confirm leaves the scene exactly where it was.
                     left = False
-                    for _ in range(6):
+                    for _ in range(8):
                         time.sleep(0.7)
                         cur2 = (self._gamestate(b).get("states", {}).get(app) or {})
-                        now_scene = (cur2.get("signals") or {}).get("scene") or ""
-                        if str(now_scene).lower() != str(want_scene).lower():
+                        now = (str((cur2.get("signals") or {}).get("scene") or "").lower(),
+                               str(((cur2.get("extra") or {}).get("popup")) or "").lower())
+                        if now != before:
                             left = True
                             break
+                    what = ("popup %s" % want_popup) if want_popup is not None else scene
                     if not left:
-                        return fail(step, "dismiss clicked but still on %s" % scene)
-                    steps.append({"step": step, "ok": True, "detail": "dismissed %s" % scene})
+                        return fail(step, "dismiss ran but %s is still up" % what)
+                    steps.append({"step": step, "ok": True, "detail": "dismissed %s" % what})
                 else:
                     steps.append({"step": step, "ok": True, "detail": "not present"})
             elif "assert" in step:

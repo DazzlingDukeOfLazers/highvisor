@@ -132,6 +132,37 @@
       },
       {
        "dismiss": {
+        "popup": "message",
+        "key": "Escape"
+       },
+       "note": "CANCEL a stray modal first. A popup left over from an earlier run blocks CmdQuit entirely -- the command goes nowhere and the step then fails for lack of any change. Escape is Qud's Cancel on these confirms, so this clears the way without ANSWERING anything."
+      },
+      {
+       "dismiss": {
+        "scene": "in_game",
+        "command": "CmdQuit"
+       },
+       "note": "LEAVE A LIVE GAME. Neither app's title recipe could, so `goto title` from in_game failed and left the game running -- and every recipe that starts with {goto: title} inherited that. CmdQuit runs Qud's own quit, whose UI mirrors into Raves, so the confirms below are answered on the Raves window."
+      },
+      {
+       "dismiss": {
+        "popup": "message",
+        "key": "space"
+       },
+       "note": "'Are you sure you want to quit?' -> [Space] Yes"
+      },
+      {
+       "dismiss": {
+        "popup": "message",
+        "keys": [
+         "Right",
+         "space"
+        ]
+       },
+       "note": "'Do you want to save first?' -> Right moves off Yes, Space answers NO. Deliberate: Yes would overwrite the fixture save with whatever state the harness drove the character into, quietly destroying the reference every parity capture is measured against. One step, because Right alone changes nothing observable."
+      },
+      {
+       "dismiss": {
         "scene": "mods",
         "key": "Escape"
        },

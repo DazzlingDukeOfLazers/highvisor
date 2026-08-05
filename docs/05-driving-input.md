@@ -168,3 +168,39 @@ never helped and only a restart appeared to fix it.
 
 The fix belongs in the app, per the standing rule: **when detection is wrong, teach the app to
 report the scene.** `LoadGameScreen` needs a `UiState.set_scene` call.
+
+
+## Leaving a live game: `goto title` is reversible now (2026-08-05)
+
+Neither app's `title` recipe could exit a running game — it self-healed menus and popups only —
+so `goto title` from `in_game` failed and left the game up, and every recipe beginning
+`{goto: title}` inherited that. The goto trace is what made it visible.
+
+Raves' recipe now runs Qud's own quit and answers the confirms on the RAVES window, because the
+popup mirror puts them there:
+
+    dismiss {popup: message, key: Escape}          cancel a stray modal first
+    dismiss {scene: in_game, command: CmdQuit}     Qud's own quit command
+    dismiss {popup: message, key: space}           "Are you sure you want to quit?" -> Yes
+    dismiss {popup: message, keys: [Right, space]} "Do you want to save first?"     -> NO
+
+**Answering No is deliberate and load-bearing.** Yes would overwrite the fixture save with
+whatever state the harness had driven the character into — quietly destroying the reference every
+parity capture is measured against. Verified: after a full round trip the save's timestamp is
+unchanged.
+
+Three primitives were added to `dismiss` to express this, each because the flow proved a gap:
+
+| addition | why |
+|---|---|
+| `popup:` condition | leaving a game means answering a chain of confirms while the SCENE never changes, so scene alone cannot tell the steps apart |
+| `command:` action | a named QUD command through the mod, so the flow starts through Qud's own command path instead of guessed keys |
+| `keys:` sequence | some keys move a selection INSIDE a modal rather than answering it — the Right that shifts a confirm from Yes to No changes nothing observable, and verifying after it fails a step that worked |
+
+The postcondition for a dismiss is now that the app's (scene, popup) PAIR changed, which is what
+lets one branch serve all three shapes: closing a screen moves the scene, raising a confirm moves
+the popup, answering one moves it back.
+
+**Still restart-based:** Qud's own `title` recipe. `_load_save` restarts Qud to reach the title,
+which works and is untouched here; Qud's modern UI ignores synthesized keys, so its confirms
+cannot be driven the same way unless Raves is up to mirror them.
