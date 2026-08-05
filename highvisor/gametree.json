@@ -1,1868 +1,1908 @@
 {
- "version": 1,
- "note": "Canonical game state-machine tree (one source, three views). done[app] = 0..1, how finished our 1:1 work is on that screen for that app (Qud = reference/how well we detect+drive it; Raves = render/impl fidelity). Edit freely; the cockpit reloads on file change. detect[app] recognises 'we are here' from live signals: game_live (Qud's 48710 bridge pushes a snapshot on connect ONLY when a game is actually running \u2014 the true menu-vs-in-game signal; the raw port is open even at the main menu, so it can't tell them apart), port (raw listener open = modded Qud alive), and ocr_any (case-insensitive substrings in an OCR of the window). A node matches when all its conditions hold; the DEEPEST match wins. Conditions needing OCR only match on an OCR-enabled poll, so cheap polls fall back to the coarsest ancestor.",
- "apps": {
-  "qud": {
-   "label": "Qud",
-   "window": "CavesOfQud",
-   "port": 48710,
-   "state_file": "~/Library/Application Support/RavesOfQud/qud_state.json",
-   "launcher": "qud_solo"
-  },
-  "raves": {
-   "label": "Raves",
-   "window": "Raves of Qud",
-   "state_file": "~/Library/Application Support/RavesOfQud/raves_state.json",
-   "launcher": "raves"
-  }
- },
- "root": {
-  "id": "root",
-  "label": "Game",
-  "children": [
-   {
-    "id": "freehold",
-    "label": "Freehold Games splash",
-    "note": "transient boot splash \u2014 no reliable detector yet",
-    "done": {
-     "qud": 1.0,
-     "raves": 0.0
+  "version": 1,
+  "note": "Canonical game state-machine tree (one source, three views). done[app] = 0..1, how finished our 1:1 work is on that screen for that app (Qud = reference/how well we detect+drive it; Raves = render/impl fidelity). Edit freely; the cockpit reloads on file change. detect[app] recognises 'we are here' from live signals: game_live (Qud's 48710 bridge pushes a snapshot on connect ONLY when a game is actually running \u2014 the true menu-vs-in-game signal; the raw port is open even at the main menu, so it can't tell them apart), port (raw listener open = modded Qud alive), and ocr_any (case-insensitive substrings in an OCR of the window). A node matches when all its conditions hold; the DEEPEST match wins. Conditions needing OCR only match on an OCR-enabled poll, so cheap polls fall back to the coarsest ancestor.",
+  "apps": {
+    "qud": {
+      "label": "Qud",
+      "window": "CavesOfQud",
+      "port": 48710,
+      "state_file": "~/Library/Application Support/RavesOfQud/qud_state.json",
+      "launcher": "qud_solo"
     },
-    "detect": {}
-   },
-   {
-    "id": "title",
-    "label": "Title Screen",
-    "note": "children are the SCENE CONTAINERS (each scored individually for 1:1 fidelity); the menu options nest under menu_box (they're both its contents and the nav edges to other scenes).",
-    "done": {
-     "qud": 1.0,
-     "raves": 0.9
-    },
-    "detect": {
-     "qud": [
-      {
-       "scene": [
-        "MainMenu",
-        "title"
-       ]
-      },
-      {
-       "game_live": false
-      }
-     ],
-     "raves": [
-      {
-       "scene": "title"
-      },
-      {
-       "ocr_any": [
-        "caves of qud",
-        "new game",
-        "continue",
-        "records",
-        "modding toolkit"
-       ]
-      }
-     ]
-    },
-    "goto": {
-     "qud": [
-      {
-       "launch": "qud_solo",
-       "unless_running": true
-      },
-      {
-       "wait_window": "CavesOfQud",
-       "timeout": 60
-      },
-      {
-       "dismiss": {
-        "scene": "play",
-        "command": "CmdQuit",
-        "answers": [
-         "Yes",
-         "No"
-        ]
-       },
-       "note": "LEAVE A LIVE GAME, first-party throughout: CmdQuit is pushed through Qud's own command path and the confirms are answered by BUTTON via the mod, so nothing here depends on synthesized keys -- which Qud's modern UI ignores outright. Yes to 'are you sure you want to quit', then NO to 'do you want to save first': Yes there would overwrite the fixture save with whatever state the harness drove the character into, destroying the reference every parity capture is measured against. Previously the only way out of a live game was a restart (see _load_save)."
-      },
-      {
-       "dismiss": {
-        "scene": "PopupMessage",
-        "bridge": "uiback"
-       },
-       "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up. That is what made the equipment key look broken for a whole session. Driving popups over the bridge is what leaves them, so any recipe that may follow one should clear it first; uiback does, verified."
-      },
-      {
-       "dismiss": {
-        "scene": "DynamicPopupMessage",
-        "bridge": "uiback"
-       },
-       "note": "self-heal: cancel a stray popup (quit-confirm etc.)"
-      },
-      {
-       "dismiss": {
-        "scene": "ModernHighScores",
-        "bridge": "uiback"
-       },
-       "note": "self-heal: back out of a submenu left open"
-      },
-      {
-       "dismiss": {
-        "scene": "ModernOptionsMenu",
-        "bridge": "uiback"
-       },
-       "note": "self-heal: back out of a submenu left open"
-      },
-      {
-       "dismiss": {
-        "scene": "ModManager",
-        "bridge": "uiback"
-       },
-       "note": "self-heal: back out of a submenu left open"
-      },
-      {
-       "dismiss": {
-        "scene": "ModernSaveManagement",
-        "bridge": "uiback"
-       },
-       "note": "self-heal: back out of a submenu left open"
-      },
-      {
-       "assert": {
-        "scene": "MainMenu"
-       },
-       "timeout": 20
-      }
-     ],
-     "raves": [
-      {
-       "launch": "raves_solo",
-       "unless_running": true
-      },
-      {
-       "wait_window": "Raves of Qud",
-       "timeout": 30
-      },
-      {
-       "dock": "Raves of Qud",
-       "note": "stack into the standard slot above Qud (fresh launches land off-slot)"
-      },
-      {
-       "dismiss": {
-        "popup": "message",
-        "key": "Escape"
-       },
-       "note": "CANCEL a stray modal first. A popup left over from an earlier run blocks CmdQuit entirely -- the command goes nowhere and the step then fails for lack of any change. Escape is Qud's Cancel on these confirms, so this clears the way without ANSWERING anything."
-      },
-      {
-       "dismiss": {
-        "scene": "in_game",
-        "command": "CmdQuit"
-       },
-       "note": "LEAVE A LIVE GAME. Neither app's title recipe could, so `goto title` from in_game failed and left the game running -- and every recipe that starts with {goto: title} inherited that. CmdQuit runs Qud's own quit, whose UI mirrors into Raves, so the confirms below are answered on the Raves window."
-      },
-      {
-       "dismiss": {
-        "popup": "message",
-        "key": "space"
-       },
-       "note": "'Are you sure you want to quit?' -> [Space] Yes"
-      },
-      {
-       "dismiss": {
-        "popup": "message",
-        "keys": [
-         "Right",
-         "space"
-        ]
-       },
-       "note": "'Do you want to save first?' -> Right moves off Yes, Space answers NO. Deliberate: Yes would overwrite the fixture save with whatever state the harness drove the character into, quietly destroying the reference every parity capture is measured against. One step, because Right alone changes nothing observable."
-      },
-      {
-       "dismiss": {
-        "scene": "mods",
-        "key": "Escape"
-       },
-       "note": "self-heal: back out of a submenu left open"
-      },
-      {
-       "dismiss": {
-        "scene": "options",
-        "key": "Escape"
-       },
-       "note": "self-heal: back out of a submenu left open"
-      },
-      {
-       "dismiss": {
-        "scene": "records",
-        "key": "Escape"
-       },
-       "note": "self-heal: back out of a submenu left open"
-      },
-      {
-       "dismiss": {
-        "scene": "loadgame",
-        "key": "Escape"
-       },
-       "note": "self-heal: back out of the Continue/Load Game picker. Its omission is why goto got STUCK there: the picker is a descendant of title, so the recipe's final assert passed by containment while the app never left, and the next step then clicked for a 'Continue' that is not on the picker."
-      },
-      {
-       "dismiss": {
-        "scene": "quit_dialog",
-        "key": "Escape"
-       }
-      },
-      {
-       "assert": {
-        "node": "title"
-       },
-       "timeout": 20
-      }
-     ]
-    },
-    "children": [
-     {
-      "id": "background",
-      "label": "Background (cave art)",
-      "done": {
-       "qud": 1.0,
-       "raves": 0.85
-      },
-      "detect": {}
-     },
-     {
-      "id": "logo",
-      "label": "Logo (CAVES OF QUD wordmark)",
-      "done": {
-       "qud": 1.0,
-       "raves": 0.8
-      },
-      "detect": {}
-     },
-     {
-      "id": "menu_box",
-      "label": "Option Box (frame + hieroglyph header)",
-      "done": {
-       "qud": 1.0,
-       "raves": 0.9
-      },
-      "detect": {},
-      "children": [
-       {
-        "id": "new_game",
-        "label": "New Game \u2192 Character Creation",
-        "done": {
-         "qud": 0.6,
-         "raves": 0.4
-        },
-        "detect": {
-         "qud": {
-          "ocr_any": [
-           "character creation",
-           "choose genotype",
-           "choose preset",
-           "choose calling",
-           "mutations",
-           "pregens"
-          ],
-          "game_live": false
-         },
-         "raves": [
-          {
-           "scene": [
-            "chargen_game_mode",
-            "chargen_genotype",
-            "chargen_subtype"
-           ]
-          },
-          {
-           "ocr_any": [
-            "character creation",
-            "choose genotype",
-            "choose preset",
-            "genotype"
-           ]
-          }
-         ]
-        },
-        "children": [
-         {
-          "id": "game_mode",
-          "label": "Choose Game Mode",
-          "done": {
-           "qud": 0.7,
-           "raves": 0.85
-          },
-          "detect": {
-           "raves": [
-            {
-             "scene": "chargen_game_mode"
-            }
-           ]
-          },
-          "goto": {
-           "raves": [
-            {
-             "goto": "title"
-            },
-            {
-             "activate": "Raves of Qud"
-            },
-            {
-             "click_text": "New Game",
-             "window": "Raves of Qud"
-            },
-            {
-             "assert": {
-              "scene": "chargen_game_mode"
-             },
-             "timeout": 12
-            }
-           ],
-           "qud": [
-            {
-             "goto": "title"
-            },
-            {
-             "activate": "CavesOfQud"
-            },
-            {
-             "click_text": "New Game",
-             "window": "CavesOfQud"
-            },
-            {
-             "sleep": 1.0
-            },
-            {
-             "assert": {
-              "ocr_contains": "game mode"
-             },
-             "timeout": 15
-            }
-           ]
-          }
-         },
-         {
-          "id": "genotype",
-          "label": "Choose Genotype",
-          "done": {
-           "qud": 0.6,
-           "raves": 0.75
-          },
-          "detect": {
-           "raves": [
-            {
-             "scene": "chargen_genotype"
-            }
-           ]
-          },
-          "goto": {
-           "raves": [
-            {
-             "goto": "game_mode"
-            },
-            {
-             "key": "enter",
-             "window": "Raves of Qud",
-             "note": "confirm the default card (Classic)"
-            },
-            {
-             "assert": {
-              "scene": "chargen_genotype"
-             },
-             "timeout": 10
-            }
-           ]
-          }
-         },
-         {
-          "id": "calling",
-          "label": "Calling / Subtype",
-          "done": {
-           "qud": 0.5,
-           "raves": 0.2
-          },
-          "detect": {
-           "raves": [
-            {
-             "scene": "chargen_subtype"
-            }
-           ]
-          },
-          "goto": {
-           "raves": [
-            {
-             "goto": "genotype"
-            },
-            {
-             "key": "enter",
-             "window": "Raves of Qud",
-             "note": "confirm the default genotype"
-            },
-            {
-             "assert": {
-              "scene": "chargen_subtype"
-             },
-             "timeout": 10
-            }
-           ]
-          }
-         },
-         {
-          "id": "attributes",
-          "label": "Attributes",
-          "done": {
-           "qud": 0.4,
-           "raves": 0.1
-          },
-          "detect": {}
-         },
-         {
-          "id": "embark",
-          "label": "Embark",
-          "done": {
-           "qud": 0.5,
-           "raves": 0.1
-          },
-          "detect": {}
-         }
-        ],
-        "goto": {
-         "raves": [
-          {
-           "goto": "game_mode"
-          }
-         ],
-         "qud": [
-          {
-           "goto": "title"
-          },
-          {
-           "activate": "CavesOfQud"
-          },
-          {
-           "click_text": "New Game",
-           "window": "CavesOfQud"
-          },
-          {
-           "sleep": 1.0
-          },
-          {
-           "assert": {
-            "ocr_contains": "game mode"
-           },
-           "timeout": 15
-          }
-         ]
-        }
-       },
-       {
-        "id": "continue",
-        "label": "Continue \u2192 Load Game",
-        "done": {
-         "qud": 0.9,
-         "raves": 0.6
-        },
-        "detect": {
-         "qud": [
-          {
-           "scene": [
-            "ModernSaveManagement"
-           ]
-          },
-          {
-           "ocr_any": [
-            "load game"
-           ],
-           "game_live": false
-          }
-         ],
-         "raves": [
-          {
-           "scene": "loadgame"
-          }
-         ]
-        },
-        "children": [
-         {
-          "id": "load_game",
-          "label": "Load Game (save picker)",
-          "done": {
-           "qud": 0.9,
-           "raves": 0.2
-          },
-          "detect": {}
-         }
-        ],
-        "note": "the Load Game picker; qud reports scene=ModernSaveManagement first-party (OCR fallback kept)",
-        "goto": {
-         "qud": [
-          {
-           "goto": "title"
-          },
-          {
-           "activate": "CavesOfQud"
-          },
-          {
-           "click_text": "Continue",
-           "window": "CavesOfQud"
-          },
-          {
-           "sleep": 1.0
-          },
-          {
-           "assert": {
-            "scene": "ModernSaveManagement"
-           },
-           "timeout": 15
-          }
-         ],
-         "raves": [
-          {
-           "goto": "title"
-          },
-          {
-           "activate": "Raves of Qud"
-          },
-          {
-           "click_text": "Continue",
-           "window": "Raves of Qud"
-          },
-          {
-           "assert": {
-            "scene": "loadgame"
-           },
-           "timeout": 12
-          }
-         ]
-        }
-       },
-       {
-        "id": "records",
-        "label": "Records",
-        "done": {
-         "qud": 0.3,
-         "raves": 0.0
-        },
-        "detect": {
-         "raves": [
-          {
-           "scene": "records"
-          }
-         ],
-         "qud": [
-          {
-           "scene": [
-            "ModernHighScores"
-           ]
-          }
-         ]
-        },
-        "goto": {
-         "raves": [
-          {
-           "goto": "title"
-          },
-          {
-           "activate": "Raves of Qud"
-          },
-          {
-           "click_text": "Records",
-           "window": "Raves of Qud"
-          },
-          {
-           "assert": {
-            "scene": "records"
-           },
-           "timeout": 12
-          }
-         ],
-         "qud": [
-          {
-           "goto": "title"
-          },
-          {
-           "activate": "CavesOfQud"
-          },
-          {
-           "click_text": "Records",
-           "window": "CavesOfQud"
-          },
-          {
-           "sleep": 1.0
-          },
-          {
-           "assert": {
-            "scene": "ModernHighScores"
-           },
-           "timeout": 15
-          }
-         ]
-        }
-       },
-       {
-        "id": "options",
-        "label": "Options",
-        "done": {
-         "qud": 0.4,
-         "raves": 0.2
-        },
-        "detect": {
-         "raves": [
-          {
-           "scene": "options"
-          }
-         ],
-         "qud": [
-          {
-           "scene": [
-            "ModernOptionsMenu"
-           ]
-          }
-         ]
-        },
-        "goto": {
-         "raves": [
-          {
-           "goto": "title"
-          },
-          {
-           "activate": "Raves of Qud"
-          },
-          {
-           "click_text": "Options",
-           "window": "Raves of Qud"
-          },
-          {
-           "assert": {
-            "scene": "options"
-           },
-           "timeout": 12
-          }
-         ],
-         "qud": [
-          {
-           "goto": "title"
-          },
-          {
-           "activate": "CavesOfQud"
-          },
-          {
-           "click_text": "Options",
-           "window": "CavesOfQud"
-          },
-          {
-           "sleep": 1.0
-          },
-          {
-           "assert": {
-            "scene": "ModernOptionsMenu"
-           },
-           "timeout": 15
-          }
-         ]
-        }
-       },
-       {
-        "id": "mods",
-        "label": "Mods",
-        "done": {
-         "qud": 0.3,
-         "raves": 0.0
-        },
-        "detect": {
-         "raves": [
-          {
-           "scene": "mods"
-          }
-         ],
-         "qud": [
-          {
-           "scene": [
-            "ModManager"
-           ]
-          }
-         ]
-        },
-        "goto": {
-         "raves": [
-          {
-           "goto": "title"
-          },
-          {
-           "activate": "Raves of Qud"
-          },
-          {
-           "click_text": "Mods",
-           "window": "Raves of Qud"
-          },
-          {
-           "assert": {
-            "scene": "mods"
-           },
-           "timeout": 12
-          }
-         ],
-         "qud": [
-          {
-           "goto": "title"
-          },
-          {
-           "activate": "CavesOfQud"
-          },
-          {
-           "click_text": "Mods",
-           "window": "CavesOfQud"
-          },
-          {
-           "sleep": 1.0
-          },
-          {
-           "assert": {
-            "scene": "ModManager"
-           },
-           "timeout": 15
-          }
-         ]
-        }
-       }
-      ]
-     },
-     {
-      "id": "secondary_links",
-      "label": "Secondary List (Redeem Code \u2026 Help)",
-      "done": {
-       "qud": 1.0,
-       "raves": 1.0
-      },
-      "detect": {}
-     },
-     {
-      "id": "version",
-      "label": "Version Corner (1.0.5 / build)",
-      "done": {
-       "qud": 1.0,
-       "raves": 1.0
-      },
-      "detect": {}
-     },
-     {
-      "id": "hint_bar",
-      "label": "Hint Bar (nav-icon / Space / Esc)",
-      "done": {
-       "qud": 1.0,
-       "raves": 0.95
-      },
-      "detect": {}
-     },
-     {
-      "id": "quit_button",
-      "label": "Quit X (upper-left)",
-      "done": {
-       "qud": 1.0,
-       "raves": 0.9
-      },
-      "detect": {}
-     },
-     {
-      "id": "quit_dialog",
-      "label": "Quit Confirm (Are you sure? Yes/No)",
-      "done": {
-       "qud": 1.0,
-       "raves": 0.92
-      },
-      "detect": {
-       "qud": {
-        "ocr_any": [
-         "are you sure you want to quit"
-        ],
-        "game_live": false
-       },
-       "raves": [
-        {
-         "scene": "quit_dialog"
-        },
-        {
-         "ocr_any": [
-          "are you sure you want to quit"
-         ]
-        }
-       ]
-      }
-     }
-    ]
-   },
-   {
-    "id": "in_game",
-    "label": "In-Game",
-    "done": {
-     "qud": 1.0,
-     "raves": 0.5
-    },
-    "detect": {
-     "qud": [
-      {
-       "scene": [
-        "play",
-        "Stage",
-        "in_game",
-        "PopupMessage",
-        "PopupText",
-        "PopupYesNo"
-       ]
-      },
-      {
-       "game_live": true
-      }
-     ],
-     "raves": [
-      {
-       "scene": "in_game"
-      },
-      {
-       "ocr_any": [
-        "make camp",
-        "abilities",
-        "active effects",
-        "message log",
-        "sprint"
-       ]
-      }
-     ]
-    },
-    "goto": {
-     "qud": [
-      {
-       "goto": "title"
-      },
-      {
-       "activate": "CavesOfQud"
-      },
-      {
-       "click_text": "Continue",
-       "window": "CavesOfQud"
-      },
-      {
-       "sleep": 1.0
-      },
-      {
-       "click_hover": [
-        900,
-        190
-       ],
-       "window": "CavesOfQud",
-       "note": "top save row in the Load Game picker"
-      },
-      {
-       "assert": {
-        "node": "in_game"
-       },
-       "timeout": 30
-      }
-     ],
-     "raves": [
-      {
-       "goto": "title"
-      },
-      {
-       "activate": "Raves of Qud"
-      },
-      {
-       "sleep": 2.5,
-       "note": "let Continue enable (heartbeat poll) after a fresh launch"
-      },
-      {
-       "click_text": "Continue",
-       "window": "Raves of Qud"
-      },
-      {
-       "dismiss": {
-        "scene": "loadgame",
-        "key": "space"
-       },
-       "note": "CONDITIONAL: Raves' Continue opens the LOAD GAME picker when there is a choice to make and goes straight in-game when there is not, so this presses the picker's [Space] select only if we actually landed there. The recipe predated the picker entirely, which is how a run could stop at it -- and the title recipe, equally unaware, could not back out."
-      },
-      {
-       "assert": {
-        "node": "in_game"
-       },
-       "timeout": 60
-      }
-     ]
-    },
-    "children": [
-     {
-      "id": "world",
-      "label": "Play Field / Holodeck",
-      "done": {
-       "qud": 1.0,
-       "raves": 0.5
-      },
-      "detect": {}
-     },
-     {
-      "id": "top_bar",
-      "label": "Top Status Bar",
-      "done": {
-       "qud": 1.0,
-       "raves": 0.7
-      },
-      "detect": {}
-     },
-     {
-      "id": "ability_bar",
-      "label": "Ability / Command Bar",
-      "done": {
-       "qud": 1.0,
-       "raves": 0.3
-      },
-      "detect": {}
-     },
-     {
-      "id": "message_log",
-      "label": "Message Log",
-      "done": {
-       "qud": 1.0,
-       "raves": 0.3
-      },
-      "detect": {}
-     },
-     {
-      "id": "inventory",
-      "label": "Inventory / Equipment",
-      "done": {
-       "qud": 1.0,
-       "raves": 0.1
-      },
-      "detect": {}
-     },
-     {
-      "id": "character_sheet",
-      "label": "Character Sheet",
-      "done": {
-       "qud": 1.0,
-       "raves": 0.1
-      },
-      "detect": {}
-     },
-     {
-      "id": "look",
-      "label": "Look / Examine",
-      "done": {
-       "qud": 1.0,
-       "raves": 0.2
-      },
-      "detect": {}
-     },
-     {
-      "id": "direction_pick",
-      "label": "Direction Picker",
-      "done": {
-       "qud": 1.0,
-       "raves": 0.4
-      },
-      "detect": {}
-     },
-     {
-      "id": "status_screens",
-      "label": "Status screens (8-tab in-game menu)",
-      "note": "Qud: ONE scene (StatusScreensScreen) for all tabs; per-tab detection needs the planned heartbeat statusTab export. Tab clicks REQUIRE hover-first (hv click --hover) \u2014 plain clicks only hover-select. Plan: raves docs/status-screens-plan.md Qud opener: hover-click the person icon (1729,70). Raves opener keys = Qud's Commands.xml defaults (k/x/e/i/n/j/q, ctrl+f).",
-      "done": {
-       "qud": 0.5,
-       "raves": 0.0
-      },
-      "detect": {
-       "qud": [
-        {
-         "scene": [
-          "StatusScreensScreen"
-         ]
-        }
-       ],
-       "raves": [
-        {
-         "scene": [
-          "status_skills",
-          "status_attributes",
-          "status_equipment",
-          "status_tinkering",
-          "status_journal",
-          "status_quests",
-          "status_reputation",
-          "status_messagelog"
-         ]
-        }
-       ]
-      },
-      "children": [
-       {
-        "id": "status_skills",
-        "label": "skills",
-        "done": {
-         "qud": 0.5,
-         "raves": 0.0
-        },
-        "detect": {
-         "raves": [
-          {
-           "scene": "status_skills"
-          }
-         ]
-        },
-        "goto": {
-         "qud": [
-          {
-           "assert": {
-            "scene": "StatusScreensScreen",
-            "app": "qud"
-           },
-           "timeout": 5,
-           "note": "open the status screen first (opener recipe TBD)"
-          },
-          {
-           "activate": "CavesOfQud"
-          },
-          {
-           "click_hover": [
-            277,
-            136
-           ],
-           "window": "CavesOfQud"
-          },
-          {
-           "sleep": 1.0
-          }
-         ],
-         "raves": [
-          {
-           "goto": "in_game"
-          },
-          {
-           "activate": "Raves of Qud"
-          },
-          {
-           "key": "k",
-           "window": "Raves of Qud"
-          },
-          {
-           "assert": {
-            "scene": "status_skills",
-            "app": "raves"
-           },
-           "timeout": 8
-          }
-         ]
-        }
-       },
-       {
-        "id": "status_attributes",
-        "label": "attributes",
-        "done": {
-         "qud": 0.5,
-         "raves": 0.0
-        },
-        "detect": {
-         "raves": [
-          {
-           "scene": "status_attributes"
-          }
-         ]
-        },
-        "goto": {
-         "qud": [
-          {
-           "assert": {
-            "scene": "StatusScreensScreen",
-            "app": "qud"
-           },
-           "timeout": 5,
-           "note": "open the status screen first (opener recipe TBD)"
-          },
-          {
-           "activate": "CavesOfQud"
-          },
-          {
-           "click_hover": [
-            500,
-            136
-           ],
-           "window": "CavesOfQud"
-          },
-          {
-           "sleep": 1.0
-          }
-         ],
-         "raves": [
-          {
-           "goto": "in_game"
-          },
-          {
-           "activate": "Raves of Qud"
-          },
-          {
-           "key": "x",
-           "window": "Raves of Qud"
-          },
-          {
-           "assert": {
-            "scene": "status_attributes",
-            "app": "raves"
-           },
-           "timeout": 8
-          }
-         ]
-        }
-       },
-       {
-        "id": "status_equipment",
-        "label": "equipment",
-        "done": {
-         "qud": 0.5,
-         "raves": 0.0
-        },
-        "detect": {
-         "raves": [
-          {
-           "scene": "status_equipment"
-          }
-         ]
-        },
-        "goto": {
-         "qud": [
-          {
-           "dismiss": {
-            "scene": "PopupMessage",
-            "bridge": "uiback"
-           },
-           "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up. That is what made the equipment key look broken for a whole session. Driving popups over the bridge is what leaves them, so any recipe that may follow one should clear it first; uiback does, verified."
-          },
-          {
-           "dismiss": {
-            "scene": "DynamicPopupMessage",
-            "bridge": "uiback"
-           },
-           "note": "the other popup class, same treatment"
-          },
-          {
-           "goto": "status_screens",
-           "note": "the real opener, which this recipe used to lack -- it merely ASSERTED the screen was already open ('opener recipe TBD') and so failed whenever it was not. Note it opens by CLICKING the HUD button: Qud's own 'e' opens the screen but is not a toggle, so it cannot be used to reach a known state."
-          },
-          {
-           "activate": "CavesOfQud"
-          },
-          {
-           "note": "the Equipment tab in the 8-tab bar",
-           "click_hover": [
-            745,
-            136
-           ],
-           "window": "CavesOfQud"
-          },
-          {
-           "sleep": 1.0
-          },
-          {
-           "assert": {
-            "scene": "StatusScreensScreen",
-            "app": "qud"
-           },
-           "timeout": 10,
-           "note": "the mod reports the SCREEN, not which tab -- the tab itself is not observable from first-party state, so this is as far as the assert can go"
-          }
-         ],
-         "raves": [
-          {
-           "goto": "in_game"
-          },
-          {
-           "activate": "Raves of Qud"
-          },
-          {
-           "key": "e",
-           "window": "Raves of Qud"
-          },
-          {
-           "assert": {
-            "scene": "status_equipment",
-            "app": "raves"
-           },
-           "timeout": 8
-          }
-         ]
-        },
-        "note": "Leaf scores come from raves-of-qud tools/capture/parity.py with reports/2026-08-04-status-screens/parity-equipment.json \u2014 region-scoped, masked diffs (image = sprite ink with the chrome masked out, frame = chrome with the interior masked, composite = both). Whole-frame means are too noisy to adjudicate these: the live playfield behind the scrim shifts the average by ~0.7 between identical builds.",
-        "children": [
-         {
-          "id": "equipment_doll_image",
-          "label": "Doll: item images",
-          "note": "parity leaf doll_image[*] \u2014 equipped sprite ink only.",
-          "done": {
-           "qud": 1.0,
-           "raves": 0.3
-          },
-          "detect": {}
-         },
-         {
-          "id": "equipment_doll_frame",
-          "label": "Doll: slot frames",
-          "note": "parity leaf doll_frame[*] \u2014 slot chrome only.",
-          "done": {
-           "qud": 1.0,
-           "raves": 0.7
-          },
-          "detect": {}
-         },
-         {
-          "id": "equipment_doll_cell",
-          "label": "Doll: slot (image+frame)",
-          "note": "parity leaf doll_cell[*] \u2014 what the eye sees.",
-          "done": {
-           "qud": 1.0,
-           "raves": 0.5
-          },
-          "detect": {}
-         },
-         {
-          "id": "equipment_filter_image",
-          "label": "Filter: category icons",
-          "note": "parity leaf filter_image[*] \u2014 icon ink only.",
-          "done": {
-           "qud": 1.0,
-           "raves": 0.3
-          },
-          "detect": {}
-         },
-         {
-          "id": "equipment_filter_frame",
-          "label": "Filter: cell frames",
-          "note": "parity leaf filter_frame[*] \u2014 corner-loop chrome, ported 2026-08-04.",
-          "done": {
-           "qud": 1.0,
-           "raves": 0.8
-          },
-          "detect": {}
-         },
-         {
-          "id": "equipment_filter_cell",
-          "label": "Filter: cell (image+frame)",
-          "note": "parity leaf filter_cell[*].",
-          "done": {
-           "qud": 1.0,
-           "raves": 0.6
-          },
-          "detect": {}
-         },
-         {
-          "id": "equipment_category_image",
-          "label": "Category cell: image",
-          "note": "parity leaf filter_image[*] \u2014 Qud's categoryImageMap sprite, tan two-tone.",
-          "done": {
-           "qud": 1.0,
-           "raves": 0.5
-          },
-          "detect": {}
-         },
-         {
-          "id": "equipment_category_frame",
-          "label": "Category cell: frame",
-          "note": "parity leaf filter_frame[*] \u2014 corner-loop chrome (ported 2026-08-04).",
-          "done": {
-           "qud": 1.0,
-           "raves": 0.8
-          },
-          "detect": {}
-         },
-         {
-          "id": "equipment_category_hover",
-          "label": "Category cell: hover",
-          "note": "Qud brightens the whole cell frame (51,80,91)->(65,106,115) on hover; ported and verified live (delta 4.05 vs Qud 4.12).",
-          "done": {
-           "qud": 1.0,
-           "raves": 0.9
-          },
-          "detect": {}
-         },
-         {
-          "id": "equipment_category_select",
-          "label": "Category cell: select",
-          "note": "gold frame + list filtering on click; multi-select mirrors enabledCategories.",
-          "done": {
-           "qud": 1.0,
-           "raves": 0.8
-          },
-          "detect": {}
-         },
-         {
-          "id": "equipment_category_order",
-          "label": "Category strip: order",
-          "note": "filterOrder = category of the alphabetically-first item; equipped items included.",
-          "done": {
-           "qud": 1.0,
-           "raves": 0.9
-          },
-          "detect": {}
-         },
-         {
-          "id": "equipment_category_water",
-          "label": "Category header: water/drams",
-          "note": "the $drams figure in the header line (GetFreeDrams).",
-          "done": {
-           "qud": 1.0,
-           "raves": 0.7
-          },
-          "detect": {}
-         },
-         {
-          "id": "equipment_category_weight",
-          "label": "Category header: weight",
-          "note": "carried/max lbs in the header; the header block placement is still ~2px off.",
-          "done": {
-           "qud": 1.0,
-           "raves": 0.6
-          },
-          "detect": {}
-         },
-         {
-          "id": "equipment_list_categories",
-          "label": "List: categories",
-          "note": "category rows with [-]/[+] and Qud's own name colouring.",
-          "done": {
-           "qud": 1.0,
-           "raves": 0.8
-          },
-          "detect": {}
-         },
-         {
-          "id": "equipment_list_category_weight",
-          "label": "List: category weight",
-          "note": "the |n lbs.| column, right-aligned at x1673.",
-          "done": {
-           "qud": 1.0,
-           "raves": 0.9
-          },
-          "detect": {}
-         },
-         {
-          "id": "equipment_line_icon",
-          "label": "Line item: icon",
-          "note": "per-row item tile from RenderForUI(\"Inventory\").",
-          "done": {
-           "qud": 1.0,
-           "raves": 0.7
-          },
-          "detect": {}
-         },
-         {
-          "id": "equipment_line_text",
-          "label": "Line item: description text",
-          "note": "row label from GameObject.DisplayName incl. the nameless-item fallback.",
-          "done": {
-           "qud": 1.0,
-           "raves": 0.9
-          },
-          "detect": {}
-         },
-         {
-          "id": "equipment_line_colors",
-          "label": "Line item: description colours",
-          "note": "Qud markup resolved through the palette + CP437 badge glyphs.",
-          "done": {
-           "qud": 1.0,
-           "raves": 0.9
-          },
-          "detect": {}
-         },
-         {
-          "id": "equipment_scrolling",
-          "label": "List: scrolling",
-          "note": "wheel/PageUp/PageDown through the inventory; no capture-diff coverage yet.",
-          "done": {
-           "qud": 1.0,
-           "raves": 0.5
-          },
-          "detect": {}
-         },
-         {
-          "id": "equipment_item_popup",
-          "label": "Item interaction popup",
-          "note": "Qud's own menu, raised by EquipmentAPI.TwiddleObject and mirrored over the popup channel. Parity spec: raves-of-qud/reports/2026-08-05-item-popup/parity-item-popup.json. Qud's popup carries a HEADER above the commands (item tile + name + notched divider) that Raves does not draw yet -- the leaves below measure that gap, so their scores are the size of the work remaining, not a misalignment.",
-          "done": {
-           "qud": 1.0,
-           "raves": 0.5
-          },
-          "detect": {},
-          "children": [
-           {
-            "id": "item_popup_image_frame",
-            "label": "Image frame (above the commands)",
-            "note": "parity leaf popup_image_frame - the framed header block, Qud x825-1079 y334-486. 16.48.",
-            "done": {
-             "qud": 1.0,
-             "raves": 0.0
-            },
-            "detect": {}
-           },
-           {
-            "id": "item_popup_frame_text_content",
-            "label": "Image frame: text content",
-            "note": "parity leaf popup_frame_text_content - the item name line inside the block. 32.21.",
-            "done": {
-             "qud": 1.0,
-             "raves": 0.0
-            },
-            "detect": {}
-           },
-           {
-            "id": "item_popup_frame_text_color",
-            "label": "Image frame: text colour",
-            "note": "parity leaf popup_frame_text_color (kind ink_color - palette only, position ignored). 25.80.",
-            "done": {
-             "qud": 1.0,
-             "raves": 0.0
-            },
-            "detect": {}
-           },
-           {
-            "id": "item_popup_image_geometry",
-            "label": "Image: size / position",
-            "note": "parity leaf popup_image_geometry (kind geometry - ink bbox only, colour ignored). Qud 42x54 at x939 y369; 47.00px mean.",
-            "done": {
-             "qud": 1.0,
-             "raves": 0.0
-            },
-            "detect": {}
-           },
-           {
-            "id": "item_popup_image_color",
-            "label": "Image: colour",
-            "note": "parity leaf popup_image_color (kind ink_color). 106.33.",
-            "done": {
-             "qud": 1.0,
-             "raves": 0.0
-            },
-            "detect": {}
-           }
-          ]
-         }
-        ]
-       },
-       {
-        "id": "status_tinkering",
-        "label": "tinkering",
-        "done": {
-         "qud": 0.5,
-         "raves": 0.0
-        },
-        "detect": {
-         "raves": [
-          {
-           "scene": "status_tinkering"
-          }
-         ]
-        },
-        "goto": {
-         "qud": [
-          {
-           "assert": {
-            "scene": "StatusScreensScreen",
-            "app": "qud"
-           },
-           "timeout": 5,
-           "note": "open the status screen first (opener recipe TBD)"
-          },
-          {
-           "activate": "CavesOfQud"
-          },
-          {
-           "click_hover": [
-            925,
-            136
-           ],
-           "window": "CavesOfQud"
-          },
-          {
-           "sleep": 1.0
-          }
-         ],
-         "raves": [
-          {
-           "goto": "in_game"
-          },
-          {
-           "activate": "Raves of Qud"
-          },
-          {
-           "key": "n",
-           "window": "Raves of Qud"
-          },
-          {
-           "assert": {
-            "scene": "status_tinkering",
-            "app": "raves"
-           },
-           "timeout": 8
-          }
-         ]
-        }
-       },
-       {
-        "id": "status_journal",
-        "label": "journal",
-        "done": {
-         "qud": 0.5,
-         "raves": 0.0
-        },
-        "detect": {
-         "raves": [
-          {
-           "scene": "status_journal"
-          }
-         ]
-        },
-        "goto": {
-         "qud": [
-          {
-           "assert": {
-            "scene": "StatusScreensScreen",
-            "app": "qud"
-           },
-           "timeout": 5,
-           "note": "open the status screen first (opener recipe TBD)"
-          },
-          {
-           "activate": "CavesOfQud"
-          },
-          {
-           "click_hover": [
-            1095,
-            136
-           ],
-           "window": "CavesOfQud"
-          },
-          {
-           "sleep": 1.0
-          }
-         ],
-         "raves": [
-          {
-           "goto": "in_game"
-          },
-          {
-           "activate": "Raves of Qud"
-          },
-          {
-           "key": "j",
-           "window": "Raves of Qud"
-          },
-          {
-           "assert": {
-            "scene": "status_journal",
-            "app": "raves"
-           },
-           "timeout": 8
-          }
-         ]
-        }
-       },
-       {
-        "id": "status_quests",
-        "label": "quests",
-        "done": {
-         "qud": 0.5,
-         "raves": 0.0
-        },
-        "detect": {
-         "raves": [
-          {
-           "scene": "status_quests"
-          }
-         ]
-        },
-        "goto": {
-         "qud": [
-          {
-           "assert": {
-            "scene": "StatusScreensScreen",
-            "app": "qud"
-           },
-           "timeout": 5,
-           "note": "open the status screen first (opener recipe TBD)"
-          },
-          {
-           "activate": "CavesOfQud"
-          },
-          {
-           "click_hover": [
-            1250,
-            136
-           ],
-           "window": "CavesOfQud"
-          },
-          {
-           "sleep": 1.0
-          }
-         ],
-         "raves": [
-          {
-           "goto": "in_game"
-          },
-          {
-           "activate": "Raves of Qud"
-          },
-          {
-           "key": "q",
-           "window": "Raves of Qud"
-          },
-          {
-           "assert": {
-            "scene": "status_quests",
-            "app": "raves"
-           },
-           "timeout": 8
-          }
-         ]
-        }
-       },
-       {
-        "id": "status_reputation",
-        "label": "reputation",
-        "done": {
-         "qud": 0.5,
-         "raves": 0.0
-        },
-        "detect": {
-         "raves": [
-          {
-           "scene": "status_reputation"
-          }
-         ]
-        },
-        "goto": {
-         "qud": [
-          {
-           "assert": {
-            "scene": "StatusScreensScreen",
-            "app": "qud"
-           },
-           "timeout": 5,
-           "note": "open the status screen first (opener recipe TBD)"
-          },
-          {
-           "activate": "CavesOfQud"
-          },
-          {
-           "click_hover": [
-            1420,
-            136
-           ],
-           "window": "CavesOfQud"
-          },
-          {
-           "sleep": 1.0
-          }
-         ],
-         "raves": [
-          {
-           "goto": "in_game"
-          },
-          {
-           "activate": "Raves of Qud"
-          },
-          {
-           "key": "ctrl+f",
-           "window": "Raves of Qud"
-          },
-          {
-           "assert": {
-            "scene": "status_reputation",
-            "app": "raves"
-           },
-           "timeout": 8
-          }
-         ]
-        }
-       },
-       {
-        "id": "status_messagelog",
-        "label": "messagelog",
-        "done": {
-         "qud": 0.9,
-         "raves": 0.8
-        },
-        "detect": {
-         "raves": [
-          {
-           "scene": "status_messagelog"
-          }
-         ]
-        },
-        "goto": {
-         "qud": [
-          {
-           "assert": {
-            "scene": "StatusScreensScreen",
-            "app": "qud"
-           },
-           "timeout": 5,
-           "note": "open the status screen first (opener recipe TBD)"
-          },
-          {
-           "activate": "CavesOfQud"
-          },
-          {
-           "click_hover": [
-            1615,
-            136
-           ],
-           "window": "CavesOfQud"
-          },
-          {
-           "sleep": 1.0
-          }
-         ],
-         "raves": [
-          {
-           "goto": "in_game"
-          },
-          {
-           "activate": "Raves of Qud"
-          },
-          {
-           "key": "f2",
-           "window": "Raves of Qud"
-          },
-          {
-           "sleep": 0.6
-          },
-          {
-           "click": [
-            1615,
-            136
-           ],
-           "window": "Raves of Qud"
-          },
-          {
-           "assert": {
-            "scene": "status_messagelog",
-            "app": "raves"
-           },
-           "timeout": 8
-          }
-         ]
-        }
-       }
-      ],
-      "goto": {
-       "qud": [
-        {
-         "goto": "in_game"
-        },
-        {
-         "activate": "CavesOfQud"
-        },
-        {
-         "click_hover": [
-          1729,
-          70
-         ],
-         "window": "CavesOfQud"
-        },
-        {
-         "sleep": 1.2
-        },
-        {
-         "assert": {
-          "scene": "StatusScreensScreen",
-          "app": "qud"
-         },
-         "timeout": 10
-        }
-       ]
-      }
-     },
-     {
-      "id": "control_mapping",
-      "label": "Control Mapping",
-      "note": "system menu -> Control Mapping. QUD DETECTION GAP: KeybindsScreen never updates _ActiveGameView (scene stays 'play'), so qud detect leans on OCR only.",
-      "done": {
-       "qud": 0.8,
-       "raves": 0.3
-      },
-      "detect": {
-       "raves": [
-        {
-         "scene": "control_mapping"
-        }
-       ],
-       "qud": [
-        {
-         "ocr_any": [
-          "control mapping",
-          "configuring controller"
-         ]
-        }
-       ]
-      },
-      "goto": {
-       "raves": [
-        {
-         "goto": "in_game"
-        },
-        {
-         "activate": "Raves of Qud"
-        },
-        {
-         "sleep": 2.0,
-         "note": "post-restart settle \u2014 the bridge client needs a beat before Esc lands as CmdSystemMenu"
-        },
-        {
-         "key": "escape",
-         "window": "Raves of Qud",
-         "note": "1:1 Esc = CmdSystemMenu; the popup mirrors back"
-        },
-        {
-         "assert": {
-          "popup": "menu",
-          "app": "raves"
-         },
-         "timeout": 8
-        },
-        {
-         "click_text": "Control Mapping",
-         "window": "Raves of Qud"
-        },
-        {
-         "assert": {
-          "scene": "control_mapping",
-          "app": "raves"
-         },
-         "timeout": 8
-        }
-       ]
-      }
-     }
-    ]
-   },
-   {
-    "id": "summary",
-    "label": "Game over / summary",
-    "note": "the tombstone + GameSummaryScreen after a death (Wander mode returns to the picker afterwards). Injected Esc is IGNORED here \u2014 a restart is the reliable exit.",
-    "done": {
-     "qud": 1.0,
-     "raves": 0.0
-    },
-    "detect": {
-     "qud": [
-      {
-       "scene": [
-        "GameSummaryScreen",
-        "TombstoneScreen"
-       ]
-      }
-     ]
+    "raves": {
+      "label": "Raves",
+      "window": "Raves of Qud",
+      "state_file": "~/Library/Application Support/RavesOfQud/raves_state.json",
+      "launcher": "raves"
     }
-   }
-  ]
- }
+  },
+  "root": {
+    "id": "root",
+    "label": "Game",
+    "children": [
+      {
+        "id": "freehold",
+        "label": "Freehold Games splash",
+        "note": "transient boot splash \u2014 no reliable detector yet",
+        "done": {
+          "qud": 1.0,
+          "raves": 0.0
+        },
+        "detect": {}
+      },
+      {
+        "id": "title",
+        "label": "Title Screen",
+        "note": "children are the SCENE CONTAINERS (each scored individually for 1:1 fidelity); the menu options nest under menu_box (they're both its contents and the nav edges to other scenes).",
+        "done": {
+          "qud": 1.0,
+          "raves": 0.9
+        },
+        "detect": {
+          "qud": [
+            {
+              "scene": [
+                "MainMenu",
+                "title"
+              ]
+            },
+            {
+              "game_live": false
+            }
+          ],
+          "raves": [
+            {
+              "scene": "title"
+            },
+            {
+              "ocr_any": [
+                "caves of qud",
+                "new game",
+                "continue",
+                "records",
+                "modding toolkit"
+              ]
+            }
+          ]
+        },
+        "goto": {
+          "qud": [
+            {
+              "launch": "qud_solo",
+              "unless_running": true
+            },
+            {
+              "wait_window": "CavesOfQud",
+              "timeout": 60
+            },
+            {
+              "dismiss": {
+                "scene": "play",
+                "command": "CmdQuit",
+                "answers": [
+                  "Yes",
+                  "No"
+                ]
+              },
+              "note": "LEAVE A LIVE GAME, first-party throughout: CmdQuit is pushed through Qud's own command path and the confirms are answered by BUTTON via the mod, so nothing here depends on synthesized keys -- which Qud's modern UI ignores outright. Yes to 'are you sure you want to quit', then NO to 'do you want to save first': Yes there would overwrite the fixture save with whatever state the harness drove the character into, destroying the reference every parity capture is measured against. Previously the only way out of a live game was a restart (see _load_save)."
+            },
+            {
+              "dismiss": {
+                "scene": "PopupMessage",
+                "bridge": "uiback"
+              },
+              "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up. That is what made the equipment key look broken for a whole session. Driving popups over the bridge is what leaves them, so any recipe that may follow one should clear it first; uiback does, verified."
+            },
+            {
+              "dismiss": {
+                "scene": "DynamicPopupMessage",
+                "bridge": "uiback"
+              },
+              "note": "self-heal: cancel a stray popup (quit-confirm etc.)"
+            },
+            {
+              "dismiss": {
+                "scene": "ModernHighScores",
+                "bridge": "uiback"
+              },
+              "note": "self-heal: back out of a submenu left open"
+            },
+            {
+              "dismiss": {
+                "scene": "ModernOptionsMenu",
+                "bridge": "uiback"
+              },
+              "note": "self-heal: back out of a submenu left open"
+            },
+            {
+              "dismiss": {
+                "scene": "ModManager",
+                "bridge": "uiback"
+              },
+              "note": "self-heal: back out of a submenu left open"
+            },
+            {
+              "dismiss": {
+                "scene": "ModernSaveManagement",
+                "bridge": "uiback"
+              },
+              "note": "self-heal: back out of a submenu left open"
+            },
+            {
+              "assert": {
+                "scene": "MainMenu"
+              },
+              "timeout": 20
+            }
+          ],
+          "raves": [
+            {
+              "launch": "raves_solo",
+              "unless_running": true
+            },
+            {
+              "wait_window": "Raves of Qud",
+              "timeout": 30
+            },
+            {
+              "dock": "Raves of Qud",
+              "note": "stack into the standard slot above Qud (fresh launches land off-slot)"
+            },
+            {
+              "dismiss": {
+                "popup": "message",
+                "key": "Escape"
+              },
+              "note": "CANCEL a stray modal first. A popup left over from an earlier run blocks CmdQuit entirely -- the command goes nowhere and the step then fails for lack of any change. Escape is Qud's Cancel on these confirms, so this clears the way without ANSWERING anything."
+            },
+            {
+              "dismiss": {
+                "scene": "in_game",
+                "command": "CmdQuit"
+              },
+              "note": "LEAVE A LIVE GAME. Neither app's title recipe could, so `goto title` from in_game failed and left the game running -- and every recipe that starts with {goto: title} inherited that. CmdQuit runs Qud's own quit, whose UI mirrors into Raves, so the confirms below are answered on the Raves window."
+            },
+            {
+              "dismiss": {
+                "popup": "message",
+                "key": "space"
+              },
+              "note": "'Are you sure you want to quit?' -> [Space] Yes"
+            },
+            {
+              "dismiss": {
+                "popup": "message",
+                "keys": [
+                  "Right",
+                  "space"
+                ]
+              },
+              "note": "'Do you want to save first?' -> Right moves off Yes, Space answers NO. Deliberate: Yes would overwrite the fixture save with whatever state the harness drove the character into, quietly destroying the reference every parity capture is measured against. One step, because Right alone changes nothing observable."
+            },
+            {
+              "dismiss": {
+                "scene": "mods",
+                "key": "Escape"
+              },
+              "note": "self-heal: back out of a submenu left open"
+            },
+            {
+              "dismiss": {
+                "scene": "options",
+                "key": "Escape"
+              },
+              "note": "self-heal: back out of a submenu left open"
+            },
+            {
+              "dismiss": {
+                "scene": "records",
+                "key": "Escape"
+              },
+              "note": "self-heal: back out of a submenu left open"
+            },
+            {
+              "dismiss": {
+                "scene": "loadgame",
+                "key": "Escape"
+              },
+              "note": "self-heal: back out of the Continue/Load Game picker. Its omission is why goto got STUCK there: the picker is a descendant of title, so the recipe's final assert passed by containment while the app never left, and the next step then clicked for a 'Continue' that is not on the picker."
+            },
+            {
+              "dismiss": {
+                "scene": "quit_dialog",
+                "key": "Escape"
+              }
+            },
+            {
+              "assert": {
+                "node": "title"
+              },
+              "timeout": 20
+            }
+          ]
+        },
+        "children": [
+          {
+            "id": "background",
+            "label": "Background (cave art)",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.85
+            },
+            "detect": {}
+          },
+          {
+            "id": "logo",
+            "label": "Logo (CAVES OF QUD wordmark)",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.8
+            },
+            "detect": {}
+          },
+          {
+            "id": "menu_box",
+            "label": "Option Box (frame + hieroglyph header)",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.9
+            },
+            "detect": {},
+            "children": [
+              {
+                "id": "new_game",
+                "label": "New Game \u2192 Character Creation",
+                "done": {
+                  "qud": 0.6,
+                  "raves": 0.4
+                },
+                "detect": {
+                  "qud": {
+                    "ocr_any": [
+                      "character creation",
+                      "choose genotype",
+                      "choose preset",
+                      "choose calling",
+                      "mutations",
+                      "pregens"
+                    ],
+                    "game_live": false
+                  },
+                  "raves": [
+                    {
+                      "scene": [
+                        "chargen_game_mode",
+                        "chargen_genotype",
+                        "chargen_subtype"
+                      ]
+                    },
+                    {
+                      "ocr_any": [
+                        "character creation",
+                        "choose genotype",
+                        "choose preset",
+                        "genotype"
+                      ]
+                    }
+                  ]
+                },
+                "children": [
+                  {
+                    "id": "game_mode",
+                    "label": "Choose Game Mode",
+                    "done": {
+                      "qud": 0.7,
+                      "raves": 0.85
+                    },
+                    "detect": {
+                      "raves": [
+                        {
+                          "scene": "chargen_game_mode"
+                        }
+                      ]
+                    },
+                    "goto": {
+                      "raves": [
+                        {
+                          "goto": "title"
+                        },
+                        {
+                          "activate": "Raves of Qud"
+                        },
+                        {
+                          "click_text": "New Game",
+                          "window": "Raves of Qud"
+                        },
+                        {
+                          "assert": {
+                            "scene": "chargen_game_mode"
+                          },
+                          "timeout": 12
+                        }
+                      ],
+                      "qud": [
+                        {
+                          "goto": "title"
+                        },
+                        {
+                          "activate": "CavesOfQud"
+                        },
+                        {
+                          "click_text": "New Game",
+                          "window": "CavesOfQud"
+                        },
+                        {
+                          "sleep": 1.0
+                        },
+                        {
+                          "assert": {
+                            "ocr_contains": "game mode"
+                          },
+                          "timeout": 15
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "genotype",
+                    "label": "Choose Genotype",
+                    "done": {
+                      "qud": 0.6,
+                      "raves": 0.75
+                    },
+                    "detect": {
+                      "raves": [
+                        {
+                          "scene": "chargen_genotype"
+                        }
+                      ]
+                    },
+                    "goto": {
+                      "raves": [
+                        {
+                          "goto": "game_mode"
+                        },
+                        {
+                          "key": "enter",
+                          "window": "Raves of Qud",
+                          "note": "confirm the default card (Classic)"
+                        },
+                        {
+                          "assert": {
+                            "scene": "chargen_genotype"
+                          },
+                          "timeout": 10
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "calling",
+                    "label": "Calling / Subtype",
+                    "done": {
+                      "qud": 0.5,
+                      "raves": 0.2
+                    },
+                    "detect": {
+                      "raves": [
+                        {
+                          "scene": "chargen_subtype"
+                        }
+                      ]
+                    },
+                    "goto": {
+                      "raves": [
+                        {
+                          "goto": "genotype"
+                        },
+                        {
+                          "key": "enter",
+                          "window": "Raves of Qud",
+                          "note": "confirm the default genotype"
+                        },
+                        {
+                          "assert": {
+                            "scene": "chargen_subtype"
+                          },
+                          "timeout": 10
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "attributes",
+                    "label": "Attributes",
+                    "done": {
+                      "qud": 0.4,
+                      "raves": 0.1
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "embark",
+                    "label": "Embark",
+                    "done": {
+                      "qud": 0.5,
+                      "raves": 0.1
+                    },
+                    "detect": {}
+                  }
+                ],
+                "goto": {
+                  "raves": [
+                    {
+                      "goto": "game_mode"
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "goto": "title"
+                    },
+                    {
+                      "activate": "CavesOfQud"
+                    },
+                    {
+                      "click_text": "New Game",
+                      "window": "CavesOfQud"
+                    },
+                    {
+                      "sleep": 1.0
+                    },
+                    {
+                      "assert": {
+                        "ocr_contains": "game mode"
+                      },
+                      "timeout": 15
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "continue",
+                "label": "Continue \u2192 Load Game",
+                "done": {
+                  "qud": 0.9,
+                  "raves": 0.6
+                },
+                "detect": {
+                  "qud": [
+                    {
+                      "scene": [
+                        "ModernSaveManagement"
+                      ]
+                    },
+                    {
+                      "ocr_any": [
+                        "load game"
+                      ],
+                      "game_live": false
+                    }
+                  ],
+                  "raves": [
+                    {
+                      "scene": "loadgame"
+                    }
+                  ]
+                },
+                "children": [
+                  {
+                    "id": "load_game",
+                    "label": "Load Game (save picker)",
+                    "done": {
+                      "qud": 0.9,
+                      "raves": 0.2
+                    },
+                    "detect": {}
+                  }
+                ],
+                "note": "the Load Game picker; qud reports scene=ModernSaveManagement first-party (OCR fallback kept)",
+                "goto": {
+                  "qud": [
+                    {
+                      "goto": "title"
+                    },
+                    {
+                      "activate": "CavesOfQud"
+                    },
+                    {
+                      "click_text": "Continue",
+                      "window": "CavesOfQud"
+                    },
+                    {
+                      "sleep": 1.0
+                    },
+                    {
+                      "assert": {
+                        "scene": "ModernSaveManagement"
+                      },
+                      "timeout": 15
+                    }
+                  ],
+                  "raves": [
+                    {
+                      "goto": "title"
+                    },
+                    {
+                      "activate": "Raves of Qud"
+                    },
+                    {
+                      "click_text": "Continue",
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "assert": {
+                        "scene": "loadgame"
+                      },
+                      "timeout": 12
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "records",
+                "label": "Records",
+                "done": {
+                  "qud": 0.3,
+                  "raves": 0.0
+                },
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "records"
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "scene": [
+                        "ModernHighScores"
+                      ]
+                    }
+                  ]
+                },
+                "goto": {
+                  "raves": [
+                    {
+                      "goto": "title"
+                    },
+                    {
+                      "activate": "Raves of Qud"
+                    },
+                    {
+                      "click_text": "Records",
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "assert": {
+                        "scene": "records"
+                      },
+                      "timeout": 12
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "goto": "title"
+                    },
+                    {
+                      "activate": "CavesOfQud"
+                    },
+                    {
+                      "click_text": "Records",
+                      "window": "CavesOfQud"
+                    },
+                    {
+                      "sleep": 1.0
+                    },
+                    {
+                      "assert": {
+                        "scene": "ModernHighScores"
+                      },
+                      "timeout": 15
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "options",
+                "label": "Options",
+                "done": {
+                  "qud": 0.4,
+                  "raves": 0.2
+                },
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "options"
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "scene": [
+                        "ModernOptionsMenu"
+                      ]
+                    }
+                  ]
+                },
+                "goto": {
+                  "raves": [
+                    {
+                      "goto": "title"
+                    },
+                    {
+                      "activate": "Raves of Qud"
+                    },
+                    {
+                      "click_text": "Options",
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "assert": {
+                        "scene": "options"
+                      },
+                      "timeout": 12
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "goto": "title"
+                    },
+                    {
+                      "activate": "CavesOfQud"
+                    },
+                    {
+                      "click_text": "Options",
+                      "window": "CavesOfQud"
+                    },
+                    {
+                      "sleep": 1.0
+                    },
+                    {
+                      "assert": {
+                        "scene": "ModernOptionsMenu"
+                      },
+                      "timeout": 15
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mods",
+                "label": "Mods",
+                "done": {
+                  "qud": 0.3,
+                  "raves": 0.0
+                },
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "mods"
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "scene": [
+                        "ModManager"
+                      ]
+                    }
+                  ]
+                },
+                "goto": {
+                  "raves": [
+                    {
+                      "goto": "title"
+                    },
+                    {
+                      "activate": "Raves of Qud"
+                    },
+                    {
+                      "click_text": "Mods",
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "assert": {
+                        "scene": "mods"
+                      },
+                      "timeout": 12
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "goto": "title"
+                    },
+                    {
+                      "activate": "CavesOfQud"
+                    },
+                    {
+                      "click_text": "Mods",
+                      "window": "CavesOfQud"
+                    },
+                    {
+                      "sleep": 1.0
+                    },
+                    {
+                      "assert": {
+                        "scene": "ModManager"
+                      },
+                      "timeout": 15
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "secondary_links",
+            "label": "Secondary List (Redeem Code \u2026 Help)",
+            "done": {
+              "qud": 1.0,
+              "raves": 1.0
+            },
+            "detect": {}
+          },
+          {
+            "id": "version",
+            "label": "Version Corner (1.0.5 / build)",
+            "done": {
+              "qud": 1.0,
+              "raves": 1.0
+            },
+            "detect": {}
+          },
+          {
+            "id": "hint_bar",
+            "label": "Hint Bar (nav-icon / Space / Esc)",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.95
+            },
+            "detect": {}
+          },
+          {
+            "id": "quit_button",
+            "label": "Quit X (upper-left)",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.9
+            },
+            "detect": {}
+          },
+          {
+            "id": "quit_dialog",
+            "label": "Quit Confirm (Are you sure? Yes/No)",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.92
+            },
+            "detect": {
+              "qud": {
+                "ocr_any": [
+                  "are you sure you want to quit"
+                ],
+                "game_live": false
+              },
+              "raves": [
+                {
+                  "scene": "quit_dialog"
+                },
+                {
+                  "ocr_any": [
+                    "are you sure you want to quit"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "in_game",
+        "label": "In-Game",
+        "done": {
+          "qud": 1.0,
+          "raves": 0.5
+        },
+        "detect": {
+          "qud": [
+            {
+              "scene": [
+                "play",
+                "Stage",
+                "in_game",
+                "PopupMessage",
+                "PopupText",
+                "PopupYesNo"
+              ]
+            },
+            {
+              "game_live": true
+            }
+          ],
+          "raves": [
+            {
+              "scene": "in_game"
+            },
+            {
+              "ocr_any": [
+                "make camp",
+                "abilities",
+                "active effects",
+                "message log",
+                "sprint"
+              ]
+            }
+          ]
+        },
+        "goto": {
+          "qud": [
+            {
+              "goto": "title"
+            },
+            {
+              "activate": "CavesOfQud"
+            },
+            {
+              "click_text": "Continue",
+              "window": "CavesOfQud"
+            },
+            {
+              "sleep": 1.0
+            },
+            {
+              "click_hover": [
+                900,
+                190
+              ],
+              "window": "CavesOfQud",
+              "note": "top save row in the Load Game picker"
+            },
+            {
+              "assert": {
+                "node": "in_game"
+              },
+              "timeout": 30
+            }
+          ],
+          "raves": [
+            {
+              "goto": "title"
+            },
+            {
+              "activate": "Raves of Qud"
+            },
+            {
+              "sleep": 2.5,
+              "note": "let Continue enable (heartbeat poll) after a fresh launch"
+            },
+            {
+              "click_text": "Continue",
+              "window": "Raves of Qud"
+            },
+            {
+              "dismiss": {
+                "scene": "loadgame",
+                "key": "space"
+              },
+              "note": "CONDITIONAL: Raves' Continue opens the LOAD GAME picker when there is a choice to make and goes straight in-game when there is not, so this presses the picker's [Space] select only if we actually landed there. The recipe predated the picker entirely, which is how a run could stop at it -- and the title recipe, equally unaware, could not back out."
+            },
+            {
+              "assert": {
+                "node": "in_game"
+              },
+              "timeout": 60
+            }
+          ]
+        },
+        "children": [
+          {
+            "id": "world",
+            "label": "Play Field / Holodeck",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.5
+            },
+            "detect": {}
+          },
+          {
+            "id": "top_bar",
+            "label": "Top Status Bar",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.7
+            },
+            "detect": {}
+          },
+          {
+            "id": "ability_bar",
+            "label": "Ability / Command Bar",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.3
+            },
+            "detect": {}
+          },
+          {
+            "id": "message_log",
+            "label": "Message Log",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.3
+            },
+            "detect": {}
+          },
+          {
+            "id": "inventory",
+            "label": "Inventory / Equipment",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.1
+            },
+            "detect": {}
+          },
+          {
+            "id": "character_sheet",
+            "label": "Character Sheet",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.1
+            },
+            "detect": {}
+          },
+          {
+            "id": "look",
+            "label": "Look / Examine",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.2
+            },
+            "detect": {}
+          },
+          {
+            "id": "direction_pick",
+            "label": "Direction Picker",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.4
+            },
+            "detect": {}
+          },
+          {
+            "id": "status_screens",
+            "label": "Status screens (8-tab in-game menu)",
+            "note": "Qud: ONE scene (StatusScreensScreen) for all tabs; per-tab detection needs the planned heartbeat statusTab export. Tab clicks REQUIRE hover-first (hv click --hover) \u2014 plain clicks only hover-select. Plan: raves docs/status-screens-plan.md Qud opener: hover-click the person icon (1729,70). Raves opener keys = Qud's Commands.xml defaults (k/x/e/i/n/j/q, ctrl+f).",
+            "done": {
+              "qud": 0.5,
+              "raves": 0.0
+            },
+            "detect": {
+              "qud": [
+                {
+                  "scene": [
+                    "StatusScreensScreen"
+                  ]
+                }
+              ],
+              "raves": [
+                {
+                  "scene": [
+                    "status_skills",
+                    "status_attributes",
+                    "status_equipment",
+                    "status_tinkering",
+                    "status_journal",
+                    "status_quests",
+                    "status_reputation",
+                    "status_messagelog"
+                  ]
+                }
+              ]
+            },
+            "children": [
+              {
+                "id": "status_skills",
+                "label": "skills",
+                "done": {
+                  "qud": 0.5,
+                  "raves": 0.0
+                },
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "status_skills"
+                    }
+                  ]
+                },
+                "goto": {
+                  "qud": [
+                    {
+                      "assert": {
+                        "scene": "StatusScreensScreen",
+                        "app": "qud"
+                      },
+                      "timeout": 5,
+                      "note": "open the status screen first (opener recipe TBD)"
+                    },
+                    {
+                      "activate": "CavesOfQud"
+                    },
+                    {
+                      "click_hover": [
+                        277,
+                        136
+                      ],
+                      "window": "CavesOfQud"
+                    },
+                    {
+                      "sleep": 1.0
+                    }
+                  ],
+                  "raves": [
+                    {
+                      "goto": "in_game"
+                    },
+                    {
+                      "activate": "Raves of Qud"
+                    },
+                    {
+                      "key": "k",
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "assert": {
+                        "scene": "status_skills",
+                        "app": "raves"
+                      },
+                      "timeout": 8
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "status_attributes",
+                "label": "attributes",
+                "done": {
+                  "qud": 0.5,
+                  "raves": 0.0
+                },
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "status_attributes"
+                    }
+                  ]
+                },
+                "goto": {
+                  "qud": [
+                    {
+                      "assert": {
+                        "scene": "StatusScreensScreen",
+                        "app": "qud"
+                      },
+                      "timeout": 5,
+                      "note": "open the status screen first (opener recipe TBD)"
+                    },
+                    {
+                      "activate": "CavesOfQud"
+                    },
+                    {
+                      "click_hover": [
+                        500,
+                        136
+                      ],
+                      "window": "CavesOfQud"
+                    },
+                    {
+                      "sleep": 1.0
+                    }
+                  ],
+                  "raves": [
+                    {
+                      "goto": "in_game"
+                    },
+                    {
+                      "activate": "Raves of Qud"
+                    },
+                    {
+                      "key": "x",
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "assert": {
+                        "scene": "status_attributes",
+                        "app": "raves"
+                      },
+                      "timeout": 8
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "status_equipment",
+                "label": "equipment",
+                "done": {
+                  "qud": 0.5,
+                  "raves": 0.0
+                },
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "status_equipment"
+                    }
+                  ]
+                },
+                "goto": {
+                  "qud": [
+                    {
+                      "dismiss": {
+                        "scene": "PopupMessage",
+                        "bridge": "uiback"
+                      },
+                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up. That is what made the equipment key look broken for a whole session. Driving popups over the bridge is what leaves them, so any recipe that may follow one should clear it first; uiback does, verified."
+                    },
+                    {
+                      "dismiss": {
+                        "scene": "DynamicPopupMessage",
+                        "bridge": "uiback"
+                      },
+                      "note": "the other popup class, same treatment"
+                    },
+                    {
+                      "goto": "status_screens",
+                      "note": "the real opener, which this recipe used to lack -- it merely ASSERTED the screen was already open ('opener recipe TBD') and so failed whenever it was not. Note it opens by CLICKING the HUD button: Qud's own 'e' opens the screen but is not a toggle, so it cannot be used to reach a known state."
+                    },
+                    {
+                      "activate": "CavesOfQud"
+                    },
+                    {
+                      "note": "the Equipment tab in the 8-tab bar",
+                      "click_hover": [
+                        745,
+                        136
+                      ],
+                      "window": "CavesOfQud"
+                    },
+                    {
+                      "sleep": 1.0
+                    },
+                    {
+                      "assert": {
+                        "scene": "StatusScreensScreen",
+                        "app": "qud"
+                      },
+                      "timeout": 10,
+                      "note": "the mod reports the SCREEN, not which tab -- the tab itself is not observable from first-party state, so this is as far as the assert can go"
+                    }
+                  ],
+                  "raves": [
+                    {
+                      "goto": "in_game"
+                    },
+                    {
+                      "activate": "Raves of Qud"
+                    },
+                    {
+                      "key": "e",
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "assert": {
+                        "scene": "status_equipment",
+                        "app": "raves"
+                      },
+                      "timeout": 8
+                    }
+                  ]
+                },
+                "note": "Leaf scores come from raves-of-qud tools/capture/parity.py with reports/2026-08-04-status-screens/parity-equipment.json \u2014 region-scoped, masked diffs (image = sprite ink with the chrome masked out, frame = chrome with the interior masked, composite = both). Whole-frame means are too noisy to adjudicate these: the live playfield behind the scrim shifts the average by ~0.7 between identical builds.",
+                "children": [
+                  {
+                    "id": "equipment_doll_image",
+                    "label": "Doll: item images",
+                    "note": "parity leaf doll_image[*] \u2014 equipped sprite ink only.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.3
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_doll_frame",
+                    "label": "Doll: slot frames",
+                    "note": "parity leaf doll_frame[*] \u2014 slot chrome only.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.7
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_doll_cell",
+                    "label": "Doll: slot (image+frame)",
+                    "note": "parity leaf doll_cell[*] \u2014 what the eye sees.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.5
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_filter_image",
+                    "label": "Filter: category icons",
+                    "note": "parity leaf filter_image[*] \u2014 icon ink only.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.3
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_filter_frame",
+                    "label": "Filter: cell frames",
+                    "note": "parity leaf filter_frame[*] \u2014 corner-loop chrome, ported 2026-08-04.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.8
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_filter_cell",
+                    "label": "Filter: cell (image+frame)",
+                    "note": "parity leaf filter_cell[*].",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.6
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_category_image",
+                    "label": "Category cell: image",
+                    "note": "parity leaf filter_image[*] \u2014 Qud's categoryImageMap sprite, tan two-tone.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.5
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_category_frame",
+                    "label": "Category cell: frame",
+                    "note": "parity leaf filter_frame[*] \u2014 corner-loop chrome (ported 2026-08-04).",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.8
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_category_hover",
+                    "label": "Category cell: hover",
+                    "note": "Qud brightens the whole cell frame (51,80,91)->(65,106,115) on hover; ported and verified live (delta 4.05 vs Qud 4.12).",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.9
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_category_select",
+                    "label": "Category cell: select",
+                    "note": "gold frame + list filtering on click; multi-select mirrors enabledCategories.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.8
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_category_order",
+                    "label": "Category strip: order",
+                    "note": "filterOrder = category of the alphabetically-first item; equipped items included.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.9
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_category_water",
+                    "label": "Category header: water/drams",
+                    "note": "the $drams figure in the header line (GetFreeDrams).",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.7
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_category_weight",
+                    "label": "Category header: weight",
+                    "note": "carried/max lbs in the header; the header block placement is still ~2px off.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.6
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_list_categories",
+                    "label": "List: categories",
+                    "note": "category rows with [-]/[+] and Qud's own name colouring.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.8
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_list_category_weight",
+                    "label": "List: category weight",
+                    "note": "the |n lbs.| column, right-aligned at x1673.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.9
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_line_icon",
+                    "label": "Line item: icon",
+                    "note": "per-row item tile from RenderForUI(\"Inventory\").",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.7
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_line_text",
+                    "label": "Line item: description text",
+                    "note": "row label from GameObject.DisplayName incl. the nameless-item fallback.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.9
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_line_colors",
+                    "label": "Line item: description colours",
+                    "note": "Qud markup resolved through the palette + CP437 badge glyphs.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.9
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_scrolling",
+                    "label": "List: scrolling",
+                    "note": "wheel/PageUp/PageDown through the inventory; no capture-diff coverage yet.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.5
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_item_popup",
+                    "label": "Item interaction popup",
+                    "note": "Qud's own menu, raised by EquipmentAPI.TwiddleObject and mirrored over the popup channel. Parity spec: raves-of-qud/reports/2026-08-05-item-popup/parity-item-popup.json. Qud's popup carries a HEADER above the commands (item tile + name + notched divider) that Raves does not draw yet -- the leaves below measure that gap, so their scores are the size of the work remaining, not a misalignment.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.5
+                    },
+                    "detect": {},
+                    "children": [
+                      {
+                        "id": "item_popup_image_frame",
+                        "label": "Image frame (above the commands)",
+                        "note": "parity leaf popup_image_frame - the framed header block, Qud x825-1079 y334-486. 16.48.",
+                        "done": {
+                          "qud": 1.0,
+                          "raves": 0.0
+                        },
+                        "detect": {}
+                      },
+                      {
+                        "id": "item_popup_frame_text_content",
+                        "label": "Image frame: text content",
+                        "note": "parity leaf popup_frame_text_content - the item name line inside the block. 32.21.",
+                        "done": {
+                          "qud": 1.0,
+                          "raves": 0.0
+                        },
+                        "detect": {}
+                      },
+                      {
+                        "id": "item_popup_frame_text_color",
+                        "label": "Image frame: text colour",
+                        "note": "parity leaf popup_frame_text_color (kind ink_color - palette only, position ignored). 25.80.",
+                        "done": {
+                          "qud": 1.0,
+                          "raves": 0.0
+                        },
+                        "detect": {}
+                      },
+                      {
+                        "id": "item_popup_image_geometry",
+                        "label": "Image: size / position",
+                        "note": "parity leaf popup_image_geometry (kind geometry - ink bbox only, colour ignored). Qud 42x54 at x939 y369; 47.00px mean.",
+                        "done": {
+                          "qud": 1.0,
+                          "raves": 0.0
+                        },
+                        "detect": {}
+                      },
+                      {
+                        "id": "item_popup_image_color",
+                        "label": "Image: colour",
+                        "note": "parity leaf popup_image_color (kind ink_color). 106.33.",
+                        "done": {
+                          "qud": 1.0,
+                          "raves": 0.0
+                        },
+                        "detect": {}
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "status_tinkering",
+                "label": "tinkering",
+                "done": {
+                  "qud": 0.5,
+                  "raves": 0.0
+                },
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "status_tinkering"
+                    }
+                  ]
+                },
+                "goto": {
+                  "qud": [
+                    {
+                      "dismiss": {
+                        "scene": "PopupMessage",
+                        "bridge": "uiback"
+                      },
+                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up. That is what made the equipment key look broken for a whole session. Driving popups over the bridge is what leaves them, so any recipe that may follow one should clear it first; uiback does, verified."
+                    },
+                    {
+                      "dismiss": {
+                        "scene": "DynamicPopupMessage",
+                        "bridge": "uiback"
+                      },
+                      "note": "the other popup class, same treatment"
+                    },
+                    {
+                      "goto": "status_screens",
+                      "note": "the real opener, which this recipe used to lack -- it merely ASSERTED the screen was already open ('opener recipe TBD') and so failed whenever it was not. Note it opens by CLICKING the HUD button: Qud's own 'e' opens the screen but is not a toggle, so it cannot be used to reach a known state."
+                    },
+                    {
+                      "activate": "CavesOfQud"
+                    },
+                    {
+                      "click_hover": [
+                        925,
+                        136
+                      ],
+                      "window": "CavesOfQud"
+                    },
+                    {
+                      "sleep": 1.0
+                    }
+                  ],
+                  "raves": [
+                    {
+                      "goto": "in_game"
+                    },
+                    {
+                      "activate": "Raves of Qud"
+                    },
+                    {
+                      "key": "n",
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "assert": {
+                        "scene": "status_tinkering",
+                        "app": "raves"
+                      },
+                      "timeout": 8
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "status_journal",
+                "label": "journal",
+                "done": {
+                  "qud": 0.5,
+                  "raves": 0.0
+                },
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "status_journal"
+                    }
+                  ]
+                },
+                "goto": {
+                  "qud": [
+                    {
+                      "dismiss": {
+                        "scene": "PopupMessage",
+                        "bridge": "uiback"
+                      },
+                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up. That is what made the equipment key look broken for a whole session. Driving popups over the bridge is what leaves them, so any recipe that may follow one should clear it first; uiback does, verified."
+                    },
+                    {
+                      "dismiss": {
+                        "scene": "DynamicPopupMessage",
+                        "bridge": "uiback"
+                      },
+                      "note": "the other popup class, same treatment"
+                    },
+                    {
+                      "goto": "status_screens",
+                      "note": "the real opener, which this recipe used to lack -- it merely ASSERTED the screen was already open ('opener recipe TBD') and so failed whenever it was not. Note it opens by CLICKING the HUD button: Qud's own 'e' opens the screen but is not a toggle, so it cannot be used to reach a known state."
+                    },
+                    {
+                      "activate": "CavesOfQud"
+                    },
+                    {
+                      "click_hover": [
+                        1095,
+                        136
+                      ],
+                      "window": "CavesOfQud"
+                    },
+                    {
+                      "sleep": 1.0
+                    }
+                  ],
+                  "raves": [
+                    {
+                      "goto": "in_game"
+                    },
+                    {
+                      "activate": "Raves of Qud"
+                    },
+                    {
+                      "key": "j",
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "assert": {
+                        "scene": "status_journal",
+                        "app": "raves"
+                      },
+                      "timeout": 8
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "status_quests",
+                "label": "quests",
+                "done": {
+                  "qud": 0.5,
+                  "raves": 0.0
+                },
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "status_quests"
+                    }
+                  ]
+                },
+                "goto": {
+                  "qud": [
+                    {
+                      "dismiss": {
+                        "scene": "PopupMessage",
+                        "bridge": "uiback"
+                      },
+                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up. That is what made the equipment key look broken for a whole session. Driving popups over the bridge is what leaves them, so any recipe that may follow one should clear it first; uiback does, verified."
+                    },
+                    {
+                      "dismiss": {
+                        "scene": "DynamicPopupMessage",
+                        "bridge": "uiback"
+                      },
+                      "note": "the other popup class, same treatment"
+                    },
+                    {
+                      "goto": "status_screens",
+                      "note": "the real opener, which this recipe used to lack -- it merely ASSERTED the screen was already open ('opener recipe TBD') and so failed whenever it was not. Note it opens by CLICKING the HUD button: Qud's own 'e' opens the screen but is not a toggle, so it cannot be used to reach a known state."
+                    },
+                    {
+                      "activate": "CavesOfQud"
+                    },
+                    {
+                      "click_hover": [
+                        1250,
+                        136
+                      ],
+                      "window": "CavesOfQud"
+                    },
+                    {
+                      "sleep": 1.0
+                    }
+                  ],
+                  "raves": [
+                    {
+                      "goto": "in_game"
+                    },
+                    {
+                      "activate": "Raves of Qud"
+                    },
+                    {
+                      "key": "q",
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "assert": {
+                        "scene": "status_quests",
+                        "app": "raves"
+                      },
+                      "timeout": 8
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "status_reputation",
+                "label": "reputation",
+                "done": {
+                  "qud": 0.5,
+                  "raves": 0.0
+                },
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "status_reputation"
+                    }
+                  ]
+                },
+                "goto": {
+                  "qud": [
+                    {
+                      "dismiss": {
+                        "scene": "PopupMessage",
+                        "bridge": "uiback"
+                      },
+                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up. That is what made the equipment key look broken for a whole session. Driving popups over the bridge is what leaves them, so any recipe that may follow one should clear it first; uiback does, verified."
+                    },
+                    {
+                      "dismiss": {
+                        "scene": "DynamicPopupMessage",
+                        "bridge": "uiback"
+                      },
+                      "note": "the other popup class, same treatment"
+                    },
+                    {
+                      "goto": "status_screens",
+                      "note": "the real opener, which this recipe used to lack -- it merely ASSERTED the screen was already open ('opener recipe TBD') and so failed whenever it was not. Note it opens by CLICKING the HUD button: Qud's own 'e' opens the screen but is not a toggle, so it cannot be used to reach a known state."
+                    },
+                    {
+                      "activate": "CavesOfQud"
+                    },
+                    {
+                      "click_hover": [
+                        1420,
+                        136
+                      ],
+                      "window": "CavesOfQud"
+                    },
+                    {
+                      "sleep": 1.0
+                    }
+                  ],
+                  "raves": [
+                    {
+                      "goto": "in_game"
+                    },
+                    {
+                      "activate": "Raves of Qud"
+                    },
+                    {
+                      "key": "ctrl+f",
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "assert": {
+                        "scene": "status_reputation",
+                        "app": "raves"
+                      },
+                      "timeout": 8
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "status_messagelog",
+                "label": "messagelog",
+                "done": {
+                  "qud": 0.9,
+                  "raves": 0.8
+                },
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "status_messagelog"
+                    }
+                  ]
+                },
+                "goto": {
+                  "qud": [
+                    {
+                      "assert": {
+                        "scene": "StatusScreensScreen",
+                        "app": "qud"
+                      },
+                      "timeout": 5,
+                      "note": "open the status screen first (opener recipe TBD)"
+                    },
+                    {
+                      "activate": "CavesOfQud"
+                    },
+                    {
+                      "click_hover": [
+                        1615,
+                        136
+                      ],
+                      "window": "CavesOfQud"
+                    },
+                    {
+                      "sleep": 1.0
+                    }
+                  ],
+                  "raves": [
+                    {
+                      "goto": "in_game"
+                    },
+                    {
+                      "activate": "Raves of Qud"
+                    },
+                    {
+                      "key": "f2",
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "sleep": 0.6
+                    },
+                    {
+                      "click": [
+                        1615,
+                        136
+                      ],
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "assert": {
+                        "scene": "status_messagelog",
+                        "app": "raves"
+                      },
+                      "timeout": 8
+                    }
+                  ]
+                }
+              }
+            ],
+            "goto": {
+              "qud": [
+                {
+                  "goto": "in_game"
+                },
+                {
+                  "activate": "CavesOfQud"
+                },
+                {
+                  "click_hover": [
+                    1729,
+                    70
+                  ],
+                  "window": "CavesOfQud"
+                },
+                {
+                  "sleep": 1.2
+                },
+                {
+                  "assert": {
+                    "scene": "StatusScreensScreen",
+                    "app": "qud"
+                  },
+                  "timeout": 10
+                }
+              ]
+            }
+          },
+          {
+            "id": "control_mapping",
+            "label": "Control Mapping",
+            "note": "system menu -> Control Mapping. QUD DETECTION GAP: KeybindsScreen never updates _ActiveGameView (scene stays 'play'), so qud detect leans on OCR only.",
+            "done": {
+              "qud": 0.8,
+              "raves": 0.3
+            },
+            "detect": {
+              "raves": [
+                {
+                  "scene": "control_mapping"
+                }
+              ],
+              "qud": [
+                {
+                  "ocr_any": [
+                    "control mapping",
+                    "configuring controller"
+                  ]
+                }
+              ]
+            },
+            "goto": {
+              "raves": [
+                {
+                  "goto": "in_game"
+                },
+                {
+                  "activate": "Raves of Qud"
+                },
+                {
+                  "sleep": 2.0,
+                  "note": "post-restart settle \u2014 the bridge client needs a beat before Esc lands as CmdSystemMenu"
+                },
+                {
+                  "key": "escape",
+                  "window": "Raves of Qud",
+                  "note": "1:1 Esc = CmdSystemMenu; the popup mirrors back"
+                },
+                {
+                  "assert": {
+                    "popup": "menu",
+                    "app": "raves"
+                  },
+                  "timeout": 8
+                },
+                {
+                  "click_text": "Control Mapping",
+                  "window": "Raves of Qud"
+                },
+                {
+                  "assert": {
+                    "scene": "control_mapping",
+                    "app": "raves"
+                  },
+                  "timeout": 8
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "summary",
+        "label": "Game over / summary",
+        "note": "the tombstone + GameSummaryScreen after a death (Wander mode returns to the picker afterwards). Injected Esc is IGNORED here \u2014 a restart is the reliable exit.",
+        "done": {
+          "qud": 1.0,
+          "raves": 0.0
+        },
+        "detect": {
+          "qud": [
+            {
+              "scene": [
+                "GameSummaryScreen",
+                "TombstoneScreen"
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
 }
