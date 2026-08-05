@@ -215,3 +215,30 @@ when nothing is up is a no-op the mod logs and discards.
 Verified for both apps: `goto title` from a live game passes on repeated cycles, `title <-> in_game`
 round-trips, and the fixture save's timestamp is unchanged throughout. `_load_save`'s restart path
 is untouched — it is still the right move when the goal is a CLEAN process, not just the title.
+
+
+## The Qud equipment screen: an opener, a ghost, and ten dead clicks (2026-08-05)
+
+`goto qud status_equipment` never opened anything. Its recipe carried the note "open the status
+screen first (opener recipe TBD)" and merely ASSERTED the screen was already up, so it failed
+whenever it was not. It now chains `status_screens` (which opens by CLICKING the HUD button --
+Qud's own `e` opens the screen but is not a toggle, so it cannot be used to reach a known state)
+and then clicks the Equipment tab.
+
+Two things it uncovered, both of which had been costing time for a while:
+
+**The ghost modal.** `UIManager.popupMessages` is a free pool, and a RELEASED copy still looks
+live -- so the mod can report `scene=PopupMessage` with nothing on screen, and Qud swallows every
+key while it believes a modal is up. That is what made the equipment key look broken for a whole
+session; the key was fine. `uiback` clears it (verified), so both the equipment and title recipes
+now self-heal `PopupMessage` as well as `DynamicPopupMessage`. Driving popups over the bridge is
+what leaves them, so any scripted popup work should expect one.
+
+**Ten dead click steps.** Every Qud status-tab recipe wrote its click as
+`{"click": {"window": …, "x": …, "y": …}}`, but the engine reads `{"click"|"click_hover": [x,y],
+"window": …}` -- so `window` resolved to None and the step failed EVERY time it ran, in all eight
+tab recipes plus the status_screens opener and one Raves recipe. Nobody noticed because the
+screen was usually already open and no recipe asserted afterwards. The goto trace surfaced it in
+one line: `error: no window None`.
+
+Verified from a clean in-game state: closed -> open on the Equipment tab, 7 steps, no failures.

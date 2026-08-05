@@ -88,6 +88,13 @@
       },
       {
        "dismiss": {
+        "scene": "PopupMessage",
+        "bridge": "uiback"
+       },
+       "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up. That is what made the equipment key look broken for a whole session. Driving popups over the bridge is what leaves them, so any recipe that may follow one should clear it first; uiback does, verified."
+      },
+      {
+       "dismiss": {
         "scene": "DynamicPopupMessage",
         "bridge": "uiback"
        },
@@ -1017,12 +1024,11 @@
            "activate": "CavesOfQud"
           },
           {
-           "click": {
-            "window": "CavesOfQud",
-            "x": 277,
-            "y": 136,
-            "hover": true
-           }
+           "click_hover": [
+            277,
+            136
+           ],
+           "window": "CavesOfQud"
           },
           {
            "sleep": 1.0
@@ -1077,12 +1083,11 @@
            "activate": "CavesOfQud"
           },
           {
-           "click": {
-            "window": "CavesOfQud",
-            "x": 500,
-            "y": 136,
-            "hover": true
-           }
+           "click_hover": [
+            500,
+            136
+           ],
+           "window": "CavesOfQud"
           },
           {
            "sleep": 1.0
@@ -1126,26 +1131,44 @@
         "goto": {
          "qud": [
           {
-           "assert": {
-            "scene": "StatusScreensScreen",
-            "app": "qud"
+           "dismiss": {
+            "scene": "PopupMessage",
+            "bridge": "uiback"
            },
-           "timeout": 5,
-           "note": "open the status screen first (opener recipe TBD)"
+           "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up. That is what made the equipment key look broken for a whole session. Driving popups over the bridge is what leaves them, so any recipe that may follow one should clear it first; uiback does, verified."
+          },
+          {
+           "dismiss": {
+            "scene": "DynamicPopupMessage",
+            "bridge": "uiback"
+           },
+           "note": "the other popup class, same treatment"
+          },
+          {
+           "goto": "status_screens",
+           "note": "the real opener, which this recipe used to lack -- it merely ASSERTED the screen was already open ('opener recipe TBD') and so failed whenever it was not. Note it opens by CLICKING the HUD button: Qud's own 'e' opens the screen but is not a toggle, so it cannot be used to reach a known state."
           },
           {
            "activate": "CavesOfQud"
           },
           {
-           "click": {
-            "window": "CavesOfQud",
-            "x": 745,
-            "y": 136,
-            "hover": true
-           }
+           "note": "the Equipment tab in the 8-tab bar",
+           "click_hover": [
+            745,
+            136
+           ],
+           "window": "CavesOfQud"
           },
           {
            "sleep": 1.0
+          },
+          {
+           "assert": {
+            "scene": "StatusScreensScreen",
+            "app": "qud"
+           },
+           "timeout": 10,
+           "note": "the mod reports the SCREEN, not which tab -- the tab itself is not observable from first-party state, so this is as far as the assert can go"
           }
          ],
          "raves": [
@@ -1452,12 +1475,11 @@
            "activate": "CavesOfQud"
           },
           {
-           "click": {
-            "window": "CavesOfQud",
-            "x": 925,
-            "y": 136,
-            "hover": true
-           }
+           "click_hover": [
+            925,
+            136
+           ],
+           "window": "CavesOfQud"
           },
           {
            "sleep": 1.0
@@ -1512,12 +1534,11 @@
            "activate": "CavesOfQud"
           },
           {
-           "click": {
-            "window": "CavesOfQud",
-            "x": 1095,
-            "y": 136,
-            "hover": true
-           }
+           "click_hover": [
+            1095,
+            136
+           ],
+           "window": "CavesOfQud"
           },
           {
            "sleep": 1.0
@@ -1572,12 +1593,11 @@
            "activate": "CavesOfQud"
           },
           {
-           "click": {
-            "window": "CavesOfQud",
-            "x": 1250,
-            "y": 136,
-            "hover": true
-           }
+           "click_hover": [
+            1250,
+            136
+           ],
+           "window": "CavesOfQud"
           },
           {
            "sleep": 1.0
@@ -1632,12 +1652,11 @@
            "activate": "CavesOfQud"
           },
           {
-           "click": {
-            "window": "CavesOfQud",
-            "x": 1420,
-            "y": 136,
-            "hover": true
-           }
+           "click_hover": [
+            1420,
+            136
+           ],
+           "window": "CavesOfQud"
           },
           {
            "sleep": 1.0
@@ -1692,12 +1711,11 @@
            "activate": "CavesOfQud"
           },
           {
-           "click": {
-            "window": "CavesOfQud",
-            "x": 1615,
-            "y": 136,
-            "hover": true
-           }
+           "click_hover": [
+            1615,
+            136
+           ],
+           "window": "CavesOfQud"
           },
           {
            "sleep": 1.0
@@ -1718,11 +1736,11 @@
            "sleep": 0.6
           },
           {
-           "click": {
-            "window": "Raves of Qud",
-            "x": 1615,
-            "y": 136
-           }
+           "click": [
+            1615,
+            136
+           ],
+           "window": "Raves of Qud"
           },
           {
            "assert": {
@@ -1744,12 +1762,11 @@
          "activate": "CavesOfQud"
         },
         {
-         "click": {
-          "window": "CavesOfQud",
-          "x": 1729,
-          "y": 70,
-          "hover": true
-         }
+         "click_hover": [
+          1729,
+          70
+         ],
+         "window": "CavesOfQud"
         },
         {
          "sleep": 1.2
