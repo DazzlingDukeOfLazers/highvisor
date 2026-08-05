@@ -904,7 +904,7 @@
      {
       "id": "status_screens",
       "label": "Status screens (8-tab in-game menu)",
-      "note": "Qud: ONE scene (StatusScreensScreen) for all tabs; per-tab detection needs the planned heartbeat statusTab export. Tab clicks REQUIRE hover-first (hv click --hover) \u2014 plain clicks only hover-select. Plan: raves docs/status-screens-plan.md Qud opener: hover-click the person icon (1729,70).",
+      "note": "Qud: ONE scene (StatusScreensScreen) for all tabs; per-tab detection needs the planned heartbeat statusTab export. Tab clicks REQUIRE hover-first (hv click --hover) \u2014 plain clicks only hover-select. Plan: raves docs/status-screens-plan.md Qud opener: hover-click the person icon (1729,70). Raves opener keys = Qud's Commands.xml defaults (k/x/e/i/n/j/q, ctrl+f).",
       "done": {
        "qud": 0.5,
        "raves": 0.0
@@ -980,18 +980,8 @@
            "activate": "Raves of Qud"
           },
           {
-           "key": "f2",
+           "key": "k",
            "window": "Raves of Qud"
-          },
-          {
-           "sleep": 0.8
-          },
-          {
-           "click": {
-            "window": "Raves of Qud",
-            "x": 277,
-            "y": 136
-           }
           },
           {
            "assert": {
@@ -1050,18 +1040,8 @@
            "activate": "Raves of Qud"
           },
           {
-           "key": "f2",
+           "key": "x",
            "window": "Raves of Qud"
-          },
-          {
-           "sleep": 0.8
-          },
-          {
-           "click": {
-            "window": "Raves of Qud",
-            "x": 500,
-            "y": 136
-           }
           },
           {
            "assert": {
@@ -1120,18 +1100,8 @@
            "activate": "Raves of Qud"
           },
           {
-           "key": "f2",
+           "key": "e",
            "window": "Raves of Qud"
-          },
-          {
-           "sleep": 0.8
-          },
-          {
-           "click": {
-            "window": "Raves of Qud",
-            "x": 745,
-            "y": 136
-           }
           },
           {
            "assert": {
@@ -1141,7 +1111,200 @@
            "timeout": 8
           }
          ]
-        }
+        },
+        "note": "Leaf scores come from raves-of-qud tools/capture/parity.py with reports/2026-08-04-status-screens/parity-equipment.json \u2014 region-scoped, masked diffs (image = sprite ink with the chrome masked out, frame = chrome with the interior masked, composite = both). Whole-frame means are too noisy to adjudicate these: the live playfield behind the scrim shifts the average by ~0.7 between identical builds.",
+        "children": [
+         {
+          "id": "equipment_doll_image",
+          "label": "Doll: item images",
+          "note": "parity leaf doll_image[*] \u2014 equipped sprite ink only.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.3
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_doll_frame",
+          "label": "Doll: slot frames",
+          "note": "parity leaf doll_frame[*] \u2014 slot chrome only.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.7
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_doll_cell",
+          "label": "Doll: slot (image+frame)",
+          "note": "parity leaf doll_cell[*] \u2014 what the eye sees.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.5
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_filter_image",
+          "label": "Filter: category icons",
+          "note": "parity leaf filter_image[*] \u2014 icon ink only.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.3
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_filter_frame",
+          "label": "Filter: cell frames",
+          "note": "parity leaf filter_frame[*] \u2014 corner-loop chrome, ported 2026-08-04.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.8
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_filter_cell",
+          "label": "Filter: cell (image+frame)",
+          "note": "parity leaf filter_cell[*].",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.6
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_category_image",
+          "label": "Category cell: image",
+          "note": "parity leaf filter_image[*] \u2014 Qud's categoryImageMap sprite, tan two-tone.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.5
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_category_frame",
+          "label": "Category cell: frame",
+          "note": "parity leaf filter_frame[*] \u2014 corner-loop chrome (ported 2026-08-04).",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.8
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_category_hover",
+          "label": "Category cell: hover",
+          "note": "Qud brightens the whole cell frame (51,80,91)->(65,106,115) on hover; ported and verified live (delta 4.05 vs Qud 4.12).",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.9
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_category_select",
+          "label": "Category cell: select",
+          "note": "gold frame + list filtering on click; multi-select mirrors enabledCategories.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.8
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_category_order",
+          "label": "Category strip: order",
+          "note": "filterOrder = category of the alphabetically-first item; equipped items included.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.9
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_category_water",
+          "label": "Category header: water/drams",
+          "note": "the $drams figure in the header line (GetFreeDrams).",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.7
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_category_weight",
+          "label": "Category header: weight",
+          "note": "carried/max lbs in the header; the header block placement is still ~2px off.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.6
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_list_categories",
+          "label": "List: categories",
+          "note": "category rows with [-]/[+] and Qud's own name colouring.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.8
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_list_category_weight",
+          "label": "List: category weight",
+          "note": "the |n lbs.| column, right-aligned at x1673.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.9
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_line_icon",
+          "label": "Line item: icon",
+          "note": "per-row item tile from RenderForUI(\"Inventory\").",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.7
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_line_text",
+          "label": "Line item: description text",
+          "note": "row label from GameObject.DisplayName incl. the nameless-item fallback.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.9
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_line_colors",
+          "label": "Line item: description colours",
+          "note": "Qud markup resolved through the palette + CP437 badge glyphs.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.9
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_scrolling",
+          "label": "List: scrolling",
+          "note": "wheel/PageUp/PageDown through the inventory; no capture-diff coverage yet.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.5
+          },
+          "detect": {}
+         }
+        ]
        },
        {
         "id": "status_tinkering",
@@ -1190,18 +1353,8 @@
            "activate": "Raves of Qud"
           },
           {
-           "key": "f2",
+           "key": "n",
            "window": "Raves of Qud"
-          },
-          {
-           "sleep": 0.8
-          },
-          {
-           "click": {
-            "window": "Raves of Qud",
-            "x": 925,
-            "y": 136
-           }
           },
           {
            "assert": {
@@ -1260,18 +1413,8 @@
            "activate": "Raves of Qud"
           },
           {
-           "key": "f2",
+           "key": "j",
            "window": "Raves of Qud"
-          },
-          {
-           "sleep": 0.8
-          },
-          {
-           "click": {
-            "window": "Raves of Qud",
-            "x": 1095,
-            "y": 136
-           }
           },
           {
            "assert": {
@@ -1330,18 +1473,8 @@
            "activate": "Raves of Qud"
           },
           {
-           "key": "f2",
+           "key": "q",
            "window": "Raves of Qud"
-          },
-          {
-           "sleep": 0.8
-          },
-          {
-           "click": {
-            "window": "Raves of Qud",
-            "x": 1250,
-            "y": 136
-           }
           },
           {
            "assert": {
@@ -1400,18 +1533,8 @@
            "activate": "Raves of Qud"
           },
           {
-           "key": "f2",
+           "key": "ctrl+f",
            "window": "Raves of Qud"
-          },
-          {
-           "sleep": 0.8
-          },
-          {
-           "click": {
-            "window": "Raves of Qud",
-            "x": 1420,
-            "y": 136
-           }
           },
           {
            "assert": {
@@ -1474,7 +1597,7 @@
            "window": "Raves of Qud"
           },
           {
-           "sleep": 0.8
+           "sleep": 0.6
           },
           {
            "click": {
@@ -1519,6 +1642,67 @@
           "app": "qud"
          },
          "timeout": 10
+        }
+       ]
+      }
+     },
+     {
+      "id": "control_mapping",
+      "label": "Control Mapping",
+      "note": "system menu -> Control Mapping. QUD DETECTION GAP: KeybindsScreen never updates _ActiveGameView (scene stays 'play'), so qud detect leans on OCR only.",
+      "done": {
+       "qud": 0.8,
+       "raves": 0.3
+      },
+      "detect": {
+       "raves": [
+        {
+         "scene": "control_mapping"
+        }
+       ],
+       "qud": [
+        {
+         "ocr_any": [
+          "control mapping",
+          "configuring controller"
+         ]
+        }
+       ]
+      },
+      "goto": {
+       "raves": [
+        {
+         "goto": "in_game"
+        },
+        {
+         "activate": "Raves of Qud"
+        },
+        {
+         "sleep": 2.0,
+         "note": "post-restart settle \u2014 the bridge client needs a beat before Esc lands as CmdSystemMenu"
+        },
+        {
+         "key": "escape",
+         "window": "Raves of Qud",
+         "note": "1:1 Esc = CmdSystemMenu; the popup mirrors back"
+        },
+        {
+         "assert": {
+          "popup": "menu",
+          "app": "raves"
+         },
+         "timeout": 8
+        },
+        {
+         "click_text": "Control Mapping",
+         "window": "Raves of Qud"
+        },
+        {
+         "assert": {
+          "scene": "control_mapping",
+          "app": "raves"
+         },
+         "timeout": 8
         }
        ]
       }

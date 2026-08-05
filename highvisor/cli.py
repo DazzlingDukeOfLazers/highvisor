@@ -800,6 +800,8 @@ def build_parser():
     s.add_argument("name", nargs="+", help="the save's character name, exactly as the picker shows it")
     s.set_defaults(fn=_cmd_loadsave)
 
+    s = sub.add_parser("back", help="close/back out of Qud's current modern menu (first-party uiback)")
+    s.set_defaults(fn=lambda a: _print_json(_call({"op": P.OP_QUDBACK})))
     s = sub.add_parser("restart", help="clean restart: kill ALL instances, launch solo, wait for the window")
     s.add_argument("app", help="qud | raves")
     s.set_defaults(fn=_cmd_restart)
