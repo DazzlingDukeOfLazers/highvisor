@@ -1197,10 +1197,10 @@
          {
           "id": "equipment_category_hover",
           "label": "Category cell: hover",
-          "note": "hover highlight on a filter cell \u2014 NOT IMPLEMENTED in Raves yet.",
+          "note": "Qud brightens the whole cell frame (51,80,91)->(65,106,115) on hover; ported and verified live (delta 4.05 vs Qud 4.12).",
           "done": {
            "qud": 1.0,
-           "raves": 0.0
+           "raves": 0.9
           },
           "detect": {}
          },
