@@ -254,6 +254,9 @@ class Engine:
         if op == P.OP_LOAD_SAVE:
             return self._load_save(b, req.get("name", ""))
 
+        if op == P.OP_TRACE:
+            return self._read_trace(req.get("limit", 20))
+
         if op == P.OP_RESTART:
             return self._restart_app(b, req.get("app", ""))
 
@@ -830,6 +833,55 @@ class Engine:
                 return False
         return True
 
+    # ------------------------------------------------------- goto tracing
+    # Every goto run appends one record here: the state it STEERED BY on entry, each
+    # step's outcome, and the state it left behind. Written for the failure that could
+    # not be diagnosed after the fact -- a goto that reported ok because the app was
+    # "already at" a node it had actually just left, followed by an assert that failed
+    # with nothing to show why. A trivial success and a real one look identical in the
+    # return value; they do not look identical here.
+    TRACE_PATH = "~/.config/highvisor/goto-trace.jsonl"
+    TRACE_KEEP = 400          # lines; a bounded ring so it can be left on forever
+
+    def _trace(self, record):
+        import json as _json
+        import os as _os
+        import time as _time
+        try:
+            p = _os.path.expanduser(self.TRACE_PATH)
+            _os.makedirs(_os.path.dirname(p), exist_ok=True)
+            record = dict(record, t=_time.strftime("%Y-%m-%dT%H:%M:%S"))
+            with open(p, "a", encoding="utf-8") as fh:
+                fh.write(_json.dumps(record) + "\n")
+            # trim in place, cheaply, only when it has grown well past the cap
+            try:
+                with open(p, "r", encoding="utf-8") as fh:
+                    lines = fh.readlines()
+                if len(lines) > self.TRACE_KEEP * 2:
+                    with open(p, "w", encoding="utf-8") as fh:
+                        fh.writelines(lines[-self.TRACE_KEEP:])
+            except OSError:
+                pass
+        except Exception:
+            pass          # tracing must never break a drive
+
+    def _read_trace(self, limit=20):
+        import json as _json
+        import os as _os
+        p = _os.path.expanduser(self.TRACE_PATH)
+        try:
+            with open(p, "r", encoding="utf-8") as fh:
+                lines = fh.readlines()[-int(limit):]
+        except OSError:
+            return {"ok": True, "runs": [], "path": p, "note": "no trace yet"}
+        runs = []
+        for ln in lines:
+            try:
+                runs.append(_json.loads(ln))
+            except ValueError:
+                pass
+        return {"ok": True, "runs": runs, "path": p}
+
     # ------------------------------------------------------- gamego (drive-to-state)
     def _gamego(self, b, app, node_id, _depth=0):
         """Drive ``app`` to tree state ``node_id`` via the node's goto[app] recipe.
@@ -866,13 +918,29 @@ class Engine:
         # correctly reports records as title>menu_box>records, but being on the Records
         # SCREEN is not being on the title screen, and skipping the recipe strands us.
         st = self._gamestate(b).get("states", {}).get(app) or {}
+        entry = _slim_state(st)
         if st.get("node") == node_id:
+            # The trivial success. Worth tracing precisely BECAUSE it runs no steps:
+            # when it is wrong, it is wrong silently and the caller's next assert is
+            # what fails.
+            self._trace({"app": app, "node": node_id, "depth": _depth, "ok": True,
+                         "entry": entry, "steps": [], "detail": "already there"})
             return {"ok": True, "app": app, "node": node_id, "steps": [],
                     "detail": "already at %s" % node_id, "state": _slim_state(st)}
         steps = []
 
+        def _finish(ok, error=None):
+            """Record the run: what it steered by, what it did, where it ended up."""
+            try:
+                after = _slim_state(self._gamestate(b).get("states", {}).get(app) or {})
+            except Exception:
+                after = None
+            self._trace({"app": app, "node": node_id, "depth": _depth, "ok": ok,
+                         "entry": entry, "exit": after, "steps": steps, "error": error})
+
         def fail(step, why):
             steps.append({"step": step, "ok": False, "error": why})
+            _finish(False, why)
             return {"ok": False, "app": app, "node": node_id, "steps": steps, "error": why}
 
         for step in recipe:
@@ -1042,6 +1110,9 @@ class Engine:
             else:
                 return fail(step, "unknown step %r" % step)
         st = self._gamestate(b).get("states", {}).get(app)
+        # A recipe that ran every step without error has still not necessarily ARRIVED --
+        # that is the case the trace exists for, so record where it actually ended up.
+        _finish(True)
         return {"ok": True, "app": app, "node": node_id, "steps": steps,
                 "state": _slim_state(st)}
 

@@ -236,6 +236,38 @@ def _cmd_restart(a):
     raise SystemExit(0 if res.get("ok") else 1)
 
 
+def _cmd_trace(a):
+    """The last N goto runs, one line each: what it steered by -> what it reached.
+
+    Reads like a flight recorder, which is the point -- a goto that fails is usually
+    only diagnosable AFTER the fact, and the interesting field is `entry`: the state
+    the recipe believed it was starting from.
+    """
+    res = _call({"op": P.OP_TRACE, "limit": a.limit})
+    if a.json:
+        _print_json(res)
+        raise SystemExit(0 if res.get("ok") else 1)
+    runs = res.get("runs") or []
+    if not runs:
+        print("no goto runs recorded yet (%s)" % res.get("path"))
+        return
+    for r in runs:
+        entry = (r.get("entry") or {}).get("node") or "?"
+        exit_ = (r.get("exit") or {}).get("node") or "?"
+        mark = "ok " if r.get("ok") else "FAIL"
+        nsteps = len(r.get("steps") or [])
+        line = "%s  %s  %-6s %-18s %s -> %s  (%d steps)" % (
+            r.get("t", ""), mark, r.get("app", ""), r.get("node", ""), entry, exit_, nsteps)
+        if r.get("detail"):
+            line += "  [%s]" % r["detail"]
+        print(line)
+        if not r.get("ok"):
+            print("      error: %s" % r.get("error"))
+            for st in (r.get("steps") or []):
+                if not st.get("ok"):
+                    print("      failed step: %s" % st.get("step"))
+
+
 def _cmd_abort(a):
     """Panic: release focus/mouse NOW; refuse control ops for 30s."""
     _print_json(_call({"op": P.OP_ABORT}))
@@ -805,6 +837,11 @@ def build_parser():
     s = sub.add_parser("restart", help="clean restart: kill ALL instances, launch solo, wait for the window")
     s.add_argument("app", help="qud | raves")
     s.set_defaults(fn=_cmd_restart)
+
+    s = sub.add_parser("trace", help="last N goto runs: what each STEERED BY and what it reached")
+    s.add_argument("limit", nargs="?", type=int, default=20)
+    s.add_argument("--json", action="store_true")
+    s.set_defaults(fn=_cmd_trace)
 
     sub.add_parser("abort", help="PANIC: release focus/mouse now; refuse control ops for 30s").set_defaults(fn=_cmd_abort)
 

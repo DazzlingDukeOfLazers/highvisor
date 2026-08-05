@@ -45,6 +45,7 @@ OP_LAUNCH_SAVE = "launch_save"    # name, spec -> {ok, saved, path}
 OP_GAMETREE = "gametree"          # -> {ok, tree} (the canonical game state-machine tree)
 OP_GAMESTATE = "gamestate"        # [ocr] -> {ok, states:{app:{node,label,path,off,running,via}}}
 OP_GAMEGO = "gamego"              # app, node -> drive the app to that tree state via its goto recipe
+OP_TRACE = "trace"                # limit -> the last N goto runs: what each steered by, did, reached
 OP_ASSERT = "assert_state"        # app, [node|scene|popup|ocr_contains|present], timeout -> {ok, pass, actual, elapsed}
 OP_WRITE_TEXT = "write_text"      # path (under $HOME), content -> {ok, path, bytes} (small config writes)
 OP_QUDWISH = "qudwish"            # wish -> {ok, wish} — run a Caves of Qud wish via the Raves mod bridge

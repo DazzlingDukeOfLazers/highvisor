@@ -144,3 +144,27 @@ essentially immediately). The likeliest cause of that flakiness was the popup re
 fixed in raves-of-qud `cd62ff8`, which had Qud dumping a GPU texture, writing a PNG and deleting a
 file twice a second. The gate is kept because the postcondition is strictly better and costs about
 0.7s, not because it is a proven fix.
+
+
+## goto tracing: the flight recorder (2026-08-05)
+
+Every `goto` run appends a record to `~/.config/highvisor/goto-trace.jsonl` (bounded ring, ~400
+runs): the state it **steered by** on entry, each step's outcome, and the state it left behind.
+Read it with `hv trace [n]`.
+
+It exists because a failing goto is normally only diagnosable after the fact, and the return value
+cannot tell a real success from a trivial one — a recipe that reports `ok` because the app was
+"already at" a node it had in fact just left looks identical to one that drove there. In the trace
+they do not: the `entry` field is the belief the run acted on.
+
+It earned itself within a minute of existing. Three consecutive failures all read:
+
+    FAIL raves in_game   title -> title   error: text 'continue' not on screen (16 ocr lines)
+
+An OCR of the window showed why: Raves was on the **LOAD GAME** screen (save picker), while its
+state file still reported `scene=title`. So every recipe that assumes the title MENU clicks for a
+"Continue" that is not there, fails, and leaves the app exactly where it was — which is why retries
+never helped and only a restart appeared to fix it.
+
+The fix belongs in the app, per the standing rule: **when detection is wrong, teach the app to
+report the scene.** `LoadGameScreen` needs a `UiState.set_scene` call.
