@@ -1111,7 +1111,70 @@
            "timeout": 8
           }
          ]
-        }
+        },
+        "note": "Leaf scores come from raves-of-qud tools/capture/parity.py with reports/2026-08-04-status-screens/parity-equipment.json \u2014 region-scoped, masked diffs (image = sprite ink with the chrome masked out, frame = chrome with the interior masked, composite = both). Whole-frame means are too noisy to adjudicate these: the live playfield behind the scrim shifts the average by ~0.7 between identical builds.",
+        "children": [
+         {
+          "id": "equipment_doll_image",
+          "label": "Doll: item images",
+          "note": "parity leaf doll_image[*] \u2014 equipped sprite ink only.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.3
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_doll_frame",
+          "label": "Doll: slot frames",
+          "note": "parity leaf doll_frame[*] \u2014 slot chrome only.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.7
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_doll_cell",
+          "label": "Doll: slot (image+frame)",
+          "note": "parity leaf doll_cell[*] \u2014 what the eye sees.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.5
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_filter_image",
+          "label": "Filter: category icons",
+          "note": "parity leaf filter_image[*] \u2014 icon ink only.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.3
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_filter_frame",
+          "label": "Filter: cell frames",
+          "note": "parity leaf filter_frame[*] \u2014 corner-loop chrome, ported 2026-08-04.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.8
+          },
+          "detect": {}
+         },
+         {
+          "id": "equipment_filter_cell",
+          "label": "Filter: cell (image+frame)",
+          "note": "parity leaf filter_cell[*].",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.6
+          },
+          "detect": {}
+         }
+        ]
        },
        {
         "id": "status_tinkering",
