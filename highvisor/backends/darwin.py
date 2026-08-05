@@ -39,6 +39,7 @@ except ImportError:  # newer pyobjc
         kAXValueTypeCGPoint as kAXValueCGPointType,
         kAXValueTypeCGSize as kAXValueCGSizeType)
 
+from ..apps import PROFILES
 from ..backend import ActionResult, BackendError, Element, PlatformBackend, Target
 
 # NSBitmapImageFileTypePNG is 4; the symbol moved across pyobjc versions, so pin it.
@@ -114,12 +115,37 @@ class MacBackend(PlatformBackend):
                 if int(w.get("kCGWindowOwnerPID", -1)) == pid:
                     return w
             raise BackendError("no on-screen window for pid %d" % pid)
+        # A KNOWN APP ALIAS ("qud", "raves") resolves through the app registry, not by raw
+        # substring. This is not a convenience -- it is a correctness fix. Raves' window is
+        # titled "Raves of Qud (DEBUG)", so a bare "qud" substring matched BOTH apps and the
+        # front-to-back scan silently returned whichever happened to be frontmost. Every
+        # `hv shot qud` taken with Raves in front captured RAVES, and the same went for
+        # key/click/activate -- a wrong-window capture that still looks plausible is the
+        # worst possible failure for parity work, because it scores as a perfect match.
+        prof = PROFILES.get(ref.lower())
+        if prof and prof.get("window"):
+            want = prof["window"].lower()
+            for w in wins:
+                if want in (w.get("kCGWindowName") or "").lower():
+                    return w
+            raise BackendError("no window for app %r (expected title ~ %r)" % (ref, prof["window"]))
+
         low = ref.lower()
-        for w in wins:
-            if (low in (w.get("kCGWindowName") or "").lower()
-                    or low in (w.get("kCGWindowOwnerName") or "").lower()):
-                return w
-        raise BackendError("no window matching ~ %r" % ref)
+        hits = [w for w in wins
+                if low in (w.get("kCGWindowName") or "").lower()
+                or low in (w.get("kCGWindowOwnerName") or "").lower()]
+        if not hits:
+            raise BackendError("no window matching ~ %r" % ref)
+        # Ambiguity is an ERROR, not a coin flip on z-order: picking the frontmost is exactly
+        # how the bug above went unnoticed. Two windows of the SAME app are fine (that's one
+        # target); two different apps are not.
+        pids = {int(w.get("kCGWindowOwnerPID", -1)) for w in hits}
+        if len(pids) > 1:
+            names = ", ".join("win:%s %s" % (w.get("kCGWindowNumber"), w.get("kCGWindowName") or "?")
+                              for w in hits)
+            raise BackendError("%r is ambiguous across %d apps: %s -- use win:<id> or an app alias"
+                               % (ref, len(pids), names))
+        return hits[0]
 
     def _bounds(self, w) -> tuple:
         """(x, y, w, h) of a CGWindow dict, in points."""

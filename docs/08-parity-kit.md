@@ -116,6 +116,15 @@ PYTHONPATH=<highvisor> python -m highvisor.cli scene --all --parity --text \
 
 ## Gotchas (the hard-won bits)
 
+- **A target string is an APP ALIAS or a `win:<id>` — never a loose substring.** `_resolve`
+  used to substring-match window titles front-to-back, and Raves' window is titled
+  **"Raves of Qud (DEBUG)"** — which contains "qud". So `hv shot qud` returned whichever of
+  the two happened to be frontmost, and the same went for `key`/`click`/`activate`. It failed
+  silently and *plausibly*: a Raves capture labelled `qud` scores as a perfect parity match,
+  which is the worst way for a measurement rig to be wrong. Aliases in `apps.PROFILES` now
+  resolve through the registry's exact window name, and a free-form string that matches two
+  different apps is a hard error listing both rather than a coin flip on z-order. **If a
+  parity number from before this looks too good, re-measure it.**
 - **Qud's legacy popups need `--hover`.** A bare warp+click drives Unity UI buttons
   (Qud's toolbar, its title menu) but its *console* popups (the in-game ☰ menu, "press
   [Space]" prompts) activate the item under `Input.mousePosition`, which
