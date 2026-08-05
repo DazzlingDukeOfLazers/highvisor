@@ -119,3 +119,28 @@ automated loop has to walk the pre-game menus by mouse first:
 
 Verified end-to-end this session: title → Continue → Load picker → save row → bridge up,
 entirely via `hv click --hover`.
+
+
+## Restart readiness: a window is not an app (2026-08-05)
+
+`restart` used to return as soon as a window with the right title existed. For a Godot app that is
+about a second after launch — before settings load, before the bridge connects, before the app has
+reported a scene — so "restart succeeded" told a caller nothing about whether driving it would
+work. It now additionally waits for the app's own state file to carry a write NEWER than the
+launch, and reports `reporting: true|false`.
+
+Newer-than-launch is the test, not freshness: the dying process's last write is only a second or
+two old and looks perfectly fresh, so freshness alone cannot distinguish the new process's first
+word from the corpse's last.
+
+For Qud this is the more valuable half — its window appears well before the mod has compiled and
+started its heartbeat, and `loadsave` needs the mod, not the window.
+
+**Honest scope.** This was written to fix an intermittent `restart → goto → assert` failure, and it
+is NOT demonstrated to do so. By the time it existed the failure had stopped reproducing: six
+trials, warm and cold (i.e. straight after a rebuild), with the gate both enabled and disabled, all
+passed — and no ghost report was observable either (Raves' state file flips to the new process
+essentially immediately). The likeliest cause of that flakiness was the popup re-announce churn
+fixed in raves-of-qud `cd62ff8`, which had Qud dumping a GPU texture, writing a PNG and deleting a
+file twice a second. The gate is kept because the postcondition is strictly better and costs about
+0.7s, not because it is a proven fix.

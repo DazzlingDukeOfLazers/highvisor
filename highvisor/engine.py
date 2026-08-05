@@ -567,6 +567,7 @@ class Engine:
         spec, largs = resolve_launch(launcher)
         if not spec:
             return {"ok": False, "error": "no launcher %r" % launcher}
+        launched_at = _t.time()
         b.launch(spec, largs)
         deadline = _t.time() + 45
         appeared = False
@@ -575,14 +576,61 @@ class Engine:
                 appeared = True
                 break
             _t.sleep(1.0)
-        if appeared:
+        if not appeared:
+            return {"ok": False, "launched": spec, "window": None,
+                    "error": "window never appeared"}
+        try:
+            self._dock(b, win)   # standing slot rule, best-effort
+        except Exception:
+            pass
+        # A WINDOW IS NOT READINESS: Godot puts one up in about a second, before the
+        # app has loaded settings, connected or reported anything. Returning on the
+        # window alone gave callers a postcondition they could not use -- "restart
+        # succeeded" told you nothing about whether driving it would work.
+        #
+        # This waits for a report written AFTER we launched, which is the difference
+        # between the new process's first word and the dead one's last (freshness
+        # alone cannot tell them apart: the corpse's write is only a second old).
+        #
+        # HONEST SCOPE: this was written to fix an intermittent restart->goto->assert
+        # failure, and it does NOT demonstrably do so -- by the time it existed the
+        # failure had stopped reproducing (6 trials, warm and cold, with the gate
+        # both on and off, all passed; and no ghost report was observable either).
+        # The flakiness most likely came from the popup re-announce churn fixed in
+        # raves-of-qud cd62ff8, which had Qud dumping a GPU texture twice a second.
+        # Kept because the postcondition is strictly better and costs ~0.7s, not
+        # because it is a proven fix.
+        reporting = self._await_report(app, launched_at)
+        return {"ok": True, "launched": spec, "window": win,
+                "reporting": reporting,
+                "error": None if reporting
+                         else "window up but the app never reported a scene; "
+                              "driving it now would steer by the previous process"}
+
+    def _await_report(self, app, since, timeout=60.0):
+        """Block until `app`'s state file carries a write NEWER than `since`.
+
+        mtime > launch time is what separates the new process's first report from the
+        dead one's last -- freshness alone cannot, because the corpse's write is only
+        a second or two old and looks perfectly fresh.
+        """
+        import os as _os
+        import time as _t
+        from . import gametree
+        cfg = (gametree.apps(gametree.load_tree()).get(app) or {})
+        path = cfg.get("state_file")
+        if not path:
+            return None          # app authors no report; nothing to wait for
+        p = _os.path.expanduser(path)
+        deadline = _t.time() + timeout
+        while _t.time() < deadline:
             try:
-                self._dock(b, win)   # standing slot rule, best-effort
-            except Exception:
+                if _os.path.getmtime(p) > since:
+                    return True
+            except OSError:
                 pass
-        return {"ok": appeared, "launched": spec,
-                "window": win if appeared else None,
-                "error": None if appeared else "window never appeared"}
+            _t.sleep(0.25)
+        return False
 
     # ------------------------------------------------------- load save BY NAME
     def _load_save(self, b, name):

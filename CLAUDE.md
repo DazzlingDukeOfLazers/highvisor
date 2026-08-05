@@ -18,12 +18,17 @@ fix compounds. Concretely:
 | screenshot-then-guess "what screen is it on?" | `hv state` (first-party scene reports), `hv probe` |
 | click-drive to a known screen by hand | `hv goto <app> <node>` (gametree recipes) |
 | sleep-and-hope waiting for a state | `hv assert --app qud --node in_game --timeout 20` |
-| pkill/osascript restart seances | `hv restart qud` / `hv restart raves` (kills ALL instances incl. duplicates, relaunches, waits) |
+| pkill/osascript restart seances | `hv restart qud` / `hv restart raves` (kills ALL instances incl. duplicates, relaunches, waits for the app to REPORT) |
 | blind top-row Continue clicks | `hv loadsave <name>` (row computed from DISK metadata — `hv saves` lists them, no game launch) |
 
 The daemon **self-restarts** (2026-08-03): a source watcher re-execs it when any highvisor `.py`
 changes (edit → it picks itself up in ~2s), and `hv install-daemon` adds a launchd KeepAlive agent
-for crash restart. If `nc -z 127.0.0.1 48720` fails AND the agent isn't installed, ask Daniel.
+for crash restart. **You cannot check that by PID or uptime** — `os.execv` replaces the
+process image in place, so both are PRESERVED across a re-exec. A daemon showing hours of uptime
+may well be running code you saved a minute ago. To tell, grep the daemon log for
+`source changed: … — re-exec`, or call an op and look for behaviour only the new code has. (Cost
+of learning this the other way: a wrong "the watcher is broken" conclusion, and a pointless manual
+daemon restart.) If `nc -z 127.0.0.1 48720` fails AND the agent isn't installed, ask Daniel.
 `webui/` static files still only need a browser reload.
 
 ## THE TIMESHARE GUARD — this machine is shared
