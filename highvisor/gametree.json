@@ -1303,6 +1303,68 @@
            "raves": 0.5
           },
           "detect": {}
+         },
+         {
+          "id": "equipment_item_popup",
+          "label": "Item interaction popup",
+          "note": "Qud's own menu, raised by EquipmentAPI.TwiddleObject and mirrored over the popup channel. Parity spec: raves-of-qud/reports/2026-08-05-item-popup/parity-item-popup.json. Qud's popup carries a HEADER above the commands (item tile + name + notched divider) that Raves does not draw yet -- the leaves below measure that gap, so their scores are the size of the work remaining, not a misalignment.",
+          "done": {
+           "qud": 1.0,
+           "raves": 0.5
+          },
+          "detect": {},
+          "children": [
+           {
+            "id": "item_popup_image_frame",
+            "label": "Image frame (above the commands)",
+            "note": "parity leaf popup_image_frame - the framed header block, Qud x825-1079 y334-486. 16.48.",
+            "done": {
+             "qud": 1.0,
+             "raves": 0.0
+            },
+            "detect": {}
+           },
+           {
+            "id": "item_popup_frame_text_content",
+            "label": "Image frame: text content",
+            "note": "parity leaf popup_frame_text_content - the item name line inside the block. 32.21.",
+            "done": {
+             "qud": 1.0,
+             "raves": 0.0
+            },
+            "detect": {}
+           },
+           {
+            "id": "item_popup_frame_text_color",
+            "label": "Image frame: text colour",
+            "note": "parity leaf popup_frame_text_color (kind ink_color - palette only, position ignored). 25.80.",
+            "done": {
+             "qud": 1.0,
+             "raves": 0.0
+            },
+            "detect": {}
+           },
+           {
+            "id": "item_popup_image_geometry",
+            "label": "Image: size / position",
+            "note": "parity leaf popup_image_geometry (kind geometry - ink bbox only, colour ignored). Qud 42x54 at x939 y369; 47.00px mean.",
+            "done": {
+             "qud": 1.0,
+             "raves": 0.0
+            },
+            "detect": {}
+           },
+           {
+            "id": "item_popup_image_color",
+            "label": "Image: colour",
+            "note": "parity leaf popup_image_color (kind ink_color). 106.33.",
+            "done": {
+             "qud": 1.0,
+             "raves": 0.0
+            },
+            "detect": {}
+           }
+          ]
          }
         ]
        },
