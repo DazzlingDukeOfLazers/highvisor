@@ -153,6 +153,13 @@
       },
       {
        "dismiss": {
+        "scene": "loadgame",
+        "key": "Escape"
+       },
+       "note": "self-heal: back out of the Continue/Load Game picker. Its omission is why goto got STUCK there: the picker is a descendant of title, so the recipe's final assert passed by containment while the app never left, and the next step then clicked for a 'Continue' that is not on the picker."
+      },
+      {
+       "dismiss": {
         "scene": "quit_dialog",
         "key": "Escape"
        }
@@ -821,10 +828,17 @@
        "window": "Raves of Qud"
       },
       {
+       "dismiss": {
+        "scene": "loadgame",
+        "key": "space"
+       },
+       "note": "CONDITIONAL: Raves' Continue opens the LOAD GAME picker when there is a choice to make and goes straight in-game when there is not, so this presses the picker's [Space] select only if we actually landed there. The recipe predated the picker entirely, which is how a run could stop at it -- and the title recipe, equally unaware, could not back out."
+      },
+      {
        "assert": {
         "node": "in_game"
        },
-       "timeout": 20
+       "timeout": 60
       }
      ]
     },
