@@ -201,6 +201,17 @@ The postcondition for a dismiss is now that the app's (scene, popup) PAIR change
 lets one branch serve all three shapes: closing a screen moves the scene, raising a confirm moves
 the popup, answering one moves it back.
 
-**Still restart-based:** Qud's own `title` recipe. `_load_save` restarts Qud to reach the title,
-which works and is untouched here; Qud's modern UI ignores synthesized keys, so its confirms
-cannot be driven the same way unless Raves is up to mirror them.
+Qud's own recipe does the same thing WITHOUT Raves, and without a single key:
+
+    dismiss {scene: play, command: CmdQuit, answers: [Yes, No]}
+
+`CmdQuit` goes through Qud's own command path, and each confirm is answered by BUTTON through
+the mod (`popup / action:button / btn:`), which dismisses the popup it announced. That matters
+because Qud's modern UI ignores OS-synthesized keys outright — the constraint that made this look
+undoable. Qud publishes no popup state of its own, so the prompts cannot be conditioned
+individually the way Raves' can; instead the chain is sent blind, which is safe because answering
+when nothing is up is a no-op the mod logs and discards.
+
+Verified for both apps: `goto title` from a live game passes on repeated cycles, `title <-> in_game`
+round-trips, and the fixture save's timestamp is unchanged throughout. `_load_save`'s restart path
+is untouched — it is still the right move when the goal is a CLEAN process, not just the title.

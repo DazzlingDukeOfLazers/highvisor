@@ -77,6 +77,17 @@
       },
       {
        "dismiss": {
+        "scene": "play",
+        "command": "CmdQuit",
+        "answers": [
+         "Yes",
+         "No"
+        ]
+       },
+       "note": "LEAVE A LIVE GAME, first-party throughout: CmdQuit is pushed through Qud's own command path and the confirms are answered by BUTTON via the mod, so nothing here depends on synthesized keys -- which Qud's modern UI ignores outright. Yes to 'are you sure you want to quit', then NO to 'do you want to save first': Yes there would overwrite the fixture save with whatever state the harness drove the character into, destroying the reference every parity capture is measured against. Previously the only way out of a live game was a restart (see _load_save)."
+      },
+      {
+       "dismiss": {
         "scene": "DynamicPopupMessage",
         "bridge": "uiback"
        },

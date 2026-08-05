@@ -519,6 +519,28 @@ class Engine:
         except OSError as e:
             return {"ok": False, "error": "qud bridge: %s" % e}
 
+    def _qud_popup_answer(self, btn):
+        """Answer Qud's OWN popup by its bottom-button command (Yes/No/Cancel).
+
+        The mod dismisses the popup it announced, so this needs no keys and no focus --
+        which matters because Qud's modern UI ignores OS-synthesized keys entirely.
+        Answering when no popup is up is a harmless no-op (the mod logs "no target"),
+        so a fixed sequence can be sent without first detecting each prompt.
+        """
+        import json as _json
+        import socket as _socket
+        import struct as _struct
+        from .apps import PROFILES
+        port = PROFILES.get("qud", {}).get("port", 48710)
+        payload = _json.dumps({"type": "command", "name": "popup",
+                               "action": "button", "btn": btn}).encode("utf-8")
+        try:
+            with _socket.create_connection(("127.0.0.1", port), timeout=3) as s:
+                s.sendall(_struct.pack(">I", len(payload)) + payload)
+            return {"ok": True, "btn": btn}
+        except OSError as e:
+            return {"ok": False, "error": "qud bridge: %s" % e}
+
     def _qud_bridge(self, name):
         """Send a bare {"type":"command","name":...} frame to the Qud mod bridge
         (listener is up from the main menu on — ModSensitiveCacheInit). First-party
@@ -1096,6 +1118,12 @@ class Engine:
                         r = self._qud_command(cond["command"])
                         if not r.get("ok"):
                             return fail(step, "dismiss command: %s" % r.get("error"))
+                        # the command may raise a chain of confirms it owns
+                        for btn in (cond.get("answers") or []):
+                            time.sleep(1.2)
+                            rr = self._qud_popup_answer(btn)
+                            if not rr.get("ok"):
+                                return fail(step, "dismiss answer: %s" % rr.get("error"))
                     elif cond.get("bridge"):
                         # first-party dismissal — no OCR, no coords, no focus steal
                         r = self._qud_bridge(cond["bridge"])
@@ -1123,6 +1151,17 @@ class Engine:
                         ox, oy = cond.get("offset") or (0, 0)
                         b.click(win.id, int((bx + bw / 2.0) / sc) + int(ox),
                                 int((by + bh / 2.0) / sc) + int(oy), hover=True)
+                    elif cond.get("answers"):
+                        # A fixed chain of popup ANSWERS, first-party through the mod.
+                        # Qud reports no popup state of its own, so the steps cannot be
+                        # conditioned individually the way Raves' can -- but an answer
+                        # with nothing to answer is a no-op, so the chain is safe to
+                        # send blind and still says exactly what it is doing.
+                        for btn in cond["answers"]:
+                            rr = self._qud_popup_answer(btn)
+                            if not rr.get("ok"):
+                                return fail(step, "dismiss answer: %s" % rr.get("error"))
+                            time.sleep(1.2)
                     elif cond.get("keys"):
                         # A SEQUENCE, verified once at the end. Needed because some keys
                         # move a selection INSIDE a modal rather than answering it: the
