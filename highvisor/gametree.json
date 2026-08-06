@@ -877,6 +877,11 @@
               "window": "Raves of Qud"
             },
             {
+              "key": "space",
+              "window": "Raves of Qud",
+              "note": "ACTIVATE. Raves' main menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted Continue and stopped there. The recipe then sat at the title forever, which reads as 'Raves won't connect to the bridge' -- it had simply never left the menu."
+            },
+            {
               "dismiss": {
                 "scene": "loadgame",
                 "key": "space"
