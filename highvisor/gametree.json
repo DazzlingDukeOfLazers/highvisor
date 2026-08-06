@@ -68,6 +68,13 @@
         "goto": {
           "qud": [
             {
+              "dismiss": {
+                "scene": "StatusScreensScreen",
+                "bridge": "uiback"
+              },
+              "note": "CLOSE THE STATUS SCREENS FIRST. Nothing dismissed them on the way out, so a Qud parked on any of the eight tabs could not reach in_game or title -- the recipe just failed its own assert and left the screen up. Worse than a plain failure: a capture taken after it looks like a map shot and is actually a status screen, which is how a 'the world shows through Qud's status backdrop' reading came out of comparing one status screen against another. uiback routes StatusScreensScreen to its unguarded Exit()."
+            },
+            {
               "launch": "qud_solo",
               "unless_running": true
             },
@@ -849,6 +856,13 @@
         },
         "goto": {
           "qud": [
+            {
+              "dismiss": {
+                "scene": "StatusScreensScreen",
+                "bridge": "uiback"
+              },
+              "note": "CLOSE THE STATUS SCREENS FIRST. Nothing dismissed them on the way out, so a Qud parked on any of the eight tabs could not reach in_game or title -- the recipe just failed its own assert and left the screen up. Worse than a plain failure: a capture taken after it looks like a map shot and is actually a status screen, which is how a 'the world shows through Qud's status backdrop' reading came out of comparing one status screen against another. uiback routes StatusScreensScreen to its unguarded Exit()."
+            },
             {
               "goto": "title"
             },
