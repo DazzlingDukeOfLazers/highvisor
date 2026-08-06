@@ -592,21 +592,26 @@
           {
             "id": "modding_toolkit",
             "label": "Modding Toolkit (secondary-links menu)",
-            "note": "Walked live on Lumpy (Win11 4K, Qud 1.0.5, 2026-08-06); captures in the session scratchpad. Coordinates are Lumpy 3840x2160 window px — HALVE for the standard 1920x1080 slots. QUIRKS: this legacy console menu ignores scancode arrow keys (title menu needs them) — drive it by hover-clicking rows; Enter selects, Space does not; the first click after a focus change is eaten by activation, so recipes double-click. No OCR/state detection on Windows yet (hv ocr is macOS-only; qud_state.json needs the bridge mod deployed) — asserts omitted until one exists.",
+            "note": "Walked live on Lumpy (Win11 4K, Qud 1.0.5, 2026-08-06); captures in the session scratchpad. Coordinates are Lumpy 3840x2160 window px — HALVE for the standard 1920x1080 slots. QUIRKS: this legacy console menu ignores scancode arrow keys (title menu needs them) — drive it by hover-clicking rows; Enter selects, Space does not; the first click after a focus change is eaten by activation, so recipes double-click. SCENES: the bridge mod heartbeat reports first-party names for every toolkit screen (UIManager._currentWindow + SingletonWindowBase probes) — detect entries below use them; ocr_any stays as the Mac fallback.",
             "done": {
-              "qud": 0.7,
+              "qud": 0.9,
               "raves": 0.0
             },
             "detect": {
-              "qud": {
-                "ocr_any": [
-                  "mod manager",
-                  "workshop uploader",
-                  "histographicnomicon",
-                  "waveform collapse map generator"
-                ],
-                "game_live": false
-              }
+              "qud": [
+                {
+                  "scene": "ModToolkit"
+                },
+                {
+                  "ocr_any": [
+                    "mod manager",
+                    "workshop uploader",
+                    "histographicnomicon",
+                    "waveform collapse map generator"
+                  ],
+                  "game_live": false
+                }
+              ]
             },
             "goto": {
               "qud": [
@@ -631,6 +636,12 @@
                   ],
                   "window": "CavesOfQud",
                   "note": "repeat — first click may be eaten by activation; lands in empty space if already open"
+                },
+                {
+                  "assert": {
+                    "node": "modding_toolkit"
+                  },
+                  "timeout": 10
                 }
               ]
             },
@@ -638,12 +649,18 @@
               {
                 "id": "mod_manager",
                 "label": "Mod Manager",
-                "note": "opens the SAME Mods screen as title>menu_box>mods (two-pane list + tile preview, footer [Esc] Back / [v] Disable All); list empty until mods are installed",
+                "note": "opens the SAME Mods screen as title>menu_box>mods (two-pane list + tile preview, footer [Esc] Back / [v] Disable All); list empty until mods are installed. Esc exits to TITLE (verified), not the toolkit menu.",
                 "done": {
-                  "qud": 0.7,
+                  "qud": 0.9,
                   "raves": 0.0
                 },
-                "detect": {},
+                "detect": {
+                  "qud": [
+                    {
+                      "scene": "ModManagerUI"
+                    }
+                  ]
+                },
                 "goto": {
                   "qud": [
                     {
@@ -664,10 +681,16 @@
                 "label": "Workshop Uploader",
                 "note": "modern full-screen UI: < Back / browse mods folder / refresh, Mods-folder list, 'Select a mod to manage it'. Esc does NOT exit — click < Back at [217,74]; Back returns to TITLE, not the toolkit menu.",
                 "done": {
-                  "qud": 0.6,
+                  "qud": 0.9,
                   "raves": 0.0
                 },
-                "detect": {},
+                "detect": {
+                  "qud": [
+                    {
+                      "scene": "SteamWorkshopUploaderView"
+                    }
+                  ]
+                },
                 "goto": {
                   "qud": [
                     {
@@ -686,12 +709,18 @@
               {
                 "id": "map_editor",
                 "label": "Map Editor",
-                "note": "80x25 canvas + searchable blueprint palette (In Use filter) + File/Edit/Transform/View/Recent menu bar; Ctrl+Click paint, Alt+Click pick, Ctrl+Z/Y. Exit: File [90,33] > Exit [129,520] > confirm Yes [1851,1110] -> returns to the TOOLKIT menu (unlike the Back-to-title tools).",
+                "note": "80x25 canvas + searchable blueprint palette (In Use filter) + File/Edit/Transform/View/Recent menu bar; Ctrl+Click paint, Alt+Click pick, Ctrl+Z/Y. Exit: File [90,33] > Exit [129,520] > confirm Yes [1851,1110] -> returns to the TOOLKIT menu (unlike the Back-to-title tools). Also flips the legacy view to 'MapEditor' — which then STAYS stale after exit; trust `scene` (window-priority), not `view`.",
                 "done": {
-                  "qud": 0.7,
+                  "qud": 0.9,
                   "raves": 0.0
                 },
-                "detect": {},
+                "detect": {
+                  "qud": [
+                    {
+                      "scene": "MapEditorWindow"
+                    }
+                  ]
+                },
                 "goto": {
                   "qud": [
                     {
@@ -742,10 +771,16 @@
                 "label": "Blueprint Browser",
                 "note": "filterable collapsible tree of the full ObjectBlueprints hierarchy (Object, SultanMuralController expandable) — the natural UI mirror of the Object Checker enumeration. Back [3709,2068] returns to TITLE.",
                 "done": {
-                  "qud": 0.6,
+                  "qud": 0.9,
                   "raves": 0.0
                 },
-                "detect": {},
+                "detect": {
+                  "qud": [
+                    {
+                      "scene": "BrowseBlueprintsView"
+                    }
+                  ]
+                },
                 "goto": {
                   "qud": [
                     {
@@ -786,10 +821,16 @@
                 "label": "Histographicnomicon",
                 "note": "history-generation debug tool: Generate / Test Failure Redirect / Test Variable, scrollable output canvas, Reload + Back. Back [3717,2097] returns to TITLE.",
                 "done": {
-                  "qud": 0.6,
+                  "qud": 0.9,
                   "raves": 0.0
                 },
-                "detect": {},
+                "detect": {
+                  "qud": [
+                    {
+                      "scene": "HistoryTestView"
+                    }
+                  ]
+                },
                 "goto": {
                   "qud": [
                     {
@@ -810,10 +851,16 @@
                 "label": "Waveform Collapse Map Generator",
                 "note": "white preview canvas + parameter console (default 'pass:temple,n=3,width=78,height=23'), Generate / Generate Fast / Reseed To Static / TTest. Back [3706,2090] returns to TITLE.",
                 "done": {
-                  "qud": 0.6,
+                  "qud": 0.9,
                   "raves": 0.0
                 },
-                "detect": {},
+                "detect": {
+                  "qud": [
+                    {
+                      "scene": "WaveformTestView"
+                    }
+                  ]
+                },
                 "goto": {
                   "qud": [
                     {
