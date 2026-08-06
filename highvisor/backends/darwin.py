@@ -616,21 +616,54 @@ class MacBackend(PlatformBackend):
     def _char_keycode(self, ch: str):
         return _US_KEYCODES.get(ch.lower())
 
+    # Physical keycodes for the modifiers, so a combo can PRESS and RELEASE them for real.
+    _MOD_KEYS = (
+        (Quartz.kCGEventFlagMaskControl, 0x3B),
+        (Quartz.kCGEventFlagMaskShift, 0x38),
+        (Quartz.kCGEventFlagMaskAlternate, 0x3A),
+        (Quartz.kCGEventFlagMaskCommand, 0x37),
+    )
+
     def _post_key(self, keycode: int, flags: int, pid: Optional[int] = None):
         # HID-system source, same as click(): Unity's input system IGNORES keyboard
         # events synthesized with a None source (Qud's modern menus dropped every
         # injected Escape until this matched the known-good click path). Small gap
         # between down and up so per-frame pollers can't miss the pair.
+        #
+        # MODIFIERS ARE PRESSED AND RELEASED FOR REAL, not smuggled onto the key event.
+        # Setting kCGEventFlagMaskControl on a keyboard event posted to the HID tap makes
+        # macOS believe Control is HELD, and nothing here ever cleared it — so after one
+        # `hv key <win> ctrl+tab` EVERY subsequent key arrived modified. A later plain "n"
+        # reached the app as Ctrl+N and silently did nothing, which is exactly how Raves'
+        # status-screen openers "intermittently" stopped working: they stopped the moment a
+        # combo was first sent and stayed broken for the life of the session. Bracketing the
+        # key with genuine modifier down/up leaves the global modifier state as we found it.
         src = Quartz.CGEventSourceCreate(Quartz.kCGEventSourceStateHIDSystemState)
-        for down in (True, False):
-            ev = Quartz.CGEventCreateKeyboardEvent(src, keycode, down)
-            if flags:
-                Quartz.CGEventSetFlags(ev, flags)
+
+        def _post(ev):
             if pid:
                 Quartz.CGEventPostToPid(pid, ev)
             else:
                 Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
-            time.sleep(0.03)
+            time.sleep(0.02)
+
+        mods = [(mask, kc) for mask, kc in self._MOD_KEYS if flags & mask]
+        acc = 0
+        for mask, kc in mods:                      # press each modifier
+            acc |= mask
+            ev = Quartz.CGEventCreateKeyboardEvent(src, kc, True)
+            Quartz.CGEventSetFlags(ev, acc)
+            _post(ev)
+        for down in (True, False):                 # the key itself
+            ev = Quartz.CGEventCreateKeyboardEvent(src, keycode, down)
+            if flags:
+                Quartz.CGEventSetFlags(ev, flags)
+            _post(ev)
+        for mask, kc in reversed(mods):            # release, innermost first
+            acc &= ~mask
+            ev = Quartz.CGEventCreateKeyboardEvent(src, kc, False)
+            Quartz.CGEventSetFlags(ev, acc)
+            _post(ev)
 
     def _post_char(self, ch: str, pid: Optional[int] = None):
         """Type one character by its unicode (keycode 0 + a unicode payload) so any

@@ -116,6 +116,16 @@ PYTHONPATH=<highvisor> python -m highvisor.cli scene --all --parity --text \
 
 ## Gotchas (the hard-won bits)
 
+- **A modified key used to leave its MODIFIER STUCK DOWN, silently corrupting every later key.**
+  `_post_key` set `kCGEventFlagMaskControl` on the key event and nothing ever cleared it, so macOS
+  went on believing Control was held: after one `hv key <win> ctrl+tab`, a later plain `n` reached
+  the app as **Ctrl+N** and did nothing. That is the whole explanation for Raves' status-screen
+  openers "intermittently" breaking — they stopped the moment a combo was first sent and stayed
+  broken for the rest of the session, on every app, for every key. Modifiers are now PRESSED AND
+  RELEASED as real key events around the keystroke. *Symptom to recognise:* single keys stop
+  working after you send your first combo, and a fresh app launch does not fix it (the stuck state
+  is in the OS, not the app).
+
 - **Qud's uiQueue does NOT drain while its window is in the BACKGROUND.** Measured: a
   `uiprobe` command sent with Qud backgrounded logged nothing at all, and ran the instant
   Qud was focused. Every bridge command that marshals onto that queue — `uiback`,
