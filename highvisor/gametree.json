@@ -1013,6 +1013,12 @@
                     {
                       "scene": "status_skills"
                     }
+                  ],
+                  "qud": [
+                    {
+                      "scene": "StatusScreensScreen",
+                      "tab": "SkillsAndPowers"
+                    }
                   ]
                 },
                 "goto": {
@@ -1072,6 +1078,12 @@
                     {
                       "scene": "status_attributes"
                     }
+                  ],
+                  "qud": [
+                    {
+                      "scene": "StatusScreensScreen",
+                      "tab": "Character"
+                    }
                   ]
                 },
                 "goto": {
@@ -1130,6 +1142,12 @@
                   "raves": [
                     {
                       "scene": "status_equipment"
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "scene": "StatusScreensScreen",
+                      "tab": "InventoryAndEquipment"
                     }
                   ]
                 },
@@ -1464,6 +1482,12 @@
                     {
                       "scene": "status_tinkering"
                     }
+                  ],
+                  "qud": [
+                    {
+                      "scene": "StatusScreensScreen",
+                      "tab": "Tinkering"
+                    }
                   ]
                 },
                 "goto": {
@@ -1532,6 +1556,12 @@
                   "raves": [
                     {
                       "scene": "status_journal"
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "scene": "StatusScreensScreen",
+                      "tab": "Journal"
                     }
                   ]
                 },
@@ -1602,6 +1632,12 @@
                     {
                       "scene": "status_quests"
                     }
+                  ],
+                  "qud": [
+                    {
+                      "scene": "StatusScreensScreen",
+                      "tab": "Quests"
+                    }
                   ]
                 },
                 "goto": {
@@ -1671,6 +1707,12 @@
                     {
                       "scene": "status_reputation"
                     }
+                  ],
+                  "qud": [
+                    {
+                      "scene": "StatusScreensScreen",
+                      "tab": "Factions"
+                    }
                   ]
                 },
                 "goto": {
@@ -1739,6 +1781,12 @@
                   "raves": [
                     {
                       "scene": "status_messagelog"
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "scene": "StatusScreensScreen",
+                      "tab": "MessageLog"
                     }
                   ]
                 },

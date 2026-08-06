@@ -773,7 +773,8 @@ class Engine:
             win = self._find_win(wins, cfg.get("window"))
             signals = {"present": win is not None, "port_open": None,
                        "game_live": None, "ocr_text": None,
-                       "scene": self._read_scene(cfg.get("state_file"))}
+                       "scene": self._read_scene(cfg.get("state_file")),
+                       "tab": self._read_tab(cfg.get("state_file"))}
             port = cfg.get("port")
             if port:
                 try:
@@ -803,7 +804,7 @@ class Engine:
             st["window"] = win.to_dict() if win else None
             st["signals"] = {"present": signals["present"], "port_open": signals["port_open"],
                              "game_live": signals["game_live"],
-                             "scene": signals["scene"],
+                             "scene": signals["scene"], "tab": signals["tab"],
                              "ocr_used": signals["ocr_text"] is not None}
             st["extra"] = self._read_state_extra(cfg.get("state_file"))
             states[app] = st
@@ -835,6 +836,11 @@ class Engine:
     def _read_scene(self, path):
         d = self._read_state_file(path)
         return d.get("scene") if d else None
+
+    def _read_tab(self, path):
+        """The active SUB-SCREEN within the reported scene (Qud's status-screen tab)."""
+        d = self._read_state_file(path)
+        return d.get("tab") if d else None
 
     def _read_state_extra(self, path):
         """The full fresh report minus the scene key (mode, popup, zone, …) for the UI."""

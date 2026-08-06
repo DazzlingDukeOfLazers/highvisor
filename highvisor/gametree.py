@@ -8,13 +8,17 @@ signals for an app, decides which node that app is currently in. Gathering the s
 (window list, port check, OCR) lives in the engine, which has the backend.
 
 State evaluation (``evaluate``):
-  signals = {present: bool, port_open: bool|None, ocr_text: str|None, scene: str|None}
+  signals = {present: bool, port_open: bool|None, ocr_text: str|None, scene: str|None,
+             tab: str|None}
   - present False                       -> {"off": True}  (no window)
   - else walk the tree; a node MATCHES when every condition in its detect[app] holds:
         "port": True/False   -> requires port_open to equal it (skip if port_open is None)
         "ocr_any": [subs]    -> requires ocr_text to contain any substring
                                 (fails when ocr_text is None -> OCR-only nodes need an OCR poll)
         "scene": "name" | ["a","b"] -> requires the app-REPORTED scene to equal one of these.
+        "tab":   "name" | ["a","b"] -> same, for a sub-screen WITHIN the scene (Qud's status
+                                tabs). Pair it with "scene" so the tab name cannot match while
+                                a different window happens to be up.
                                 The apps author their own state files (the mod's qud_state.json;
                                 Raves' raves_state.json) — first-party truth, so it beats OCR
                                 guessing and works on every cheap poll. Fails when scene is None
@@ -102,6 +106,17 @@ def _matches(detect, app, signals):
         want = want if isinstance(want, list) else [want]
         if str(scene).lower() not in [str(w).lower() for w in want]:
             return False
+    if "tab" in cond:
+        # A SUB-SCREEN within the reported scene — Qud's status screens are eight tabs of one
+        # window, so `scene` alone bottoms out at status_screens and every tab below it was
+        # undetectable for Qud. The app reports the active tab by name in its state file.
+        tab = signals.get("tab")
+        if not tab:
+            return False
+        want = cond["tab"]
+        want = want if isinstance(want, list) else [want]
+        if str(tab).lower() not in [str(w).lower() for w in want]:
+            return False
     # matched every stated condition (a detector with only e.g. {"port": False} is valid)
     return True
 
@@ -127,7 +142,8 @@ def evaluate(tree, app, signals):
             cond = node["detect"][app]
             if isinstance(cond, list):   # OR-list: report via the first signature that matched
                 cond = next((c for c in cond if _matches({app: c}, app, signals)), {})
-            via = ("scene" if "scene" in cond
+            via = ("tab" if "tab" in cond
+                   else "scene" if "scene" in cond
                    else "ocr" if "ocr_any" in cond
                    else "live" if "game_live" in cond
                    else "port" if "port" in cond else "window")
