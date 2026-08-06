@@ -592,12 +592,17 @@
           {
             "id": "modding_toolkit",
             "label": "Modding Toolkit (secondary-links menu)",
-            "note": "Walked live on Lumpy (Win11 4K, Qud 1.0.5, 2026-08-06); captures in the session scratchpad. Coordinates are Lumpy 3840x2160 window px — HALVE for the standard 1920x1080 slots. QUIRKS: this legacy console menu ignores scancode arrow keys (title menu needs them) — drive it by hover-clicking rows; Enter selects, Space does not; the first click after a focus change is eaten by activation, so recipes double-click. SCENES: the bridge mod heartbeat reports first-party names for every toolkit screen (UIManager._currentWindow + SingletonWindowBase probes) — detect entries below use them; ocr_any stays as the Mac fallback.",
+            "note": "Walked live on Lumpy (Win11 4K, Qud 1.0.5, 2026-08-06); captures in the session scratchpad. Coordinates are Lumpy 3840x2160 window px — HALVE for the standard 1920x1080 slots. QUIRKS: this legacy console menu ignores scancode arrow keys (title menu needs them) — drive it by hover-clicking rows; Enter selects, Space does not; the first click after a focus change is eaten by activation, so recipes double-click. SCENES: the bridge mod heartbeat reports first-party names for every toolkit screen (UIManager._currentWindow + SingletonWindowBase probes) — detect entries below use them; ocr_any stays as the Mac fallback. RAVES: ModdingToolkitScreen.gd baseline shipped (box/title/9 rows/caret+bar/footer, scene report, Esc-close) — done.raves 0.5; polish pending: row pitch/font scale, box width vs longest row, top ornament, dimmed bears background art. Raves dev-run on Lumpy is DPI-virtualized (allow_hidpi=false, ~1.8x): click physical = logical*1.8 + (~10,31); captures are DWM-upscaled (soft) — export a build for congruence-grade pixels.",
             "done": {
               "qud": 0.9,
-              "raves": 0.0
+              "raves": 0.5
             },
             "detect": {
+              "raves": [
+                {
+                  "scene": "modding_toolkit"
+                }
+              ],
               "qud": [
                 {
                   "scene": "ModToolkit"
