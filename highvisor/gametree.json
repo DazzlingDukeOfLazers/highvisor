@@ -590,6 +590,248 @@
             "detect": {}
           },
           {
+            "id": "modding_toolkit",
+            "label": "Modding Toolkit (secondary-links menu)",
+            "note": "Walked live on Lumpy (Win11 4K, Qud 1.0.5, 2026-08-06); captures in the session scratchpad. Coordinates are Lumpy 3840x2160 window px — HALVE for the standard 1920x1080 slots. QUIRKS: this legacy console menu ignores scancode arrow keys (title menu needs them) — drive it by hover-clicking rows; Enter selects, Space does not; the first click after a focus change is eaten by activation, so recipes double-click. No OCR/state detection on Windows yet (hv ocr is macOS-only; qud_state.json needs the bridge mod deployed) — asserts omitted until one exists.",
+            "done": {
+              "qud": 0.7,
+              "raves": 0.0
+            },
+            "detect": {
+              "qud": {
+                "ocr_any": [
+                  "mod manager",
+                  "workshop uploader",
+                  "histographicnomicon",
+                  "waveform collapse map generator"
+                ],
+                "game_live": false
+              }
+            },
+            "goto": {
+              "qud": [
+                {
+                  "goto": "title"
+                },
+                {
+                  "activate": "CavesOfQud"
+                },
+                {
+                  "click_hover": [
+                    313,
+                    1805
+                  ],
+                  "window": "CavesOfQud",
+                  "note": "Modding Toolkit link, lower-left secondary list"
+                },
+                {
+                  "click_hover": [
+                    313,
+                    1805
+                  ],
+                  "window": "CavesOfQud",
+                  "note": "repeat — first click may be eaten by activation; lands in empty space if already open"
+                }
+              ]
+            },
+            "children": [
+              {
+                "id": "mod_manager",
+                "label": "Mod Manager",
+                "note": "opens the SAME Mods screen as title>menu_box>mods (two-pane list + tile preview, footer [Esc] Back / [v] Disable All); list empty until mods are installed",
+                "done": {
+                  "qud": 0.7,
+                  "raves": 0.0
+                },
+                "detect": {},
+                "goto": {
+                  "qud": [
+                    {
+                      "goto": "modding_toolkit"
+                    },
+                    {
+                      "click_hover": [
+                        1724,
+                        875
+                      ],
+                      "window": "CavesOfQud"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "workshop_uploader",
+                "label": "Workshop Uploader",
+                "note": "modern full-screen UI: < Back / browse mods folder / refresh, Mods-folder list, 'Select a mod to manage it'. Esc does NOT exit — click < Back at [217,74]; Back returns to TITLE, not the toolkit menu.",
+                "done": {
+                  "qud": 0.6,
+                  "raves": 0.0
+                },
+                "detect": {},
+                "goto": {
+                  "qud": [
+                    {
+                      "goto": "modding_toolkit"
+                    },
+                    {
+                      "click_hover": [
+                        1724,
+                        927
+                      ],
+                      "window": "CavesOfQud"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "map_editor",
+                "label": "Map Editor",
+                "note": "80x25 canvas + searchable blueprint palette (In Use filter) + File/Edit/Transform/View/Recent menu bar; Ctrl+Click paint, Alt+Click pick, Ctrl+Z/Y. Exit: File [90,33] > Exit [129,520] > confirm Yes [1851,1110] -> returns to the TOOLKIT menu (unlike the Back-to-title tools).",
+                "done": {
+                  "qud": 0.7,
+                  "raves": 0.0
+                },
+                "detect": {},
+                "goto": {
+                  "qud": [
+                    {
+                      "goto": "modding_toolkit"
+                    },
+                    {
+                      "click_hover": [
+                        1724,
+                        979
+                      ],
+                      "window": "CavesOfQud"
+                    }
+                  ]
+                },
+                "children": [
+                  {
+                    "id": "map_editor_file_menu",
+                    "label": "File menu (New/Load/Test/Save/Save As/Reload Blueprints/Exit)",
+                    "done": {
+                      "qud": 0.7,
+                      "raves": 0.0
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "map_editor_exit_confirm",
+                    "label": "Exit confirm (lose unsaved changes? Yes/No)",
+                    "done": {
+                      "qud": 0.7,
+                      "raves": 0.0
+                    },
+                    "detect": {}
+                  }
+                ]
+              },
+              {
+                "id": "mod_wiki_website",
+                "label": "Mod Wiki Website (external browser)",
+                "note": "EXTERNAL action — opens the wiki in the default browser; no in-game screen to reproduce. Excluded from capture walks.",
+                "done": {
+                  "qud": 1.0,
+                  "raves": 0.0
+                },
+                "detect": {}
+              },
+              {
+                "id": "blueprint_browser",
+                "label": "Blueprint Browser",
+                "note": "filterable collapsible tree of the full ObjectBlueprints hierarchy (Object, SultanMuralController expandable) — the natural UI mirror of the Object Checker enumeration. Back [3709,2068] returns to TITLE.",
+                "done": {
+                  "qud": 0.6,
+                  "raves": 0.0
+                },
+                "detect": {},
+                "goto": {
+                  "qud": [
+                    {
+                      "goto": "modding_toolkit"
+                    },
+                    {
+                      "click_hover": [
+                        1724,
+                        1083
+                      ],
+                      "window": "CavesOfQud"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "open_save_folder",
+                "label": "Open Save Folder (external Explorer)",
+                "note": "EXTERNAL action — opens the data folder in the OS file manager. Excluded from capture walks.",
+                "done": {
+                  "qud": 1.0,
+                  "raves": 0.0
+                },
+                "detect": {}
+              },
+              {
+                "id": "write_csproj",
+                "label": "Write Mods.csproj File (side effect)",
+                "note": "SIDE-EFFECT action — writes a csproj into the mods folder; no screen. Excluded from capture walks.",
+                "done": {
+                  "qud": 1.0,
+                  "raves": 0.0
+                },
+                "detect": {}
+              },
+              {
+                "id": "histographicnomicon",
+                "label": "Histographicnomicon",
+                "note": "history-generation debug tool: Generate / Test Failure Redirect / Test Variable, scrollable output canvas, Reload + Back. Back [3717,2097] returns to TITLE.",
+                "done": {
+                  "qud": 0.6,
+                  "raves": 0.0
+                },
+                "detect": {},
+                "goto": {
+                  "qud": [
+                    {
+                      "goto": "modding_toolkit"
+                    },
+                    {
+                      "click_hover": [
+                        1724,
+                        1238
+                      ],
+                      "window": "CavesOfQud"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "wfc_generator",
+                "label": "Waveform Collapse Map Generator",
+                "note": "white preview canvas + parameter console (default 'pass:temple,n=3,width=78,height=23'), Generate / Generate Fast / Reseed To Static / TTest. Back [3706,2090] returns to TITLE.",
+                "done": {
+                  "qud": 0.6,
+                  "raves": 0.0
+                },
+                "detect": {},
+                "goto": {
+                  "qud": [
+                    {
+                      "goto": "modding_toolkit"
+                    },
+                    {
+                      "click_hover": [
+                        1724,
+                        1292
+                      ],
+                      "window": "CavesOfQud"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
             "id": "version",
             "label": "Version Corner (1.0.5 / build)",
             "done": {

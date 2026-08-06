@@ -228,7 +228,7 @@ class WindowsBackend(PlatformBackend):
         return ActionResult(ok=True, detail="launch %s" % " ".join([spec] + args))
 
     def click(self, target: str, x: int, y: int, button: str = "left",
-              double: bool = False) -> ActionResult:
+              double: bool = False, hover: bool = False) -> ActionResult:
         hwnd = self._resolve(target)
         if hwnd is None:
             return ActionResult.fail("click needs a window target")
@@ -237,8 +237,32 @@ class WindowsBackend(PlatformBackend):
         gx, gy = rect.left + int(x), rect.top + int(y)   # window-relative -> screen px
         self.activate(target)
         time.sleep(0.06)
-        user32.SetCursorPos(gx, gy)
-        time.sleep(0.02)
+        # Move with a REAL injected event, not just SetCursorPos: SetCursorPos
+        # produces no raw input (WM_INPUT), and Unity's Input System only syncs
+        # its pointer from raw moves — a warp-then-click lands at Unity's STALE
+        # position (observed as "first click ignored" on Qud's title, Win11
+        # 2026-08-06). MOUSEEVENTF_ABSOLUTE coords are 0..65535 across the
+        # primary display.
+        MOVE_ABS = 0x0001 | 0x8000
+        sw, sh = self.screen_size()
+
+        def _move(px, py):
+            user32.SetCursorPos(px, py)
+            user32.mouse_event(MOVE_ABS, int(px * 65535 / max(sw - 1, 1)),
+                               int(py * 65535 / max(sh - 1, 1)), 0, 0)
+
+        # `hover=True` mirrors the darwin backend: Unity legacy-console UIs (Qud's
+        # menus) select the item under Input.mousePosition, which needs the cursor
+        # hovered and settled BEFORE the button pair — approach from above, then
+        # rest on the target. OFF by default: a pre-move breaks world-cell clicks.
+        if hover:
+            _move(gx, gy - 24)
+            time.sleep(0.08)
+            _move(gx, gy)
+            time.sleep(0.2)
+        else:
+            _move(gx, gy)
+            time.sleep(0.02)
         dn, up = (0x0008, 0x0010) if button == "right" else (0x0002, 0x0004)
         for _ in range(2 if double else 1):
             user32.mouse_event(dn, 0, 0, 0, 0)
@@ -425,21 +449,57 @@ class WindowsBackend(PlatformBackend):
         return ActionResult(ok=False, tier=None,
                             error="tier1(%s); no child hwnd for tier2" % tier1_err)
 
+    def _send_vk_scancode(self, vk: int) -> None:
+        """Press+release one virtual key via SendInput WITH its hardware scan code.
+        Games reading raw input (Unity's Input System) need the scan code; a
+        VK-only event is silently dropped for some keys. Arrow/nav keys are
+        extended-flag keys — without KEYEVENTF_EXTENDEDKEY they alias numpad."""
+        KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE = 0x1, 0x2, 0x8
+        extended = {0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2D, 0x2E}
+
+        class KEYBDINPUT(ctypes.Structure):
+            _fields_ = [("wVk", wintypes.WORD), ("wScan", wintypes.WORD),
+                        ("dwFlags", wintypes.DWORD), ("time", wintypes.DWORD),
+                        ("dwExtraInfo", ctypes.POINTER(ctypes.c_ulong))]
+
+        class INPUT(ctypes.Structure):
+            class _U(ctypes.Union):
+                _fields_ = [("ki", KEYBDINPUT), ("pad", ctypes.c_byte * 32)]
+            _anonymous_ = ("u",)
+            _fields_ = [("type", wintypes.DWORD), ("u", _U)]
+
+        scan = user32.MapVirtualKeyW(vk, 0)  # MAPVK_VK_TO_VSC
+        flags = KEYEVENTF_SCANCODE | (KEYEVENTF_EXTENDEDKEY if vk in extended else 0)
+        down = INPUT(type=1)  # INPUT_KEYBOARD
+        down.ki = KEYBDINPUT(vk, scan, flags, 0, None)
+        up = INPUT(type=1)
+        up.ki = KEYBDINPUT(vk, scan, flags | KEYEVENTF_KEYUP, 0, None)
+        arr = (INPUT * 2)(down, up)
+        user32.SendInput(2, arr, ctypes.sizeof(INPUT))
+        time.sleep(0.03)
+
     def key(self, target: str, keys: str, focus: bool = False) -> ActionResult:
         hwnd = self._resolve(target)
         if hwnd is None:
             return ActionResult.fail("key needs a window target")
         name = keys.strip()
         upper = name.upper()
-        # Tier 4 (opt-in): activate + SendKeys for apps that ignore PostMessage
-        # (Unity/games). Named keys become SendKeys syntax ({DOWN}/{ENTER}/…).
+        # Tier 4 (opt-in): activate + SendInput for apps that ignore PostMessage
+        # (Unity/games). Named keys go out as REAL scan-code events — Unity's raw
+        # Input System drops some VK-only synthetics (Space/Esc arrived dead from
+        # SendKeys while Enter/arrows worked; scan codes fixed it, Qud 1.0.5,
+        # Win11 2026-08-06). Unnamed multi-char sequences still fall back to
+        # SendKeys.
         if focus:
             try:
                 self.activate(target)
                 time.sleep(0.06)
-                seq = ("{%s}" % upper) if upper in VK else keys
-                auto.SendKeys(seq, waitTime=0)
-                return ActionResult(ok=True, tier=4, detail="activate + SendKeys %s" % seq)
+                if upper in VK:
+                    self._send_vk_scancode(VK[upper])
+                    return ActionResult(ok=True, tier=4,
+                                        detail="activate + SendInput scancode VK 0x%02X" % VK[upper])
+                auto.SendKeys(keys, waitTime=0)
+                return ActionResult(ok=True, tier=4, detail="activate + SendKeys %s" % keys)
             except Exception as e:
                 return ActionResult.fail("SendKeys failed: %s" % e)
         # Deliver to the editable child if present, else the top-level window.
