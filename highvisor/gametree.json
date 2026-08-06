@@ -1032,17 +1032,17 @@
                       "note": "open the status screen first (opener recipe TBD)"
                     },
                     {
-                      "activate": "CavesOfQud"
+                      "bridge": "statustab",
+                      "args": {
+                        "tab": "SkillsAndPowers"
+                      },
+                      "note": "first-party tab switch. Clicking the tab bar at a fixed coordinate missed often enough that driving to a known tab took several retries and sometimes failed outright -- and a parity capture taken on the wrong tab is worse than no capture. The mod calls StatusScreensScreen.SetPage(), which is Qud's own switch."
                     },
                     {
-                      "click_hover": [
-                        277,
-                        136
-                      ],
-                      "window": "CavesOfQud"
-                    },
-                    {
-                      "sleep": 1.0
+                      "assert": {
+                        "node": "status_skills"
+                      },
+                      "timeout": 8
                     }
                   ],
                   "raves": [
@@ -1097,17 +1097,17 @@
                       "note": "open the status screen first (opener recipe TBD)"
                     },
                     {
-                      "activate": "CavesOfQud"
+                      "bridge": "statustab",
+                      "args": {
+                        "tab": "Character"
+                      },
+                      "note": "first-party tab switch. Clicking the tab bar at a fixed coordinate missed often enough that driving to a known tab took several retries and sometimes failed outright -- and a parity capture taken on the wrong tab is worse than no capture. The mod calls StatusScreensScreen.SetPage(), which is Qud's own switch."
                     },
                     {
-                      "click_hover": [
-                        500,
-                        136
-                      ],
-                      "window": "CavesOfQud"
-                    },
-                    {
-                      "sleep": 1.0
+                      "assert": {
+                        "node": "status_attributes"
+                      },
+                      "timeout": 8
                     }
                   ],
                   "raves": [
@@ -1172,26 +1172,25 @@
                       "note": "the real opener, which this recipe used to lack -- it merely ASSERTED the screen was already open ('opener recipe TBD') and so failed whenever it was not. Note it opens by CLICKING the HUD button: Qud's own 'e' opens the screen but is not a toggle, so it cannot be used to reach a known state."
                     },
                     {
-                      "activate": "CavesOfQud"
-                    },
-                    {
-                      "note": "the Equipment tab in the 8-tab bar",
-                      "click_hover": [
-                        745,
-                        136
-                      ],
-                      "window": "CavesOfQud"
-                    },
-                    {
-                      "sleep": 1.0
-                    },
-                    {
                       "assert": {
                         "scene": "StatusScreensScreen",
                         "app": "qud"
                       },
                       "timeout": 10,
                       "note": "the mod reports the SCREEN, not which tab -- the tab itself is not observable from first-party state, so this is as far as the assert can go"
+                    },
+                    {
+                      "bridge": "statustab",
+                      "args": {
+                        "tab": "InventoryAndEquipment"
+                      },
+                      "note": "first-party tab switch. Clicking the tab bar at a fixed coordinate missed often enough that driving to a known tab took several retries and sometimes failed outright -- and a parity capture taken on the wrong tab is worse than no capture. The mod calls StatusScreensScreen.SetPage(), which is Qud's own switch."
+                    },
+                    {
+                      "assert": {
+                        "node": "status_equipment"
+                      },
+                      "timeout": 8
                     }
                   ],
                   "raves": [
@@ -1511,17 +1510,17 @@
                       "note": "the real opener, which this recipe used to lack -- it merely ASSERTED the screen was already open ('opener recipe TBD') and so failed whenever it was not. Note it opens by CLICKING the HUD button: Qud's own 'e' opens the screen but is not a toggle, so it cannot be used to reach a known state."
                     },
                     {
-                      "activate": "CavesOfQud"
+                      "bridge": "statustab",
+                      "args": {
+                        "tab": "Tinkering"
+                      },
+                      "note": "first-party tab switch. Clicking the tab bar at a fixed coordinate missed often enough that driving to a known tab took several retries and sometimes failed outright -- and a parity capture taken on the wrong tab is worse than no capture. The mod calls StatusScreensScreen.SetPage(), which is Qud's own switch."
                     },
                     {
-                      "click_hover": [
-                        925,
-                        136
-                      ],
-                      "window": "CavesOfQud"
-                    },
-                    {
-                      "sleep": 1.0
+                      "assert": {
+                        "node": "status_tinkering"
+                      },
+                      "timeout": 8
                     }
                   ],
                   "raves": [
@@ -1586,17 +1585,17 @@
                       "note": "the real opener, which this recipe used to lack -- it merely ASSERTED the screen was already open ('opener recipe TBD') and so failed whenever it was not. Note it opens by CLICKING the HUD button: Qud's own 'e' opens the screen but is not a toggle, so it cannot be used to reach a known state."
                     },
                     {
-                      "activate": "CavesOfQud"
+                      "bridge": "statustab",
+                      "args": {
+                        "tab": "Journal"
+                      },
+                      "note": "first-party tab switch. Clicking the tab bar at a fixed coordinate missed often enough that driving to a known tab took several retries and sometimes failed outright -- and a parity capture taken on the wrong tab is worse than no capture. The mod calls StatusScreensScreen.SetPage(), which is Qud's own switch."
                     },
                     {
-                      "click_hover": [
-                        1095,
-                        136
-                      ],
-                      "window": "CavesOfQud"
-                    },
-                    {
-                      "sleep": 1.0
+                      "assert": {
+                        "node": "status_journal"
+                      },
+                      "timeout": 8
                     }
                   ],
                   "raves": [
@@ -1661,17 +1660,17 @@
                       "note": "the real opener, which this recipe used to lack -- it merely ASSERTED the screen was already open ('opener recipe TBD') and so failed whenever it was not. Note it opens by CLICKING the HUD button: Qud's own 'e' opens the screen but is not a toggle, so it cannot be used to reach a known state."
                     },
                     {
-                      "activate": "CavesOfQud"
+                      "bridge": "statustab",
+                      "args": {
+                        "tab": "Quests"
+                      },
+                      "note": "first-party tab switch. Clicking the tab bar at a fixed coordinate missed often enough that driving to a known tab took several retries and sometimes failed outright -- and a parity capture taken on the wrong tab is worse than no capture. The mod calls StatusScreensScreen.SetPage(), which is Qud's own switch."
                     },
                     {
-                      "click_hover": [
-                        1250,
-                        136
-                      ],
-                      "window": "CavesOfQud"
-                    },
-                    {
-                      "sleep": 1.0
+                      "assert": {
+                        "node": "status_quests"
+                      },
+                      "timeout": 8
                     }
                   ],
                   "raves": [
@@ -1736,17 +1735,17 @@
                       "note": "the real opener, which this recipe used to lack -- it merely ASSERTED the screen was already open ('opener recipe TBD') and so failed whenever it was not. Note it opens by CLICKING the HUD button: Qud's own 'e' opens the screen but is not a toggle, so it cannot be used to reach a known state."
                     },
                     {
-                      "activate": "CavesOfQud"
+                      "bridge": "statustab",
+                      "args": {
+                        "tab": "Factions"
+                      },
+                      "note": "first-party tab switch. Clicking the tab bar at a fixed coordinate missed often enough that driving to a known tab took several retries and sometimes failed outright -- and a parity capture taken on the wrong tab is worse than no capture. The mod calls StatusScreensScreen.SetPage(), which is Qud's own switch."
                     },
                     {
-                      "click_hover": [
-                        1420,
-                        136
-                      ],
-                      "window": "CavesOfQud"
-                    },
-                    {
-                      "sleep": 1.0
+                      "assert": {
+                        "node": "status_reputation"
+                      },
+                      "timeout": 8
                     }
                   ],
                   "raves": [
@@ -1801,17 +1800,17 @@
                       "note": "open the status screen first (opener recipe TBD)"
                     },
                     {
-                      "activate": "CavesOfQud"
+                      "bridge": "statustab",
+                      "args": {
+                        "tab": "MessageLog"
+                      },
+                      "note": "first-party tab switch. Clicking the tab bar at a fixed coordinate missed often enough that driving to a known tab took several retries and sometimes failed outright -- and a parity capture taken on the wrong tab is worse than no capture. The mod calls StatusScreensScreen.SetPage(), which is Qud's own switch."
                     },
                     {
-                      "click_hover": [
-                        1615,
-                        136
-                      ],
-                      "window": "CavesOfQud"
-                    },
-                    {
-                      "sleep": 1.0
+                      "assert": {
+                        "node": "status_messagelog"
+                      },
+                      "timeout": 8
                     }
                   ],
                   "raves": [

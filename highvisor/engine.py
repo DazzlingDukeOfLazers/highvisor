@@ -541,7 +541,7 @@ class Engine:
         except OSError as e:
             return {"ok": False, "error": "qud bridge: %s" % e}
 
-    def _qud_bridge(self, name, focus=True):
+    def _qud_bridge(self, name, focus=True, args=None):
         """Send a bare {"type":"command","name":...} frame to the Qud mod bridge
         (listener is up from the main menu on — ModSensitiveCacheInit). First-party
         UI driving: e.g. "uiback" fires the modern-UI CancelButton, the real Escape
@@ -580,7 +580,13 @@ class Engine:
             except Exception:
                 pass                # not fatal: a focused Qud is the common case anyway
         port = PROFILES.get("qud", {}).get("port", 48710)
-        payload = _json.dumps({"type": "command", "name": name}).encode("utf-8")
+        frame = {"type": "command", "name": name}
+        # Extra fields ride ALONGSIDE name — the mod reads its arguments off the same flat
+        # command object (f.TryGetValue("tab", ...)), so a nested dict would be invisible to it.
+        for k, v in (args or {}).items():
+            if k not in ("type", "name"):
+                frame[k] = v
+        payload = _json.dumps(frame).encode("utf-8")
         try:
             with _socket.create_connection(("127.0.0.1", port), timeout=3) as s:
                 s.sendall(_struct.pack(">I", len(payload)) + payload)
@@ -1031,6 +1037,17 @@ class Engine:
         for step in recipe:
             self.bus.publish("gamego", app=app, node=node_id, step=step)
             if "goto" in step:
+                # ALREADY INSIDE IT? A chain step naming an ANCESTOR of where we are is
+                # satisfied by definition -- the current node's path contains it. Running it
+                # anyway walked back out: every status TAB chains through `status_screens`,
+                # whose own recipe starts at `in_game`, which cannot be reached from inside the
+                # status screens without closing them. So switching from one tab to another
+                # failed outright while switching from the map worked, which read as "the tab
+                # recipe is flaky" rather than "the chain is walking backwards".
+                cur = self._gamestate(b).get("states", {}).get(app) or {}
+                if step["goto"] in (cur.get("path") or []):
+                    steps.append({"step": step, "ok": True, "detail": "already within"})
+                    continue
                 r = self._gamego(b, app, step["goto"], _depth + 1)
                 steps.append({"step": step, "ok": r.get("ok"), "detail": r.get("detail", "")})
                 if not r.get("ok"):
@@ -1112,8 +1129,8 @@ class Engine:
                 time.sleep(float(step["sleep"]))
                 steps.append({"step": step, "ok": True})
             elif "bridge" in step:
-                # first-party command over the Qud mod bridge (e.g. "uiback")
-                r = self._qud_bridge(step["bridge"])
+                # first-party command over the Qud mod bridge (e.g. "uiback", "statustab")
+                r = self._qud_bridge(step["bridge"], args=step.get("args"))
                 steps.append({"step": step, "ok": bool(r.get("ok")), "detail": r.get("error", "")})
                 if not r.get("ok"):
                     return fail(step, r.get("error", "bridge send failed"))
