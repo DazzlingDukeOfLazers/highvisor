@@ -400,6 +400,9 @@ class MacBackend(PlatformBackend):
                 flags |= Quartz.kCGEventFlagMaskShift
             elif m in ("alt", "opt", "option"):
                 flags |= Quartz.kCGEventFlagMaskAlternate
+        # a stuck HID modifier (see _clear_stuck_mods) rides on mouse events too -- a plain
+        # left click would arrive as Cmd+click. Clear anything we didn't ask for.
+        self._clear_stuck_mods(keep=flags)
         for _ in range(2 if double else 1):
             ed = Quartz.CGEventCreateMouseEvent(src, down, pt, b)
             eu = Quartz.CGEventCreateMouseEvent(src, up, pt, b)
@@ -644,6 +647,27 @@ class MacBackend(PlatformBackend):
         (Quartz.kCGEventFlagMaskCommand, 0x37),
     )
 
+    def _clear_stuck_mods(self, keep: int = 0):
+        """Release any modifier macOS believes is HELD that this op is not deliberately
+        holding. The bracketing in _post_key leaves the modifier state clean -- unless the
+        daemon dies BETWEEN the down and the up (the source watcher re-execs on any .py
+        save, so an edit landing mid-combo orphans the down). The stuck flag then lives in
+        the OS HID state: it survives app restarts, rides on EVERY later synthetic key
+        ("e" arrives as Cmd+E and silently does nothing), and only a real keypress of that
+        modifier clears it. Cost of finding this: a full day of 'the status screens
+        intermittently refuse to open' across two Raves builds that were never at fault.
+        Releasing is safe: if the flag is set because the HUMAN is holding the key mid-
+        gesture, one synthetic up ends that gesture a beat early -- transient, and far
+        cheaper than every scripted key silently no-opping."""
+        state = Quartz.CGEventSourceFlagsState(Quartz.kCGEventSourceStateHIDSystemState)
+        src = Quartz.CGEventSourceCreate(Quartz.kCGEventSourceStateHIDSystemState)
+        for mask, kc in self._MOD_KEYS:
+            if state & mask and not (keep & mask):
+                ev = Quartz.CGEventCreateKeyboardEvent(src, kc, False)
+                Quartz.CGEventSetFlags(ev, 0)
+                Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+                time.sleep(0.02)
+
     def _post_key(self, keycode: int, flags: int, pid: Optional[int] = None):
         # HID-system source, same as click(): Unity's input system IGNORES keyboard
         # events synthesized with a None source (Qud's modern menus dropped every
@@ -658,6 +682,7 @@ class MacBackend(PlatformBackend):
         # status-screen openers "intermittently" stopped working: they stopped the moment a
         # combo was first sent and stayed broken for the life of the session. Bracketing the
         # key with genuine modifier down/up leaves the global modifier state as we found it.
+        self._clear_stuck_mods(keep=flags)
         src = Quartz.CGEventSourceCreate(Quartz.kCGEventSourceStateHIDSystemState)
 
         def _post(ev):
