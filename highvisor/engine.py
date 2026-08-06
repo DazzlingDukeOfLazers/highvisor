@@ -1037,17 +1037,21 @@ class Engine:
         for step in recipe:
             self.bus.publish("gamego", app=app, node=node_id, step=step)
             if "goto" in step:
-                # ALREADY INSIDE IT? A chain step naming an ANCESTOR of where we are is
-                # satisfied by definition -- the current node's path contains it. Running it
-                # anyway walked back out: every status TAB chains through `status_screens`,
-                # whose own recipe starts at `in_game`, which cannot be reached from inside the
-                # status screens without closing them. So switching from one tab to another
-                # failed outright while switching from the map worked, which read as "the tab
-                # recipe is flaky" rather than "the chain is walking backwards".
-                cur = self._gamestate(b).get("states", {}).get(app) or {}
-                if step["goto"] in (cur.get("path") or []):
-                    steps.append({"step": step, "ok": True, "detail": "already within"})
-                    continue
+                # "unless_within": skip this chain step when we are already INSIDE the node it
+                # names (its id is in the current path). Every status TAB chains through
+                # `status_screens`, whose own recipe starts at `in_game` -- unreachable from
+                # inside the status screens without closing them -- so tab-to-tab switching
+                # failed while switching from the map worked.
+                #
+                # OPT-IN, deliberately. Plenty of recipes use a chain step to an ancestor to get
+                # back to a known base state before acting: Raves reaches each tab by pressing its
+                # key from `in_game`, so skipping that step leaves the key landing on whatever
+                # screen is already up. Making the skip automatic fixed Qud and broke Raves.
+                if step.get("unless_within"):
+                    cur = self._gamestate(b).get("states", {}).get(app) or {}
+                    if step["goto"] in (cur.get("path") or []):
+                        steps.append({"step": step, "ok": True, "detail": "already within"})
+                        continue
                 r = self._gamego(b, app, step["goto"], _depth + 1)
                 steps.append({"step": step, "ok": r.get("ok"), "detail": r.get("detail", "")})
                 if not r.get("ok"):
@@ -1158,7 +1162,13 @@ class Engine:
                     have = str(((cur.get("extra") or {}).get("popup")) or "")
                     hit = have.lower() == str(want_popup).lower()
                 else:
-                    hit = str(scene).lower() == str(cond.get("scene", "")).lower()
+                    # A LIST of scenes is one condition, not several steps: Raves reports its
+                    # status screens as eight distinct scenes (status_skills, status_journal, ...)
+                    # that all clear the same way, and spelling out eight dismiss steps would run
+                    # eight state polls to clear one screen.
+                    want_scene = cond.get("scene", "")
+                    want_list = want_scene if isinstance(want_scene, list) else [want_scene]
+                    hit = str(scene).lower() in [str(w).lower() for w in want_list]
                 # What the step must CHANGE. Taking the pair, rather than the scene,
                 # is what lets one branch serve all three shapes: closing a screen
                 # moves the scene, raising a confirm moves the popup, and answering

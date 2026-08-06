@@ -150,6 +150,22 @@
             },
             {
               "dismiss": {
+                "scene": [
+                  "status_skills",
+                  "status_attributes",
+                  "status_equipment",
+                  "status_tinkering",
+                  "status_journal",
+                  "status_quests",
+                  "status_reputation",
+                  "status_messagelog"
+                ],
+                "key": "Escape"
+              },
+              "note": "Raves' status screens close on Escape. Without this the recipe had no way out of one, so a Raves parked on any status tab could not reach title -- and every tab recipe chains through in_game -> title, so ALL of them failed until the app was restarted."
+            },
+            {
+              "dismiss": {
                 "popup": "message",
                 "key": "Escape"
               },
@@ -1024,19 +1040,29 @@
                 "goto": {
                   "qud": [
                     {
-                      "assert": {
-                        "scene": "StatusScreensScreen",
-                        "app": "qud"
+                      "dismiss": {
+                        "scene": "PopupMessage",
+                        "bridge": "uiback"
                       },
-                      "timeout": 5,
-                      "note": "open the status screen first (opener recipe TBD)"
+                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up."
+                    },
+                    {
+                      "dismiss": {
+                        "scene": "DynamicPopupMessage",
+                        "bridge": "uiback"
+                      }
+                    },
+                    {
+                      "goto": "status_screens",
+                      "unless_within": true,
+                      "note": "skip when we are already inside the status screens: status_screens' own recipe starts at in_game, which cannot be reached from in here without closing them."
                     },
                     {
                       "bridge": "statustab",
                       "args": {
                         "tab": "SkillsAndPowers"
                       },
-                      "note": "first-party tab switch. Clicking the tab bar at a fixed coordinate missed often enough that driving to a known tab took several retries and sometimes failed outright -- and a parity capture taken on the wrong tab is worse than no capture. The mod calls StatusScreensScreen.SetPage(), which is Qud's own switch."
+                      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab."
                     },
                     {
                       "assert": {
@@ -1046,6 +1072,22 @@
                     }
                   ],
                   "raves": [
+                    {
+                      "dismiss": {
+                        "scene": [
+                          "status_skills",
+                          "status_attributes",
+                          "status_equipment",
+                          "status_tinkering",
+                          "status_journal",
+                          "status_quests",
+                          "status_reputation",
+                          "status_messagelog"
+                        ],
+                        "key": "Escape"
+                      },
+                      "note": "LEAVE THE TAB WE ARE ON FIRST. Raves reaches each tab by pressing its key from in_game, and the chain step below cannot do it: in_game's own recipe routes through `title`, which from a status screen dismisses it, lands in the game, and then fails its own assert -- so the FIRST switch failed and left Raves at in_game, and the next one worked. Tab-to-tab alternated pass/fail. One Escape here and the chain step is a no-op."
+                    },
                     {
                       "goto": "in_game"
                     },
@@ -1089,19 +1131,29 @@
                 "goto": {
                   "qud": [
                     {
-                      "assert": {
-                        "scene": "StatusScreensScreen",
-                        "app": "qud"
+                      "dismiss": {
+                        "scene": "PopupMessage",
+                        "bridge": "uiback"
                       },
-                      "timeout": 5,
-                      "note": "open the status screen first (opener recipe TBD)"
+                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up."
+                    },
+                    {
+                      "dismiss": {
+                        "scene": "DynamicPopupMessage",
+                        "bridge": "uiback"
+                      }
+                    },
+                    {
+                      "goto": "status_screens",
+                      "unless_within": true,
+                      "note": "skip when we are already inside the status screens: status_screens' own recipe starts at in_game, which cannot be reached from in here without closing them."
                     },
                     {
                       "bridge": "statustab",
                       "args": {
                         "tab": "Character"
                       },
-                      "note": "first-party tab switch. Clicking the tab bar at a fixed coordinate missed often enough that driving to a known tab took several retries and sometimes failed outright -- and a parity capture taken on the wrong tab is worse than no capture. The mod calls StatusScreensScreen.SetPage(), which is Qud's own switch."
+                      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab."
                     },
                     {
                       "assert": {
@@ -1111,6 +1163,22 @@
                     }
                   ],
                   "raves": [
+                    {
+                      "dismiss": {
+                        "scene": [
+                          "status_skills",
+                          "status_attributes",
+                          "status_equipment",
+                          "status_tinkering",
+                          "status_journal",
+                          "status_quests",
+                          "status_reputation",
+                          "status_messagelog"
+                        ],
+                        "key": "Escape"
+                      },
+                      "note": "LEAVE THE TAB WE ARE ON FIRST. Raves reaches each tab by pressing its key from in_game, and the chain step below cannot do it: in_game's own recipe routes through `title`, which from a status screen dismisses it, lands in the game, and then fails its own assert -- so the FIRST switch failed and left Raves at in_game, and the next one worked. Tab-to-tab alternated pass/fail. One Escape here and the chain step is a no-op."
+                    },
                     {
                       "goto": "in_game"
                     },
@@ -1158,33 +1226,25 @@
                         "scene": "PopupMessage",
                         "bridge": "uiback"
                       },
-                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up. That is what made the equipment key look broken for a whole session. Driving popups over the bridge is what leaves them, so any recipe that may follow one should clear it first; uiback does, verified."
+                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up."
                     },
                     {
                       "dismiss": {
                         "scene": "DynamicPopupMessage",
                         "bridge": "uiback"
-                      },
-                      "note": "the other popup class, same treatment"
+                      }
                     },
                     {
                       "goto": "status_screens",
-                      "note": "the real opener, which this recipe used to lack -- it merely ASSERTED the screen was already open ('opener recipe TBD') and so failed whenever it was not. Note it opens by CLICKING the HUD button: Qud's own 'e' opens the screen but is not a toggle, so it cannot be used to reach a known state."
-                    },
-                    {
-                      "assert": {
-                        "scene": "StatusScreensScreen",
-                        "app": "qud"
-                      },
-                      "timeout": 10,
-                      "note": "the mod reports the SCREEN, not which tab -- the tab itself is not observable from first-party state, so this is as far as the assert can go"
+                      "unless_within": true,
+                      "note": "skip when we are already inside the status screens: status_screens' own recipe starts at in_game, which cannot be reached from in here without closing them."
                     },
                     {
                       "bridge": "statustab",
                       "args": {
                         "tab": "InventoryAndEquipment"
                       },
-                      "note": "first-party tab switch. Clicking the tab bar at a fixed coordinate missed often enough that driving to a known tab took several retries and sometimes failed outright -- and a parity capture taken on the wrong tab is worse than no capture. The mod calls StatusScreensScreen.SetPage(), which is Qud's own switch."
+                      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab."
                     },
                     {
                       "assert": {
@@ -1194,6 +1254,22 @@
                     }
                   ],
                   "raves": [
+                    {
+                      "dismiss": {
+                        "scene": [
+                          "status_skills",
+                          "status_attributes",
+                          "status_equipment",
+                          "status_tinkering",
+                          "status_journal",
+                          "status_quests",
+                          "status_reputation",
+                          "status_messagelog"
+                        ],
+                        "key": "Escape"
+                      },
+                      "note": "LEAVE THE TAB WE ARE ON FIRST. Raves reaches each tab by pressing its key from in_game, and the chain step below cannot do it: in_game's own recipe routes through `title`, which from a status screen dismisses it, lands in the game, and then fails its own assert -- so the FIRST switch failed and left Raves at in_game, and the next one worked. Tab-to-tab alternated pass/fail. One Escape here and the chain step is a no-op."
+                    },
                     {
                       "goto": "in_game"
                     },
@@ -1496,25 +1572,25 @@
                         "scene": "PopupMessage",
                         "bridge": "uiback"
                       },
-                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up. That is what made the equipment key look broken for a whole session. Driving popups over the bridge is what leaves them, so any recipe that may follow one should clear it first; uiback does, verified."
+                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up."
                     },
                     {
                       "dismiss": {
                         "scene": "DynamicPopupMessage",
                         "bridge": "uiback"
-                      },
-                      "note": "the other popup class, same treatment"
+                      }
                     },
                     {
                       "goto": "status_screens",
-                      "note": "the real opener, which this recipe used to lack -- it merely ASSERTED the screen was already open ('opener recipe TBD') and so failed whenever it was not. Note it opens by CLICKING the HUD button: Qud's own 'e' opens the screen but is not a toggle, so it cannot be used to reach a known state."
+                      "unless_within": true,
+                      "note": "skip when we are already inside the status screens: status_screens' own recipe starts at in_game, which cannot be reached from in here without closing them."
                     },
                     {
                       "bridge": "statustab",
                       "args": {
                         "tab": "Tinkering"
                       },
-                      "note": "first-party tab switch. Clicking the tab bar at a fixed coordinate missed often enough that driving to a known tab took several retries and sometimes failed outright -- and a parity capture taken on the wrong tab is worse than no capture. The mod calls StatusScreensScreen.SetPage(), which is Qud's own switch."
+                      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab."
                     },
                     {
                       "assert": {
@@ -1524,6 +1600,22 @@
                     }
                   ],
                   "raves": [
+                    {
+                      "dismiss": {
+                        "scene": [
+                          "status_skills",
+                          "status_attributes",
+                          "status_equipment",
+                          "status_tinkering",
+                          "status_journal",
+                          "status_quests",
+                          "status_reputation",
+                          "status_messagelog"
+                        ],
+                        "key": "Escape"
+                      },
+                      "note": "LEAVE THE TAB WE ARE ON FIRST. Raves reaches each tab by pressing its key from in_game, and the chain step below cannot do it: in_game's own recipe routes through `title`, which from a status screen dismisses it, lands in the game, and then fails its own assert -- so the FIRST switch failed and left Raves at in_game, and the next one worked. Tab-to-tab alternated pass/fail. One Escape here and the chain step is a no-op."
+                    },
                     {
                       "goto": "in_game"
                     },
@@ -1571,25 +1663,25 @@
                         "scene": "PopupMessage",
                         "bridge": "uiback"
                       },
-                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up. That is what made the equipment key look broken for a whole session. Driving popups over the bridge is what leaves them, so any recipe that may follow one should clear it first; uiback does, verified."
+                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up."
                     },
                     {
                       "dismiss": {
                         "scene": "DynamicPopupMessage",
                         "bridge": "uiback"
-                      },
-                      "note": "the other popup class, same treatment"
+                      }
                     },
                     {
                       "goto": "status_screens",
-                      "note": "the real opener, which this recipe used to lack -- it merely ASSERTED the screen was already open ('opener recipe TBD') and so failed whenever it was not. Note it opens by CLICKING the HUD button: Qud's own 'e' opens the screen but is not a toggle, so it cannot be used to reach a known state."
+                      "unless_within": true,
+                      "note": "skip when we are already inside the status screens: status_screens' own recipe starts at in_game, which cannot be reached from in here without closing them."
                     },
                     {
                       "bridge": "statustab",
                       "args": {
                         "tab": "Journal"
                       },
-                      "note": "first-party tab switch. Clicking the tab bar at a fixed coordinate missed often enough that driving to a known tab took several retries and sometimes failed outright -- and a parity capture taken on the wrong tab is worse than no capture. The mod calls StatusScreensScreen.SetPage(), which is Qud's own switch."
+                      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab."
                     },
                     {
                       "assert": {
@@ -1599,6 +1691,22 @@
                     }
                   ],
                   "raves": [
+                    {
+                      "dismiss": {
+                        "scene": [
+                          "status_skills",
+                          "status_attributes",
+                          "status_equipment",
+                          "status_tinkering",
+                          "status_journal",
+                          "status_quests",
+                          "status_reputation",
+                          "status_messagelog"
+                        ],
+                        "key": "Escape"
+                      },
+                      "note": "LEAVE THE TAB WE ARE ON FIRST. Raves reaches each tab by pressing its key from in_game, and the chain step below cannot do it: in_game's own recipe routes through `title`, which from a status screen dismisses it, lands in the game, and then fails its own assert -- so the FIRST switch failed and left Raves at in_game, and the next one worked. Tab-to-tab alternated pass/fail. One Escape here and the chain step is a no-op."
+                    },
                     {
                       "goto": "in_game"
                     },
@@ -1646,25 +1754,25 @@
                         "scene": "PopupMessage",
                         "bridge": "uiback"
                       },
-                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up. That is what made the equipment key look broken for a whole session. Driving popups over the bridge is what leaves them, so any recipe that may follow one should clear it first; uiback does, verified."
+                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up."
                     },
                     {
                       "dismiss": {
                         "scene": "DynamicPopupMessage",
                         "bridge": "uiback"
-                      },
-                      "note": "the other popup class, same treatment"
+                      }
                     },
                     {
                       "goto": "status_screens",
-                      "note": "the real opener, which this recipe used to lack -- it merely ASSERTED the screen was already open ('opener recipe TBD') and so failed whenever it was not. Note it opens by CLICKING the HUD button: Qud's own 'e' opens the screen but is not a toggle, so it cannot be used to reach a known state."
+                      "unless_within": true,
+                      "note": "skip when we are already inside the status screens: status_screens' own recipe starts at in_game, which cannot be reached from in here without closing them."
                     },
                     {
                       "bridge": "statustab",
                       "args": {
                         "tab": "Quests"
                       },
-                      "note": "first-party tab switch. Clicking the tab bar at a fixed coordinate missed often enough that driving to a known tab took several retries and sometimes failed outright -- and a parity capture taken on the wrong tab is worse than no capture. The mod calls StatusScreensScreen.SetPage(), which is Qud's own switch."
+                      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab."
                     },
                     {
                       "assert": {
@@ -1674,6 +1782,22 @@
                     }
                   ],
                   "raves": [
+                    {
+                      "dismiss": {
+                        "scene": [
+                          "status_skills",
+                          "status_attributes",
+                          "status_equipment",
+                          "status_tinkering",
+                          "status_journal",
+                          "status_quests",
+                          "status_reputation",
+                          "status_messagelog"
+                        ],
+                        "key": "Escape"
+                      },
+                      "note": "LEAVE THE TAB WE ARE ON FIRST. Raves reaches each tab by pressing its key from in_game, and the chain step below cannot do it: in_game's own recipe routes through `title`, which from a status screen dismisses it, lands in the game, and then fails its own assert -- so the FIRST switch failed and left Raves at in_game, and the next one worked. Tab-to-tab alternated pass/fail. One Escape here and the chain step is a no-op."
+                    },
                     {
                       "goto": "in_game"
                     },
@@ -1721,25 +1845,25 @@
                         "scene": "PopupMessage",
                         "bridge": "uiback"
                       },
-                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up. That is what made the equipment key look broken for a whole session. Driving popups over the bridge is what leaves them, so any recipe that may follow one should clear it first; uiback does, verified."
+                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up."
                     },
                     {
                       "dismiss": {
                         "scene": "DynamicPopupMessage",
                         "bridge": "uiback"
-                      },
-                      "note": "the other popup class, same treatment"
+                      }
                     },
                     {
                       "goto": "status_screens",
-                      "note": "the real opener, which this recipe used to lack -- it merely ASSERTED the screen was already open ('opener recipe TBD') and so failed whenever it was not. Note it opens by CLICKING the HUD button: Qud's own 'e' opens the screen but is not a toggle, so it cannot be used to reach a known state."
+                      "unless_within": true,
+                      "note": "skip when we are already inside the status screens: status_screens' own recipe starts at in_game, which cannot be reached from in here without closing them."
                     },
                     {
                       "bridge": "statustab",
                       "args": {
                         "tab": "Factions"
                       },
-                      "note": "first-party tab switch. Clicking the tab bar at a fixed coordinate missed often enough that driving to a known tab took several retries and sometimes failed outright -- and a parity capture taken on the wrong tab is worse than no capture. The mod calls StatusScreensScreen.SetPage(), which is Qud's own switch."
+                      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab."
                     },
                     {
                       "assert": {
@@ -1749,6 +1873,22 @@
                     }
                   ],
                   "raves": [
+                    {
+                      "dismiss": {
+                        "scene": [
+                          "status_skills",
+                          "status_attributes",
+                          "status_equipment",
+                          "status_tinkering",
+                          "status_journal",
+                          "status_quests",
+                          "status_reputation",
+                          "status_messagelog"
+                        ],
+                        "key": "Escape"
+                      },
+                      "note": "LEAVE THE TAB WE ARE ON FIRST. Raves reaches each tab by pressing its key from in_game, and the chain step below cannot do it: in_game's own recipe routes through `title`, which from a status screen dismisses it, lands in the game, and then fails its own assert -- so the FIRST switch failed and left Raves at in_game, and the next one worked. Tab-to-tab alternated pass/fail. One Escape here and the chain step is a no-op."
+                    },
                     {
                       "goto": "in_game"
                     },
@@ -1792,19 +1932,29 @@
                 "goto": {
                   "qud": [
                     {
-                      "assert": {
-                        "scene": "StatusScreensScreen",
-                        "app": "qud"
+                      "dismiss": {
+                        "scene": "PopupMessage",
+                        "bridge": "uiback"
                       },
-                      "timeout": 5,
-                      "note": "open the status screen first (opener recipe TBD)"
+                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up."
+                    },
+                    {
+                      "dismiss": {
+                        "scene": "DynamicPopupMessage",
+                        "bridge": "uiback"
+                      }
+                    },
+                    {
+                      "goto": "status_screens",
+                      "unless_within": true,
+                      "note": "skip when we are already inside the status screens: status_screens' own recipe starts at in_game, which cannot be reached from in here without closing them."
                     },
                     {
                       "bridge": "statustab",
                       "args": {
                         "tab": "MessageLog"
                       },
-                      "note": "first-party tab switch. Clicking the tab bar at a fixed coordinate missed often enough that driving to a known tab took several retries and sometimes failed outright -- and a parity capture taken on the wrong tab is worse than no capture. The mod calls StatusScreensScreen.SetPage(), which is Qud's own switch."
+                      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab."
                     },
                     {
                       "assert": {
@@ -1814,6 +1964,22 @@
                     }
                   ],
                   "raves": [
+                    {
+                      "dismiss": {
+                        "scene": [
+                          "status_skills",
+                          "status_attributes",
+                          "status_equipment",
+                          "status_tinkering",
+                          "status_journal",
+                          "status_quests",
+                          "status_reputation",
+                          "status_messagelog"
+                        ],
+                        "key": "Escape"
+                      },
+                      "note": "LEAVE THE TAB WE ARE ON FIRST. Raves reaches each tab by pressing its key from in_game, and the chain step below cannot do it: in_game's own recipe routes through `title`, which from a status screen dismisses it, lands in the game, and then fails its own assert -- so the FIRST switch failed and left Raves at in_game, and the next one worked. Tab-to-tab alternated pass/fail. One Escape here and the chain step is a no-op."
+                    },
                     {
                       "goto": "in_game"
                     },
