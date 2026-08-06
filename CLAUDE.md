@@ -100,5 +100,9 @@ action instead of screenshot-guess loops:
 - A dismiss step FAILS the recipe if the affordance is missing or the scene doesn't
   change — silent "dismissed" was how a stray Cancel reached the main menu (where
   Cancel == quit confirm). Fire ONE cancel and verify; never a fallback shotgun.
+- A daemon re-exec mid key-combo orphans a modifier DOWN in the OS HID state: every later
+  synthetic key/click arrives Cmd-modified and silently no-ops ("intermittent" app-side
+  symptoms, survives app restarts). `_clear_stuck_mods` in darwin.py self-heals on every
+  key/click op — if scripted keys ever go dead again, check `CGEventSourceFlagsState` first.
 - Commit + push after each verified round; author guard before push:
   `git log --all --format='%ae' | grep -i allspice` must print nothing.
