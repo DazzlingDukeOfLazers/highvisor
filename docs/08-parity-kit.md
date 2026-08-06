@@ -116,6 +116,26 @@ PYTHONPATH=<highvisor> python -m highvisor.cli scene --all --parity --text \
 
 ## Gotchas (the hard-won bits)
 
+- **Qud's uiQueue does NOT drain while its window is in the BACKGROUND.** Measured: a
+  `uiprobe` command sent with Qud backgrounded logged nothing at all, and ran the instant
+  Qud was focused. Every bridge command that marshals onto that queue — `uiback`,
+  `uiprobe`, `statusscreen`, the exporters' chrome pass — is accepted, queued, and then
+  silently does nothing until focus returns. `_qud_bridge` therefore ACTIVATES Qud first
+  (only when it isn't already frontmost) and waits **2s**: at 0.35s the frame still landed
+  in a queue that wasn't running yet. Shorter is not cheaper here, it is a failure dressed
+  as a success.
+- **It also holds the socket open ~0.4s after sending.** Closing the instant `sendall`
+  returns races the mod's per-client reader — the server logs "dropped slow/broken client:
+  the socket has been shut down" and the command is lost.
+- **The cascade these two produce looks like something else entirely.** Qud parked in a
+  status screen stops publishing snapshots, so Raves can never leave its title screen, and
+  the visible symptom is "`hv goto raves in_game` is broken". It isn't: close Qud's screen
+  (`hv back`) and Raves recovers immediately. Verified as a reproduction and a recovery.
+- **`hv back` takes NO app argument.** `hv back qud` fails at argument parsing and never
+  reaches the daemon — which looks exactly like the daemon ignoring the command, and cost a
+  long detour chasing a bug that wasn't there. Check `hv <cmd> --help` before concluding an
+  op is broken.
+
 - **A target string is an APP ALIAS or a `win:<id>` — never a loose substring.** `_resolve`
   used to substring-match window titles front-to-back, and Raves' window is titled
   **"Raves of Qud (DEBUG)"** — which contains "qud". So `hv shot qud` returned whichever of

@@ -541,21 +541,57 @@ class Engine:
         except OSError as e:
             return {"ok": False, "error": "qud bridge: %s" % e}
 
-    def _qud_bridge(self, name):
+    def _qud_bridge(self, name, focus=True):
         """Send a bare {"type":"command","name":...} frame to the Qud mod bridge
         (listener is up from the main menu on — ModSensitiveCacheInit). First-party
         UI driving: e.g. "uiback" fires the modern-UI CancelButton, the real Escape
-        for menu screens that ignore every OS-synthesized key."""
+        for menu screens that ignore every OS-synthesized key.
+
+        ACTIVATES QUD FIRST, and that is load-bearing. These commands marshal onto the
+        mod's uiQueue, and **Unity does not drain that queue while the window is in the
+        background** (measured: a probe command logged nothing backgrounded and ran the
+        instant Qud was focused). The frame is accepted, queued, and simply sits there —
+        so an unfocused `uiback` looks like it worked and the screen stays up. That in
+        turn strands the pair: Qud holds a status screen, stops publishing snapshots, and
+        Raves can never leave its title screen. Diagnosed as "the Raves goto is broken"
+        more than once; it is this.
+
+        Anything that drives the app's UI has to go through here focused. Pass focus=False
+        only for a command you know touches no Unity object."""
         import json as _json
         import socket as _socket
         import struct as _struct
         from .apps import PROFILES
+        win = PROFILES.get("qud", {}).get("window", "CavesOfQud")
+        if focus:
+            try:
+                # Only pay the settle when Qud isn't already frontmost — list_targets is
+                # front-to-back, so the first entry is the active window.
+                tops = self.backend.list_targets()
+                front = (tops[0].to_dict().get("title") or "") if tops else ""
+                if win not in front:
+                    self.backend.activate(win)
+                    import time as _t
+                    # 2s, measured. Unity needs a beat AFTER regaining focus before it drains
+                    # the mod's uiQueue again: at 0.35s the command still landed in a queue that
+                    # wasn't running yet and did nothing. Shorter is not safer here, it is just
+                    # a failure that looks like success.
+                    _t.sleep(2.0)
+            except Exception:
+                pass                # not fatal: a focused Qud is the common case anyway
         port = PROFILES.get("qud", {}).get("port", 48710)
         payload = _json.dumps({"type": "command", "name": name}).encode("utf-8")
         try:
             with _socket.create_connection(("127.0.0.1", port), timeout=3) as s:
                 s.sendall(_struct.pack(">I", len(payload)) + payload)
-            return {"ok": True, "name": name}
+                # HOLD THE SOCKET OPEN briefly. Closing the instant sendall returns races the
+                # mod's per-client reader: the server logs "dropped slow/broken client: the
+                # socket has been shut down" and the command is lost. The bridge client the
+                # capture tools use keeps its socket alive, which is why an identical frame
+                # sent from there worked while `hv back` silently did nothing.
+                import time as _t2
+                _t2.sleep(0.4)
+            return {"ok": True, "name": name, "focused": True, "held": 0.4}
         except OSError as e:
             return {"ok": False, "error": "Qud bridge :%s unreachable (%s)" % (port, e)}
 
