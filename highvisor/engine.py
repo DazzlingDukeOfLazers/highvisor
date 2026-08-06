@@ -177,6 +177,8 @@ class Engine:
                   "double": bool(req.get("double", False))}
             if req.get("hover"):   # only forward when asked — backends without the arg won't see it
                 kw["hover"] = True
+            if req.get("mods"):    # same contract: absent unless requested
+                kw["mods"] = str(req["mods"])
             return b.click(req["target"], int(req.get("x", 0)), int(req.get("y", 0)),
                            **kw).to_dict()
 

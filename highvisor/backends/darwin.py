@@ -349,7 +349,7 @@ class MacBackend(PlatformBackend):
         return bytes(data)
 
     def click(self, target: str, x: int, y: int, button: str = "left",
-              double: bool = False, hover: bool = False) -> ActionResult:
+              double: bool = False, hover: bool = False, mods: str = "") -> ActionResult:
         w = self._resolve(target)
         if w is None:
             return ActionResult.fail("click needs a window target")
@@ -386,9 +386,26 @@ class MacBackend(PlatformBackend):
         else:
             Quartz.CGWarpMouseCursorPosition(pt)
             time.sleep(0.03)
+        # Modifier-clicks (Cmd+Right-click = Raves' element-feedback gesture): set the flag on the
+        # MOUSE events themselves. Flags-only is enough for Godot -- it reads event.meta_pressed off
+        # the click -- and avoids the stuck-modifier class of bug entirely (nothing is ever held).
+        flags = 0
+        for m in (mods or "").split(","):
+            m = m.strip().lower()
+            if m in ("cmd", "meta", "command"):
+                flags |= Quartz.kCGEventFlagMaskCommand
+            elif m in ("ctrl", "control"):
+                flags |= Quartz.kCGEventFlagMaskControl
+            elif m == "shift":
+                flags |= Quartz.kCGEventFlagMaskShift
+            elif m in ("alt", "opt", "option"):
+                flags |= Quartz.kCGEventFlagMaskAlternate
         for _ in range(2 if double else 1):
             ed = Quartz.CGEventCreateMouseEvent(src, down, pt, b)
             eu = Quartz.CGEventCreateMouseEvent(src, up, pt, b)
+            if flags:
+                Quartz.CGEventSetFlags(ed, flags)
+                Quartz.CGEventSetFlags(eu, flags)
             Quartz.CGEventPost(Quartz.kCGHIDEventTap, ed)
             Quartz.CGEventPost(Quartz.kCGHIDEventTap, eu)
             time.sleep(0.02)
@@ -562,10 +579,13 @@ class MacBackend(PlatformBackend):
         # Tier 4: activate + type the characters via CGEvent (steals focus).
         self.activate(target)
         time.sleep(0.06)
+        # GLOBAL tap, not per-pid: Godot ignores CGEventPostToPid exactly like Unity does (the
+        # same reason the key op posts to the HID tap). Per-pid typing looked delivered -- ok:true
+        # -- while the focused TextEdit never saw a character.
         for ch in text:
-            self._post_char(ch, pid)
+            self._post_char(ch, None)
         return ActionResult(ok=True, tier=4,
-                            detail="activate + CGEvent typing (tier1: %s)" % tier1_err)
+                            detail="activate + CGEvent typing, HID tap (tier1: %s)" % tier1_err)
 
     def key(self, target: str, keys: str, focus: bool = False) -> ActionResult:
         w = self._resolve(target)
