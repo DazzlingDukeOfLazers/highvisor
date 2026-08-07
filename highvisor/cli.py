@@ -415,9 +415,17 @@ def _cmd_install_daemon(a):
 
     # VERIFY, do not assume. The agent can be running perfectly and still be unable to see a
     # single window title, which is the failure this whole bundle exists to make fixable.
+    # RETRY THROUGH THE GAP. launchd has bootstrapped the job but the daemon needs a second or
+    # two to bind 48720, and `_call` RAISES on a refused connection rather than returning — so
+    # the first, expected refusal escaped this loop entirely and the install reported failure
+    # for a daemon that was about to come up fine.
+    resp = {}
     for _ in range(12):
         time.sleep(1.0)
-        resp = _call({"op": P.OP_LIST})
+        try:
+            resp = _call({"op": P.OP_LIST})
+        except (OSError, SystemExit):
+            continue
         if resp.get("ok"):
             break
     else:
