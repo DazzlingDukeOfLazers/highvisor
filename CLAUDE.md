@@ -81,6 +81,14 @@ back to OCR/port signals when stale. **When detection is wrong, teach the app to
 scene** (add a `UiState.set_scene` call / extend the mod heartbeat) rather than piling on OCR
 substrings.
 
+**On a DEPTH TIE the more trustworthy signal wins, not tree order** (`gametree.TRUST`: tab >
+scene > ocr > live > port). `title` and `in_game` are both depth 1; `title` carries a
+`{"game_live": false}` fallback and the game_live probe is a 0.35s read on Qud's bridge, so a
+busy Qud made `hv state` report "Title Screen  scene=play  via=live" while it was plainly
+in-game. That was cosmetic until `gamego` began PLANNING from the detected state — a stray
+"title" plans title->in_game, whose edge is `load_save`, i.e. reload the save over a running
+game. Guarded by `python3 tools/selftest_evaluate.py`.
+
 **Reports are PER-PROCESS.** A shared path has one writer per running instance: three live Raves
 had `raves_state.json` cycling `in_game → status_tinkering → title` every 2s, so every read was a
 coin flip — that, not a reporter bug, is why the tree "lied" and `hv goto raves in_game` needed

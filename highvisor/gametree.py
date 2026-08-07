@@ -34,6 +34,11 @@ documented there. The tree only STORES them (one canonical map: detection + navi
 import json
 import os
 
+#: How much a matching SIGNAL is worth when two nodes match at the same depth. The apps' own
+#: reports are ground truth; OCR is a reading of pixels; game_live/port are inferences from a
+#: timed socket probe and can be wrong simply because something was busy. Higher wins.
+TRUST = {"tab": 5, "scene": 4, "ocr": 3, "live": 2, "port": 1, "window": 0}
+
 _PATH = os.path.join(os.path.dirname(__file__), "gametree.json")
 _cache = None
 _cache_mtime = None
@@ -132,7 +137,7 @@ def evaluate(tree, app, signals):
         return {"off": True, "running": False, "node": None, "label": "off",
                 "path": [], "via": "no-window", "ocr_used": ocr_used}
 
-    best = None  # (depth, node, path, via)
+    best = None  # (depth, trust, node, path, via)
 
     def walk(node, depth, path):
         nonlocal best
@@ -147,8 +152,25 @@ def evaluate(tree, app, signals):
                    else "ocr" if "ocr_any" in cond
                    else "live" if "game_live" in cond
                    else "port" if "port" in cond else "window")
-            if best is None or depth > best[0]:
-                best = (depth, node, here_path, via)
+            # Deepest wins, and on a TIE the more trustworthy SIGNAL wins — not tree order.
+            #
+            # Both `title` and `in_game` sit at depth 1. `title` carries a `{"game_live": false}`
+            # fallback for reading the title when no scene file exists; `in_game` matches the
+            # mod's first-party `scene: "play"`. The game_live probe is a 0.35s read on Qud's
+            # bridge, so a busy or just-restarted Qud can miss it — and then BOTH matched at
+            # depth 1 and `title` won purely by appearing first in the children array.
+            #
+            # Observed live 2026-08-06: `hv state` reported "Title Screen  scene=play  via=live"
+            # while Qud was plainly in-game (confirmed by screenshot). Harmless when a human
+            # reads it; not harmless now that `gamego` PLANS from the detected state — a stray
+            # "title" makes it plan title->in_game, whose edge is `load_save`, i.e. reload the
+            # save over a running game.
+            #
+            # The ranking is the project's own standing rule made mechanical: first-party
+            # reports beat OCR, OCR beats inference from a port probe.
+            trust = TRUST.get(via, 0)
+            if best is None or (depth, trust) > (best[0], best[1]):
+                best = (depth, trust, node, here_path, via)
         for ch in node.get("children", []) or []:
             walk(ch, depth + 1, here_path)
 
@@ -159,6 +181,6 @@ def evaluate(tree, app, signals):
         # unmodelled screen). Honest "running, screen unknown".
         return {"off": False, "running": True, "node": None, "label": "running · unknown screen",
                 "path": [], "via": "window", "ocr_used": ocr_used}
-    _, node, path, via = best
+    _, _, node, path, via = best
     return {"off": False, "running": True, "node": node["id"], "label": node.get("label", node["id"]),
             "path": path, "via": via, "ocr_used": ocr_used}
