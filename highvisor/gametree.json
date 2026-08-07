@@ -404,23 +404,19 @@
                   {
                     "id": "me_menu_file",
                     "label": "File menu",
-                    "note": "New map (Ctrl+N) · Load map... (Ctrl+O) · Test (Ctrl+T) · Save (Ctrl+S) · Save As... | Reload Blueprints | Exit. Captured; MapEditorView backs these with NewMap/LoadMap/RunTest+BuildTestZone/Save/SaveAs/_ReloadBlueprints/Exit. Open at [46,16]; Exit at [64,260], confirm Yes at [925,555].",
+                    "note": "New map (Ctrl+N) · Load map... (Ctrl+O) · Test (Ctrl+T) · Save (Ctrl+S) · Save As... | Reload Blueprints | Exit. Captured; MapEditorView backs these with NewMap/LoadMap/RunTest+BuildTestZone/Save/SaveAs/_ReloadBlueprints/Exit. Open at [46,16]; Exit at [64,260], confirm Yes at [925,555]. Detectable since 2026-08-07: the mod's UI sampler reads each MenuBarButton's Menu.IsVisible (DialogBase) on the main thread and reports the open dropdown in the state file's `tab` slot. The menu bar is a legacy RedShadow dialog, so neither UIManager._currentWindow nor _ActiveGameView moves when it opens — that is why these five kept goto recipes after every other toolkit screen became an edge. NOT YET CLOSABLE BY EDGE: leaving a dropdown is unmodelled. `key escape` looks right on paper (DialogBase.Update cancels the top dialog on Escape) and an escape->click edge was written and driven — it reported success while arriving NOWHERE. Two faults, both worth knowing: the escape did not close the menu inside the verify window, and the verify could not tell, because `assert node=X` passes when X is an ANCESTOR of the detected node (engine._assert_holds) — so 'verify map_editor' is satisfied by the still-open me_menu_file. The click then landed on the bar with a menu down, which cancels it and opens nothing. Escaping needs measuring on its own before it is an edge.",
                     "done": {
                       "qud": 0.95,
                       "raves": 0.8
                     },
-                    "detect": {},
-                    "goto": {
+                    "detect": {
                       "qud": [
                         {
-                          "goto": "map_editor"
-                        },
-                        {
-                          "click_hover": [
-                            46,
-                            16
+                          "scene": [
+                            "MapEditorWindow",
+                            "MapEditor"
                           ],
-                          "window": "CavesOfQud"
+                          "tab": "File"
                         }
                       ]
                     }
@@ -428,23 +424,19 @@
                   {
                     "id": "me_menu_edit",
                     "label": "Edit menu",
-                    "note": "Select All (Ctrl+A) · Undo (Ctrl+Z) · Redo (Ctrl+Y). Captured. MapEditorView: SelectAll/Undo/Redo over UndoStack+RedoStack, with ReverseAction as the primitive.",
+                    "note": "Select All (Ctrl+A) · Undo (Ctrl+Z) · Redo (Ctrl+Y). Captured. MapEditorView: SelectAll/Undo/Redo over UndoStack+RedoStack, with ReverseAction as the primitive. Detectable since 2026-08-07: the mod's UI sampler reads each MenuBarButton's Menu.IsVisible (DialogBase) on the main thread and reports the open dropdown in the state file's `tab` slot. The menu bar is a legacy RedShadow dialog, so neither UIManager._currentWindow nor _ActiveGameView moves when it opens — that is why these five kept goto recipes after every other toolkit screen became an edge. NOT YET CLOSABLE BY EDGE: leaving a dropdown is unmodelled. `key escape` looks right on paper (DialogBase.Update cancels the top dialog on Escape) and an escape->click edge was written and driven — it reported success while arriving NOWHERE. Two faults, both worth knowing: the escape did not close the menu inside the verify window, and the verify could not tell, because `assert node=X` passes when X is an ANCESTOR of the detected node (engine._assert_holds) — so 'verify map_editor' is satisfied by the still-open me_menu_file. The click then landed on the bar with a menu down, which cancels it and opens nothing. Escaping needs measuring on its own before it is an edge.",
                     "done": {
                       "qud": 0.95,
                       "raves": 0.8
                     },
-                    "detect": {},
-                    "goto": {
+                    "detect": {
                       "qud": [
                         {
-                          "goto": "map_editor"
-                        },
-                        {
-                          "click_hover": [
-                            112,
-                            16
+                          "scene": [
+                            "MapEditorWindow",
+                            "MapEditor"
                           ],
-                          "window": "CavesOfQud"
+                          "tab": "Edit"
                         }
                       ]
                     }
@@ -452,23 +444,19 @@
                   {
                     "id": "me_menu_transform",
                     "label": "Transform menu",
-                    "note": "Flip Horizontal · Flip Vertical (no hotkeys). Captured. MapEditorView: FlipHorizontal/FlipVertical — they act on SelectedRegion when one is set.",
+                    "note": "Flip Horizontal · Flip Vertical (no hotkeys). Captured. MapEditorView: FlipHorizontal/FlipVertical — they act on SelectedRegion when one is set. Detectable since 2026-08-07: the mod's UI sampler reads each MenuBarButton's Menu.IsVisible (DialogBase) on the main thread and reports the open dropdown in the state file's `tab` slot. The menu bar is a legacy RedShadow dialog, so neither UIManager._currentWindow nor _ActiveGameView moves when it opens — that is why these five kept goto recipes after every other toolkit screen became an edge. NOT YET CLOSABLE BY EDGE: leaving a dropdown is unmodelled. `key escape` looks right on paper (DialogBase.Update cancels the top dialog on Escape) and an escape->click edge was written and driven — it reported success while arriving NOWHERE. Two faults, both worth knowing: the escape did not close the menu inside the verify window, and the verify could not tell, because `assert node=X` passes when X is an ANCESTOR of the detected node (engine._assert_holds) — so 'verify map_editor' is satisfied by the still-open me_menu_file. The click then landed on the bar with a menu down, which cancels it and opens nothing. Escaping needs measuring on its own before it is an edge.",
                     "done": {
                       "qud": 0.95,
                       "raves": 0.8
                     },
-                    "detect": {},
-                    "goto": {
+                    "detect": {
                       "qud": [
                         {
-                          "goto": "map_editor"
-                        },
-                        {
-                          "click_hover": [
-                            203,
-                            16
+                          "scene": [
+                            "MapEditorWindow",
+                            "MapEditor"
                           ],
-                          "window": "CavesOfQud"
+                          "tab": "Transform"
                         }
                       ]
                     }
@@ -476,23 +464,19 @@
                   {
                     "id": "me_menu_view",
                     "label": "View menu",
-                    "note": "Toggle NorthSheva Overlay (Ctrl+F1) — the ONLY item. It overlays the NorthSheva artwork as a tracing guide (MapEditorView.ToggleOverlay); that same sprite, NorthShevaTransparent, is the BackdropWindow asset found during the toolkit backdrop hunt.",
+                    "note": "Toggle NorthSheva Overlay (Ctrl+F1) — the ONLY item. It overlays the NorthSheva artwork as a tracing guide (MapEditorView.ToggleOverlay); that same sprite, NorthShevaTransparent, is the BackdropWindow asset found during the toolkit backdrop hunt. Detectable since 2026-08-07: the mod's UI sampler reads each MenuBarButton's Menu.IsVisible (DialogBase) on the main thread and reports the open dropdown in the state file's `tab` slot. The menu bar is a legacy RedShadow dialog, so neither UIManager._currentWindow nor _ActiveGameView moves when it opens — that is why these five kept goto recipes after every other toolkit screen became an edge. NOT YET CLOSABLE BY EDGE: leaving a dropdown is unmodelled. `key escape` looks right on paper (DialogBase.Update cancels the top dialog on Escape) and an escape->click edge was written and driven — it reported success while arriving NOWHERE. Two faults, both worth knowing: the escape did not close the menu inside the verify window, and the verify could not tell, because `assert node=X` passes when X is an ANCESTOR of the detected node (engine._assert_holds) — so 'verify map_editor' is satisfied by the still-open me_menu_file. The click then landed on the bar with a menu down, which cancels it and opens nothing. Escaping needs measuring on its own before it is an edge.",
                     "done": {
                       "qud": 0.95,
                       "raves": 0.8
                     },
-                    "detect": {},
-                    "goto": {
+                    "detect": {
                       "qud": [
                         {
-                          "goto": "map_editor"
-                        },
-                        {
-                          "click_hover": [
-                            293,
-                            16
+                          "scene": [
+                            "MapEditorWindow",
+                            "MapEditor"
                           ],
-                          "window": "CavesOfQud"
+                          "tab": "View"
                         }
                       ]
                     }
@@ -500,23 +484,19 @@
                   {
                     "id": "me_menu_recent",
                     "label": "Recent menu",
-                    "note": "Recently-opened maps (MapEditorView RecentMenu/AddRecentFile/UpdateRecent/RecentClick, persisted via WriteModSettings). EMPTY on a fresh install — verified: opening it drew no panel, which is the expected zero-state, not a failure.",
+                    "note": "Recently-opened maps (MapEditorView RecentMenu/AddRecentFile/UpdateRecent/RecentClick, persisted via WriteModSettings). EMPTY on a fresh install — verified: opening it drew no panel, which is the expected zero-state, not a failure. Detectable since 2026-08-07: the mod's UI sampler reads each MenuBarButton's Menu.IsVisible (DialogBase) on the main thread and reports the open dropdown in the state file's `tab` slot. The menu bar is a legacy RedShadow dialog, so neither UIManager._currentWindow nor _ActiveGameView moves when it opens — that is why these five kept goto recipes after every other toolkit screen became an edge. NOT YET CLOSABLE BY EDGE: leaving a dropdown is unmodelled. `key escape` looks right on paper (DialogBase.Update cancels the top dialog on Escape) and an escape->click edge was written and driven — it reported success while arriving NOWHERE. Two faults, both worth knowing: the escape did not close the menu inside the verify window, and the verify could not tell, because `assert node=X` passes when X is an ANCESTOR of the detected node (engine._assert_holds) — so 'verify map_editor' is satisfied by the still-open me_menu_file. The click then landed on the bar with a menu down, which cancels it and opens nothing. Escaping needs measuring on its own before it is an edge.",
                     "done": {
                       "qud": 0.9,
                       "raves": 0.8
                     },
-                    "detect": {},
-                    "goto": {
+                    "detect": {
                       "qud": [
                         {
-                          "goto": "map_editor"
-                        },
-                        {
-                          "click_hover": [
-                            369,
-                            16
+                          "scene": [
+                            "MapEditorWindow",
+                            "MapEditor"
                           ],
-                          "window": "CavesOfQud"
+                          "tab": "Recent"
                         }
                       ]
                     }
@@ -564,12 +544,22 @@
                   {
                     "id": "me_context_menu",
                     "label": "Cell/region context menu (SOLVED — raised via the mod's MapEditorDriver)",
-                    "note": "SOLVED AND SEEN (2026-08-06). Trigger, from IL: MapEditorSelectedObjectsRow.OnPointerClick is `if (eventData.button != InputButton.Right) return; MapEditorView.instance.DisplayContextInRegion(this.bp);` — a RIGHT-CLICK ON A ROW of the selected-contents list, not on the canvas. Rows come from SelectedCellContentsView, filled by UpdateSelectedContents from HasSelectedRegion/SelectedRegion, so a region containing objects is the precondition. MENU CONTENTS, now captured rather than inferred: Set owner | Set part | Add string property | Add int property | Remove property — matching SetOwnerForContext / SetPartForContext / AddPropertyForContext / AddIntPropertyForContext / RemovePropertyForContext. (Flood, DeleteInRegion and ReplaceInRegion exist on MapEditorView but are NOT on this menu.) HOW TO DRIVE IT: synthetic mouse input cannot — see me_controls. The mod now drives the editor through its own API instead (mod/MapEditorDriver.cs, bridge command `mapedit`, the same skip-the-UI approach EmbarkDriver uses for chargen): {\"name\":\"mapedit\",\"do\":\"paint\",\"x\":21,\"y\":8,\"bp\":\"Across1\"} then {\"do\":\"select\",\"x\":19,\"y\":7,\"x2\":22,\"y2\":9} then {\"do\":\"context\",\"x\":20,\"y\":8}. Verified end to end: canvas gains the objects, the readout reads 'Selected Cell: 19, 7 - 23, 10', the contents rows populate, and the menu appears at x862..988 y490..574. `{\"do\":\"state\"}` logs a JSON readback for asserts. GOTCHA worth keeping: MapFile is NOT a MapFileRegion — the cell grid is MapFile.Cells, and the driver's first version logged 'no GetOrCreateCellAt on MapFile' until that was fixed.",
+                    "note": "SOLVED AND SEEN (2026-08-06). Trigger, from IL: MapEditorSelectedObjectsRow.OnPointerClick is `if (eventData.button != InputButton.Right) return; MapEditorView.instance.DisplayContextInRegion(this.bp);` — a RIGHT-CLICK ON A ROW of the selected-contents list, not on the canvas. Rows come from SelectedCellContentsView, filled by UpdateSelectedContents from HasSelectedRegion/SelectedRegion, so a region containing objects is the precondition. MENU CONTENTS, now captured rather than inferred: Set owner | Set part | Add string property | Add int property | Remove property — matching SetOwnerForContext / SetPartForContext / AddPropertyForContext / AddIntPropertyForContext / RemovePropertyForContext. (Flood, DeleteInRegion and ReplaceInRegion exist on MapEditorView but are NOT on this menu.) HOW TO DRIVE IT: synthetic mouse input cannot — see me_controls. The mod now drives the editor through its own API instead (mod/MapEditorDriver.cs, bridge command `mapedit`, the same skip-the-UI approach EmbarkDriver uses for chargen): {\"name\":\"mapedit\",\"do\":\"paint\",\"x\":21,\"y\":8,\"bp\":\"Across1\"} then {\"do\":\"select\",\"x\":19,\"y\":7,\"x2\":22,\"y2\":9} then {\"do\":\"context\",\"x\":20,\"y\":8}. Verified end to end: canvas gains the objects, the readout reads 'Selected Cell: 19, 7 - 23, 10', the contents rows populate, and the menu appears at x862..988 y490..574. `{\"do\":\"state\"}` logs a JSON readback for asserts. GOTCHA worth keeping: MapFile is NOT a MapFileRegion — the cell grid is MapFile.Cells, and the driver's first version logged 'no GetOrCreateCellAt on MapFile' until that was fixed. Detected off the same sampler read as the menu-bar dropdowns (MapEditorView.ContextMenu.IsVisible -> tab=\"Context\"); it has no edge because it opens at the MOUSE, from a right-click on a canvas cell.",
                     "done": {
                       "qud": 0.95,
                       "raves": 0.0
                     },
-                    "detect": {}
+                    "detect": {
+                      "qud": [
+                        {
+                          "scene": [
+                            "MapEditorWindow",
+                            "MapEditor"
+                          ],
+                          "tab": "Context"
+                        }
+                      ]
+                    }
                   },
                   {
                     "id": "map_editor_exit_confirm",
@@ -2539,6 +2529,101 @@
       },
       "timeout": 15,
       "note": "Converted 2026-08-07 after re-measuring. The coordinates were never the problem — they were within 2px — and the clicks always worked; the earlier conversion attempt was driven from a Qud stuck on a stale 'Stage' scene, which invalidated the whole run. map_editor's DETECTOR was the real defect: it named the UI sampler's window ('MapEditorWindow') while the mod reports the legacy view ('MapEditor'), which is the more specific of the two and therefore wins."
+    },
+    {
+      "app": "qud",
+      "from": "map_editor",
+      "to": "me_menu_file",
+      "steps": [
+        {
+          "click_hover": [
+            46,
+            16
+          ],
+          "window": "CavesOfQud"
+        }
+      ],
+      "verify": {
+        "node": "me_menu_file"
+      },
+      "timeout": 12,
+      "note": "Converted 2026-08-07. `from` is the EDITOR ONLY, not `within map_editor`, and that is a MEASURED constraint rather than a stylistic one. MenuBarButton.onMouseEnter looks like it makes menu->menu one hop (it cancels the open dropdown and opens its own), so the first cut used `within` — and driving File->Edit closed File and opened NOTHING. The click's mouse-DOWN lands on the menu BAR, which is outside the just-opened dropdown's rect, and Menu.Update cancels any top menu clicked outside itself. From a closed bar the same click is harmless (the button opens the menu on mouse-UP, after that check). So a dropdown must be ESCAPED before the next one opens: File -> map_editor -> Edit, which the escape edge gives for cost 1. The planner found this by re-planning; pinning `from` means it no longer has to spend a failed click to learn it."
+    },
+    {
+      "app": "qud",
+      "from": "map_editor",
+      "to": "me_menu_edit",
+      "steps": [
+        {
+          "click_hover": [
+            112,
+            16
+          ],
+          "window": "CavesOfQud"
+        }
+      ],
+      "verify": {
+        "node": "me_menu_edit"
+      },
+      "timeout": 12,
+      "note": "Converted 2026-08-07. `from` is the EDITOR ONLY, not `within map_editor`, and that is a MEASURED constraint rather than a stylistic one. MenuBarButton.onMouseEnter looks like it makes menu->menu one hop (it cancels the open dropdown and opens its own), so the first cut used `within` — and driving File->Edit closed File and opened NOTHING. The click's mouse-DOWN lands on the menu BAR, which is outside the just-opened dropdown's rect, and Menu.Update cancels any top menu clicked outside itself. From a closed bar the same click is harmless (the button opens the menu on mouse-UP, after that check). So a dropdown must be ESCAPED before the next one opens: File -> map_editor -> Edit, which the escape edge gives for cost 1. The planner found this by re-planning; pinning `from` means it no longer has to spend a failed click to learn it."
+    },
+    {
+      "app": "qud",
+      "from": "map_editor",
+      "to": "me_menu_transform",
+      "steps": [
+        {
+          "click_hover": [
+            203,
+            16
+          ],
+          "window": "CavesOfQud"
+        }
+      ],
+      "verify": {
+        "node": "me_menu_transform"
+      },
+      "timeout": 12,
+      "note": "Converted 2026-08-07. `from` is the EDITOR ONLY, not `within map_editor`, and that is a MEASURED constraint rather than a stylistic one. MenuBarButton.onMouseEnter looks like it makes menu->menu one hop (it cancels the open dropdown and opens its own), so the first cut used `within` — and driving File->Edit closed File and opened NOTHING. The click's mouse-DOWN lands on the menu BAR, which is outside the just-opened dropdown's rect, and Menu.Update cancels any top menu clicked outside itself. From a closed bar the same click is harmless (the button opens the menu on mouse-UP, after that check). So a dropdown must be ESCAPED before the next one opens: File -> map_editor -> Edit, which the escape edge gives for cost 1. The planner found this by re-planning; pinning `from` means it no longer has to spend a failed click to learn it."
+    },
+    {
+      "app": "qud",
+      "from": "map_editor",
+      "to": "me_menu_view",
+      "steps": [
+        {
+          "click_hover": [
+            293,
+            16
+          ],
+          "window": "CavesOfQud"
+        }
+      ],
+      "verify": {
+        "node": "me_menu_view"
+      },
+      "timeout": 12,
+      "note": "Converted 2026-08-07. `from` is the EDITOR ONLY, not `within map_editor`, and that is a MEASURED constraint rather than a stylistic one. MenuBarButton.onMouseEnter looks like it makes menu->menu one hop (it cancels the open dropdown and opens its own), so the first cut used `within` — and driving File->Edit closed File and opened NOTHING. The click's mouse-DOWN lands on the menu BAR, which is outside the just-opened dropdown's rect, and Menu.Update cancels any top menu clicked outside itself. From a closed bar the same click is harmless (the button opens the menu on mouse-UP, after that check). So a dropdown must be ESCAPED before the next one opens: File -> map_editor -> Edit, which the escape edge gives for cost 1. The planner found this by re-planning; pinning `from` means it no longer has to spend a failed click to learn it."
+    },
+    {
+      "app": "qud",
+      "from": "map_editor",
+      "to": "me_menu_recent",
+      "steps": [
+        {
+          "click_hover": [
+            369,
+            16
+          ],
+          "window": "CavesOfQud"
+        }
+      ],
+      "verify": {
+        "node": "me_menu_recent"
+      },
+      "timeout": 12,
+      "note": "Converted 2026-08-07. `from` is the EDITOR ONLY, not `within map_editor`, and that is a MEASURED constraint rather than a stylistic one. MenuBarButton.onMouseEnter looks like it makes menu->menu one hop (it cancels the open dropdown and opens its own), so the first cut used `within` — and driving File->Edit closed File and opened NOTHING. The click's mouse-DOWN lands on the menu BAR, which is outside the just-opened dropdown's rect, and Menu.Update cancels any top menu clicked outside itself. From a closed bar the same click is harmless (the button opens the menu on mouse-UP, after that check). So a dropdown must be ESCAPED before the next one opens: File -> map_editor -> Edit, which the escape edge gives for cost 1. The planner found this by re-planning; pinning `from` means it no longer has to spend a failed click to learn it."
     },
     {
       "app": "qud",
