@@ -720,8 +720,24 @@ class Engine:
             return {"ok": False, "error": "no proc/launcher profile for app %r" % app}
         import os as _os
         if _os.name == "nt":
-            # taskkill matches the IMAGE NAME, not a command-line pattern —
-            # profiles carry the pkill -f stem, so append .exe (CoQ -> CoQ.exe).
+            # taskkill matches the IMAGE NAME, and a profile's `proc` stem is the MAC
+            # binary name. For qud that happens to match (CoQ.exe); for RAVES it does not
+            # — a dev-run Raves IS the Godot binary, so `/IM RavesOfQud.exe` matched
+            # nothing and "restart" quietly became "launch another one". That is how this
+            # box ended up with three live Raves, at which point the duplicate-instance
+            # guard (correctly) refused to drive anything.
+            #
+            # Kill by PID off the app's own WINDOWS instead. It gets duplicates, and it
+            # cannot take out an unrelated Godot editor the way an image-name kill would.
+            pids = set()
+            for t in b.list_targets():
+                d = t.to_dict()
+                if win and win in (d.get("title") or ""):
+                    if d.get("pid"):
+                        pids.add(d["pid"])
+            for pid in pids:
+                _sp.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
+            # Belt and braces for a windowless corpse the enumeration cannot see.
             _sp.run(["taskkill", "/F", "/IM", proc + ".exe"], capture_output=True)
         else:
             _sp.run(["pkill", "-9", "-f", proc], capture_output=True)
@@ -835,12 +851,46 @@ class Engine:
         except OSError as e:
             return {"ok": False, "error": "Qud bridge :%s unreachable (%s)" % (port, e)}
         deadline = _t.time() + 40
+        answered = False
         while _t.time() < deadline:
             stq = (self._gamestate(b).get("states", {}).get("qud") or {})
             if stq.get("node") == "in_game":
-                return {"ok": True, "name": name, "id": sid, "via": "bridge loadsave"}
+                r = {"ok": True, "name": name, "id": sid, "via": "bridge loadsave"}
+                if answered:
+                    r["popup"] = "answered 'Load keeping current mod configuration'"
+                return r
+            # "Mod Configuration Differs" — a save made without the bridge stops the load
+            # dead on a popup whose PRE-SELECTED option is "Restart using save game's mod
+            # configuration", i.e. relaunch with OUR BRIDGE DISABLED. Anything that blindly
+            # presses the default here silently loses the mod for every later run; that is
+            # not hypothetical, it happened on Lumpy and cost a debugging round (bridge
+            # port shut, heartbeat frozen, ModSettings.json flipped to Enabled:false).
+            #
+            # Index 1 is "Load keeping current mod configuration". Answered ONCE, and only
+            # while we are inside loadsave's own wait, so it cannot wander onto some other
+            # popup. The bridge check below is what proves we picked the right one.
+            if not answered and "popup" in str(
+                    (stq.get("signals") or {}).get("scene") or "").lower():
+                try:
+                    p2 = _json.dumps({"type": "command", "name": "popup",
+                                      "action": "option", "index": 1}).encode("utf-8")
+                    with _socket.create_connection(("127.0.0.1", port), timeout=3) as s:
+                        s.sendall(_struct.pack(">I", len(p2)) + p2)
+                    answered = True
+                except OSError:
+                    pass
             _t.sleep(1.5)
-        return {"ok": False, "error": "load did not reach in_game", "name": name, "id": sid}
+        # A closed bridge here means the mod got switched off — say so, because the
+        # symptom (stale heartbeat, "no [raves] lines") points nowhere near the cause.
+        try:
+            with _socket.create_connection(("127.0.0.1", port), timeout=2):
+                pass
+            hint = ""
+        except OSError:
+            hint = (" — and the Qud bridge is CLOSED: the mod looks disabled. Check "
+                    "Local/ModSettings.json for RavesOfQudBridge.Enabled")
+        return {"ok": False, "error": "load did not reach in_game" + hint,
+                "name": name, "id": sid, "popup_answered": answered}
 
     def _gamestate(self, b, ocr=False):
         """Evaluate the game state-machine tree against live signals for each app.
