@@ -2045,5 +2045,35 @@
       "timeout": 12,
       "note": "new_game is the chargen CONTAINER; detection reports the deepest match (game_mode), and assert passes a node that is on the current path, so landing on the first card satisfies this."
     }
+  ],
+  "tests": [
+    {
+      "id": "plan",
+      "tier": "spot",
+      "cwd": "highvisor",
+      "cmd": "python3 tools/selftest_plan.py",
+      "note": "The transition graph: every endpoint is a real node, and every target is reachable from every state we might be found in. Under the recipe model that question could only be answered by driving both apps and watching."
+    },
+    {
+      "id": "evaluate",
+      "tier": "spot",
+      "cwd": "highvisor",
+      "cmd": "python3 tools/selftest_evaluate.py",
+      "note": "Which node wins a detection tie. `title` and `in_game` are both depth 1 and a busy Qud can miss the game_live probe, so this pins first-party scene over inference."
+    },
+    {
+      "id": "state_read",
+      "tier": "spot",
+      "cwd": "highvisor",
+      "cmd": "python3 tools/selftest_state_read.py",
+      "note": "pid-keyed state reads — the fix for three live Raves all writing one report file."
+    },
+    {
+      "id": "state_graph_render",
+      "tier": "spot",
+      "cwd": "raves-of-qud",
+      "cmd": "/Users/homefolder/Downloads/Godot.app/Contents/MacOS/Godot --headless --path godot/ --script res://tests/state_graph_render.gd",
+      "note": "This panel's own text builders, against a fixture AND the real gametree.json. Found the GDScript `or`-is-boolean bug on its first run."
+    }
   ]
 }

@@ -184,3 +184,36 @@ def evaluate(tree, app, signals):
     _, _, node, path, via = best
     return {"off": False, "running": True, "node": node["id"], "label": node.get("label", node["id"]),
             "path": path, "via": via, "ocr_used": ocr_used}
+
+
+def find_test(tree, node_id, test_id):
+    """A registered check, by (node, id). ``node_id`` empty/None means the HARNESS-WIDE list.
+
+    Lookup by ID is the security model, such as it is: a caller names WHICH check to run, never
+    what to execute. The command text lives here, in version control, next to the state it
+    covers — so "run this node's check" from a UI can never become "run this string".
+    """
+    if not node_id:
+        pool = (tree or load_tree()).get("tests") or []
+    else:
+        node = find_node(tree, node_id)
+        pool = (node or {}).get("tests") or []
+    for t in pool:
+        if t.get("id") == test_id:
+            return t
+    return None
+
+
+def all_tests(tree=None):
+    """[(node_id or "", test)] for every registered check — harness-wide first."""
+    tree = tree or load_tree()
+    out = [("", t) for t in (tree.get("tests") or [])]
+
+    def walk(n):
+        for t in n.get("tests") or []:
+            out.append((n.get("id", ""), t))
+        for c in n.get("children") or []:
+            walk(c)
+
+    walk(tree["root"])
+    return out

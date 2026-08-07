@@ -148,6 +148,12 @@ label}` (Unity menus need hover), `{"click_text": label, "window": label}`, `{"k
 the standard 1920×1080 slots; re-measure if the layout changes.
 
 - `hv plan <app> <node> [--from <state>]` — the route `hv goto` would take, driving NOTHING.
+  With NO node it lists every reachable state and its cost (one call, not one per node).
+- **`hv test [id] [--node N]`** — run a check REGISTERED IN THE TREE, or list them all. The
+  caller names WHICH check; the command text lives in `gametree.json` under version control,
+  next to the state it covers, so "run this node's check" can never become "run this string".
+  Harness-wide checks sit at the tree's top level (`tests`); screen-specific ones on the node.
+  Raves' state-graph panel renders both as clickable `[T]` markers.
 - `python3 tools/selftest_plan.py` — stdlib only, no daemon, no apps. Proves every target is
   reachable from every state we might be found in. Run it with any transition edit.
 - The 20 legacy `goto[app]` recipes are GONE (2026-08-06) — the graph covers every node that

@@ -55,6 +55,7 @@ OP_QUDBACK = "qudback"            # -> {ok} — first-party Escape/close for Qud
 OP_QUD_SAVES = "qud_saves"        # -> {ok, saves:[{row,name,guid,location,mode,saved}]} (from DISK, no game needed)
 OP_LOAD_SAVE = "load_save"        # name -> restart-to-title if needed, click Continue + the row BY NAME -> {ok,row}
 OP_RESTART = "restart_app"        # app (qud|raves) -> kill ALL instances, launch solo, wait for the window
+OP_RUN_TEST = "run_test"          # [node], test -> run a REGISTERED check -> {exit, out, seconds}
 OP_GRANT_INPUT = "grant_input"    # -> raise the Accessibility prompt for the DAEMON process
 OP_ABORT = "abort_control"        # -> release focus/mouse NOW + refuse control ops for 30s (the panic path)
 

@@ -335,6 +335,25 @@ def _cmd_trace(a):
                     print("      failed step: %s" % st.get("step"))
 
 
+def _cmd_test(a):
+    """Run a REGISTERED check by id, or list them all with no arguments."""
+    if not a.test:
+        from . import gametree
+        for node, t in gametree.all_tests():
+            print("%-16s %-20s %-5s %s" % (node or "(harness)", t["id"], t.get("tier", "?"), t["cmd"]))
+        raise SystemExit(0)
+    res = _call({"op": P.OP_RUN_TEST, "node": a.node or "", "test": a.test}, timeout=660.0)
+    if not res.get("ok") and res.get("have"):
+        print("no such test. registered:")
+        for h in res["have"]:
+            print("  " + h)
+        raise SystemExit(1)
+    print("%s (%s) — %s" % (res.get("test"), res.get("tier"), res.get("detail", res.get("error"))))
+    for ln in res.get("tail") or []:
+        print("  " + ln)
+    raise SystemExit(0 if res.get("ok") else 1)
+
+
 def _cmd_grant_input(a):
     """Raise the system Accessibility prompt for the DAEMON process, and say which identity
     macOS is actually asking about — it is the interpreter, not Highvisor.app (see the
@@ -1022,6 +1041,11 @@ def build_parser():
     s.add_argument("limit", nargs="?", type=int, default=20)
     s.add_argument("--json", action="store_true")
     s.set_defaults(fn=_cmd_trace)
+
+    s = sub.add_parser("test", help="run a REGISTERED check from the tree by id (no args = list them)")
+    s.add_argument("test", nargs="?", default=None)
+    s.add_argument("--node", default=None, help="the node it is registered on (omit for harness-wide)")
+    s.set_defaults(fn=_cmd_test)
 
     sub.add_parser("grant-input", help="raise the Accessibility prompt for the daemon "
                    "(input needs a DIFFERENT grant than capture)").set_defaults(fn=_cmd_grant_input)

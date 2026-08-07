@@ -289,6 +289,9 @@ class Engine:
         if op == P.OP_RESTART:
             return self._restart_app(b, req.get("app", ""))
 
+        if op == P.OP_RUN_TEST:
+            return self._run_test(req.get("node") or "", req.get("test") or "")
+
         if op == P.OP_GRANT_INPUT:
             return b.request_input_grant()
 
@@ -1115,6 +1118,52 @@ class Engine:
                         % (edge.get("id"), edge.get("verify"),
                            (ar.get("actual") or {}).get("label"))}
         return {"ok": True}
+
+    # ------------------------------------------------------------- registered checks
+    #: Where a test's ``cwd`` resolves. Repos are SIBLINGS on both machines, so a bare name
+    #: resolves next to this checkout rather than against a machine-local path in the tree —
+    #: gametree.json is committed and shared with the PC branch.
+    TEST_TIMEOUT = 600
+
+    def _run_test(self, node_id, test_id):
+        """Run a check REGISTERED IN THE TREE, by id. Never an arbitrary command.
+
+        The caller names which check; the command text lives in gametree.json under version
+        control, next to the state it covers. That is what makes "run this node's check" safe
+        to expose from a UI — it can never become "run this string".
+        """
+        import os as _os
+        import subprocess as _sp
+        import time as _t
+        from . import gametree
+        tree = gametree.load_tree()
+        test = gametree.find_test(tree, node_id, test_id)
+        if test is None:
+            have = ["%s/%s" % (n or "-", t.get("id")) for n, t in gametree.all_tests(tree)]
+            return {"ok": False, "error": "no registered test %r on %r"
+                    % (test_id, node_id or "the harness"), "have": have}
+        repo = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+        want = test.get("cwd") or ""
+        cwd = repo if want in ("", "highvisor") else _os.path.join(_os.path.dirname(repo), want)
+        if not _os.path.isdir(cwd):
+            return {"ok": False, "error": "cwd %r for test %r does not exist (expected a sibling "
+                    "of the highvisor checkout)" % (cwd, test_id)}
+        started = _t.time()
+        try:
+            r = _sp.run(test["cmd"], shell=True, cwd=cwd, capture_output=True, text=True,
+                        timeout=self.TEST_TIMEOUT)
+            out, err, code = r.stdout, r.stderr, r.returncode
+        except _sp.TimeoutExpired:
+            return {"ok": False, "test": test_id, "node": node_id, "timeout": self.TEST_TIMEOUT,
+                    "error": "timed out after %ds" % self.TEST_TIMEOUT}
+        secs = round(_t.time() - started, 1)
+        # TAIL, not head: a check that fails says so at the END (the summary line), and the
+        # front of the output is the part you already know.
+        tail = [ln for ln in (out + err).splitlines() if ln.strip()][-12:]
+        return {"ok": code == 0, "test": test_id, "node": node_id, "exit": code,
+                "seconds": secs, "cmd": test["cmd"], "cwd": cwd, "tier": test.get("tier"),
+                "tail": tail,
+                "detail": "%s in %.1fs" % ("passed" if code == 0 else "FAILED (exit %d)" % code, secs)}
 
     def _plan_route(self, b, app, node_id, start=None):
         """The route ``gamego`` WOULD take — without touching anything.
