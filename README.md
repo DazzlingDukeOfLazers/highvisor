@@ -33,11 +33,11 @@ This matters most for unfocused capture and synthetic input, where the app class
 
 | Capability | Command | macOS | Windows |
 |---|---|---|---|
-| List / find windows | `hv ls` | ✅ | ◐ |
-| Capture an **unfocused** window | `hv shot` | ✅ (CoreGraphics `CGWindowListCreateImage`) | ◐ (`PrintWindow(PW_RENDERFULLCONTENT)`; full screen `BitBlt`) |
+| List / find windows | `hv ls` | ✅ | ✅ (Win11 + Qud 1.0.5, 2026-08-06) |
+| Capture an **unfocused** window | `hv shot` | ✅ (CoreGraphics `CGWindowListCreateImage`) | ✅ (`PrintWindow(PW_RENDERFULLCONTENT)` vs unfocused Unity/Qud, Win11, 2026-08-06; full screen `BitBlt`) |
 | Accessibility inspect | `hv inspect` | ✅ AX | ◐ UI Automation |
 | Move / resize / dock / stack | `hv move` `dock` `stack` | ✅ | ◐ |
-| Synthetic input | `hv click` `text` `key` | ✅ (incl. Unity/Qud `--hover` click) | ◐ |
+| Synthetic input | `hv click` `text` `key` | ✅ (incl. Unity/Qud `--hover` click) | ✅ (Win11 + Qud 1.0.5, 2026-08-06 — `--hover` click with raw-input move; `key --focus` scan-code SendInput) |
 | OCR a window | `hv ocr` | ✅ (Vision) | — (macOS only) |
 | Visual parity / golden regression | `hv scene` `diff` `parity` | ✅ | ◐ |
 

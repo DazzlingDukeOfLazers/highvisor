@@ -314,6 +314,487 @@
             "detect": {}
           },
           {
+            "id": "modding_toolkit",
+            "label": "Modding Toolkit (secondary-links menu)",
+            "note": "Walked live on Lumpy (Win11 4K, Qud 1.0.5, 2026-08-06); captures in the session scratchpad. Coordinates are the STANDARD 1920x1080 slot values (Qud runs 1920x1080 in the portrait column; the Godot exe carries HIGHDPIAWARE so Raves is 1:1 too). QUIRKS: this legacy console menu ignores scancode arrow keys (title menu needs them) — drive it by hover-clicking rows; Enter selects, Space does not; the first click after a focus change is eaten by activation, so recipes double-click. SCENES: the bridge mod heartbeat reports first-party names for every toolkit screen (UIManager._currentWindow + SingletonWindowBase probes) — detect entries below use them; ocr_any stays as the Mac fallback. RAVES (measured 98.15% content congruence at 1920x1080, 2026-08-06 round 3): Qud's OWN backdrop art (the mod's ExportMenuBackgrounds found it as a full-screen RawImage, texture 'bears' — NOT MainMenu.backgrounds[] nor BackdropWindowManager, both of which are inactive when this screen shows), dimmed by a MEASURED 0.765 veil; SourceCodePro console styling at Qud's metrics; functional items — Mod Manager -> ModsScreen, Blueprint Browser -> its own screen, Mod Wiki Website + Open Save Folder shell-open. Remaining: the top plant ornament and the five deep-tool screens (cosmetic rows).",
+            "done": {
+              "qud": 0.9,
+              "raves": 0.85
+            },
+            "detect": {
+              "raves": [
+                {
+                  "scene": "modding_toolkit"
+                }
+              ],
+              "qud": [
+                {
+                  "scene": "ModToolkit"
+                },
+                {
+                  "ocr_any": [
+                    "mod manager",
+                    "workshop uploader",
+                    "histographicnomicon",
+                    "waveform collapse map generator"
+                  ],
+                  "game_live": false
+                }
+              ]
+            },
+            "goto": {
+              "qud": [
+                {
+                  "goto": "title"
+                },
+                {
+                  "activate": "CavesOfQud"
+                },
+                {
+                  "click_hover": [
+                    156,
+                    902
+                  ],
+                  "window": "CavesOfQud",
+                  "note": "Modding Toolkit link, lower-left secondary list"
+                },
+                {
+                  "click_hover": [
+                    156,
+                    902
+                  ],
+                  "window": "CavesOfQud",
+                  "note": "repeat — first click may be eaten by activation; lands in empty space if already open"
+                },
+                {
+                  "assert": {
+                    "node": "modding_toolkit"
+                  },
+                  "timeout": 10
+                }
+              ]
+            },
+            "children": [
+              {
+                "id": "mod_manager",
+                "label": "Mod Manager",
+                "note": "opens the SAME Mods screen as title>menu_box>mods (two-pane list + tile preview, footer [Esc] Back / [v] Disable All); list empty until mods are installed. Esc exits to TITLE (verified), not the toolkit menu.",
+                "done": {
+                  "qud": 0.9,
+                  "raves": 0.0
+                },
+                "detect": {
+                  "qud": [
+                    {
+                      "scene": "ModManagerUI"
+                    }
+                  ]
+                },
+                "goto": {
+                  "qud": [
+                    {
+                      "goto": "modding_toolkit"
+                    },
+                    {
+                      "click_hover": [
+                        862,
+                        437
+                      ],
+                      "window": "CavesOfQud"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "workshop_uploader",
+                "label": "Workshop Uploader",
+                "note": "modern full-screen UI: < Back / browse mods folder / refresh, Mods-folder list, 'Select a mod to manage it'. Esc does NOT exit — click < Back at [217,74]; Back returns to TITLE, not the toolkit menu.",
+                "done": {
+                  "qud": 0.9,
+                  "raves": 0.0
+                },
+                "detect": {
+                  "qud": [
+                    {
+                      "scene": "SteamWorkshopUploaderView"
+                    }
+                  ]
+                },
+                "goto": {
+                  "qud": [
+                    {
+                      "goto": "modding_toolkit"
+                    },
+                    {
+                      "click_hover": [
+                        862,
+                        463
+                      ],
+                      "window": "CavesOfQud"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "map_editor",
+                "label": "Map Editor",
+                "note": "Qud's map editor: an 80x25 cell canvas with a blueprint palette. WALKED LIVE at 1920x1080 on Lumpy (Qud 1.0.5, 2026-08-06) — every menu opened and captured; the command surface below is cross-checked against Overlay.MapEditor.MapEditorView by reflection, so it includes verbs that have no menu entry. LAYOUT: menu bar y=16 (File x46, Edit x112, Transform x203, View x293, Recent x369), title 'Map Editor' centred x959; canvas x50..1470 y208..872 (80x25 => cell ~17.7x26.6) with a green cell cursor; palette panel x1524..1920 — filter field 'Enter text...' at y4..30, a '[ ] In Use' toggle at y46 (right edge), the blueprint list with per-row tile icons, and readouts at the bottom: 'Mouse Position: X, Y' + 'Brush: <name>' (y695) and 'Selected Cell: X, Y|none' (y716); control hints bottom-left y1029/y1045. EXIT: File > Exit > confirm Yes returns to the TOOLKIT menu, and it leaves the legacy view string stuck at 'MapEditor' — trust `scene` (window-priority), not `view`. RAVES: MapEditorScreen.gd shipped — 95.16% content congruence at 1920x1080 on the first build, geometry MEASURED off the reference (menu text at x29/95/160/275/342, title x913, canvas 50,208 1420x664 = 80x25, palette pitch 24, readouts y688/y710, hints y1023/y1039). Working: the five menus with their verbatim items + hotkey column (Recent draws no panel when empty, matching Qud), the dotted 80x25 canvas with hover cursor, Shift+drag region select, Ctrl+click paint, Alt+click sample, Ctrl+Z undo, flips, Select All, the NorthSheva overlay toggle, the live palette from blueprints.json with filter + In Use, and all three readouts. TILES: painted cells now render Qud's REAL tile art — QudTiles recolours the exported grayscale mask with the blueprint's TileColor/DetailColor (BlueprintExporter gained tilecolor+detail; 1529 blueprints carry both), falling back to the render glyph, and a missing mask is fetched once via the new `wanttile` bridge command (only ~245 of ~5.2k tiles ship exported, so screens ask for what they draw). NOT DONE: no .rpm file I/O (New/Load/Save/Save As/Test inert) and no per-object context menu. TILE/PAINT PATH NOW VERIFIED LIVE (2026-08-07): Ctrl+click paints and the cell renders the blueprint's art — the glyph fallback confirmed on screen for a tile-less blueprint. The blocker was a highvisor bug, since fixed: a KEYEVENTF_SCANCODE modifier press is invisible to Godot (Unity polls global key state and accepts it; Godot tracks modifiers from key MESSAGES and wants the VK form), so hv now emits BOTH forms. Two Raves bugs were found by driving it: palette rows had zero width (a Control with custom_minimum_size (0,h) in a non-expanding VBox is unclickable, so the brush never set) and modifiers now come off the EVENT rather than Input.is_key_pressed. TILE PIPELINE FULLY VERIFIED (2026-08-07): painting Clue_BloodyWatervine (tilecolor &w, detail r) drew a recognisable watervine SPRITE in brown/orange tones — 252 lit px across 6 colour groups, i.e. a real 2-colour mask recolour, not the glyph (~40px, one hue) or the flat swatch. The on-demand fetch works too: `wanttile creatures/sw_giant_clam.bmp` produced creatures_sw_giant_clam.bmp on disk in ~1s. FLATTENED TILE PATHS FIXED (2026-08-07): 345 of 4649 blueprint tile values arrive already flattened ('Assets_Content_Textures_Creatures_sw_farmer.bmp') and resolved to nothing. TileExportPump.Resolve now repairs them — drop the Assets_Content_Textures_ prefix, then split at the first underscore followed by a lower-case letter (Qud dirs are Capitalised, file names start lower-case). MEASURED canonical form: 'Creatures/sw_farmer.bmp' resolves while 'creatures/sw_farmer.bmp' (case) and 'Assets/Content/Textures/Creatures/sw_farmer.bmp' (prefix) both return null. The file is written under the ORIGINAL requested name so the client lookup still matches. Sampled 12 previously-dead paths: 11 now export; backslash separators are also repaired. The residual misses are NOT a path bug — those blueprints reference art absent from the shipped atlas (verified: the correct forward-slash form fails too), and the pump now LOGS 'could not resolve' instead of returning silently, which is what made this invisible before. RPM FILE I/O DONE and verified LOSSLESS: loaded Qud's own Barathrums_Study.rpm, saved it back, and compared parsed cell-by-cell against the pristine original — 2000 cells vs 2000, 1904 objects vs 1904, 0 missing / 0 extra / 0 differing. Cells hold object DICTS so Owner/Part/<intproperty> survive the trip; Qud writes ALL 2000 cells including 122 empty ones as <cell X Y></cell>, and matching that is what closed the last diff. New/Load/Save/Save As plus Ctrl+N/O/S are wired; the picker is a Godot FileDialog (a deliberate non-1:1 spot — a file chooser is chrome, not game UI). TEST (Ctrl+T) NOW BUILDS A ZONE, verified end to end (2026-08-07): Raves writes the on-screen map to a scratch .rpm, the bridge's new `mapedit do=test` hands the path to MapEditorDriver.Test, which loads it into Qud's LIVE MapEditorView via MapFile.LoadFile and invokes Qud's own MapEditorView.Test (-> RunTest -> async BuildTestZone, deliberately not reimplemented — Qud owns worldgen). PROOF: the heartbeat flipped from {scene:MapEditorWindow, live:false} to {scene:play, live:true, view:Stage} with 'Test invoked - Qud is building the zone' in Player.log. Requires Qud to be sitting in its Map Editor; that is Qud's constraint and the driver reports it plainly. GOTCHA WORTH KNOWING: a long-lived Qud can reach a state where GameManager.uiQueue STOPS DRAINING even while focused — every mod-driven action silently no-ops. The tell is heartbeat `ui_age` climbing without bound (seen at 83s -> 224s); the same command succeeded immediately against a freshly launched Qud. Check ui_age before diagnosing any mod command as broken. STILL OPEN: no per-object context menu, GLYPH FALLBACK FIXED: Qud's RenderString is EITHER a literal char OR a CP437 code as a DECIMAL STRING (Fulcrete '176' = light shade, Wall '219' = full block, '247' = approx among the most common) — drawing it verbatim printed the digits once per wall. Now resolved via ASCII 32..126 plus a CP437 table for 128..255, and drawn CENTRED in the cell in the console face. A reloaded Barathrums_Study is legible: shaded-block walls, furniture as π/¥/µ/ß, tile art where a mask exists.",
+                "done": {
+                  "qud": 0.95,
+                  "raves": 0.93
+                },
+                "detect": {
+                  "qud": [
+                    {
+                      "scene": "MapEditorWindow"
+                    }
+                  ]
+                },
+                "goto": {
+                  "qud": [
+                    {
+                      "goto": "modding_toolkit"
+                    },
+                    {
+                      "click_hover": [
+                        862,
+                        489
+                      ],
+                      "window": "CavesOfQud"
+                    }
+                  ]
+                },
+                "children": [
+                  {
+                    "id": "me_menu_file",
+                    "label": "File menu",
+                    "note": "New map (Ctrl+N) · Load map... (Ctrl+O) · Test (Ctrl+T) · Save (Ctrl+S) · Save As... | Reload Blueprints | Exit. Captured; MapEditorView backs these with NewMap/LoadMap/RunTest+BuildTestZone/Save/SaveAs/_ReloadBlueprints/Exit. Open at [46,16]; Exit at [64,260], confirm Yes at [925,555].",
+                    "done": {
+                      "qud": 0.95,
+                      "raves": 0.8
+                    },
+                    "detect": {},
+                    "goto": {
+                      "qud": [
+                        {
+                          "goto": "map_editor"
+                        },
+                        {
+                          "click_hover": [
+                            46,
+                            16
+                          ],
+                          "window": "CavesOfQud"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "me_menu_edit",
+                    "label": "Edit menu",
+                    "note": "Select All (Ctrl+A) · Undo (Ctrl+Z) · Redo (Ctrl+Y). Captured. MapEditorView: SelectAll/Undo/Redo over UndoStack+RedoStack, with ReverseAction as the primitive.",
+                    "done": {
+                      "qud": 0.95,
+                      "raves": 0.8
+                    },
+                    "detect": {},
+                    "goto": {
+                      "qud": [
+                        {
+                          "goto": "map_editor"
+                        },
+                        {
+                          "click_hover": [
+                            112,
+                            16
+                          ],
+                          "window": "CavesOfQud"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "me_menu_transform",
+                    "label": "Transform menu",
+                    "note": "Flip Horizontal · Flip Vertical (no hotkeys). Captured. MapEditorView: FlipHorizontal/FlipVertical — they act on SelectedRegion when one is set.",
+                    "done": {
+                      "qud": 0.95,
+                      "raves": 0.8
+                    },
+                    "detect": {},
+                    "goto": {
+                      "qud": [
+                        {
+                          "goto": "map_editor"
+                        },
+                        {
+                          "click_hover": [
+                            203,
+                            16
+                          ],
+                          "window": "CavesOfQud"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "me_menu_view",
+                    "label": "View menu",
+                    "note": "Toggle NorthSheva Overlay (Ctrl+F1) — the ONLY item. It overlays the NorthSheva artwork as a tracing guide (MapEditorView.ToggleOverlay); that same sprite, NorthShevaTransparent, is the BackdropWindow asset found during the toolkit backdrop hunt.",
+                    "done": {
+                      "qud": 0.95,
+                      "raves": 0.8
+                    },
+                    "detect": {},
+                    "goto": {
+                      "qud": [
+                        {
+                          "goto": "map_editor"
+                        },
+                        {
+                          "click_hover": [
+                            293,
+                            16
+                          ],
+                          "window": "CavesOfQud"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "me_menu_recent",
+                    "label": "Recent menu",
+                    "note": "Recently-opened maps (MapEditorView RecentMenu/AddRecentFile/UpdateRecent/RecentClick, persisted via WriteModSettings). EMPTY on a fresh install — verified: opening it drew no panel, which is the expected zero-state, not a failure.",
+                    "done": {
+                      "qud": 0.9,
+                      "raves": 0.8
+                    },
+                    "detect": {},
+                    "goto": {
+                      "qud": [
+                        {
+                          "goto": "map_editor"
+                        },
+                        {
+                          "click_hover": [
+                            369,
+                            16
+                          ],
+                          "window": "CavesOfQud"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "me_canvas",
+                    "label": "Canvas (80x25 cell grid)",
+                    "note": "x50..1470 y208..872; green cell cursor follows the mouse; left-click sets Selected Cell (readout updates), drag sets SelectedRegion (MapEditorView _dragStart/_dragDelta/isDragging, RenderSelectionFrame).",
+                    "done": {
+                      "qud": 0.9,
+                      "raves": 0.7
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "me_palette",
+                    "label": "Blueprint palette + filter",
+                    "note": "Right panel: a text filter ('Enter text...', MapEditorView UpdateFilter/_DataFilter) over the full blueprint list with per-row tile icons, plus an 'In Use' checkbox (SetFilterUsed/_FilterUsed) limiting the list to blueprints already placed. Clicking a row sets the brush — VERIFIED: clicking row 'Across1' made the readout show 'Brush: Across1' (SetBrush/SetSelectedBlueprint/GetBrushText).",
+                    "done": {
+                      "qud": 0.9,
+                      "raves": 0.7
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "me_status",
+                    "label": "Status readouts (mouse / brush / selected cell)",
+                    "note": "'Mouse Position: X, Y' + 'Brush: <name>' at y695, 'Selected Cell: X, Y' (or 'none') at y716 — MapEditorView UpdateHoverXY/UpdateSelectedXY/GetBrushText. These are the cheapest live assertions for a driven map-editor test.",
+                    "done": {
+                      "qud": 0.95,
+                      "raves": 0.7
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "me_controls",
+                    "label": "Mouse + keyboard controls (drag verbs decoded from IL)",
+                    "note": "DECODED FROM IL + VERIFIED LIVE (2026-08-06). The on-screen hint 'Ctrl+Click-Paint from palette' is MISLEADING: painting is not a click. MapEditorView.OnClick performs NO modifier check at all — it raycasts a cell and calls OnCommand (selection only). All three drag verbs live in OnDragMove, each gated on a modifier read with Input.GetKey: SHIFT (LeftShift/RightShift) -> region select (sets isDragging/_dragStart, Rect min/max, RenderSelectionFrame); CTRL (LeftControl/RightControl) -> PAINT (raycast -> MapFileRegion.GetOrCreateCellAt -> MapFileCell.Objects.Add -> UndoStack.Push -> RenderMap); NO MODIFIER -> camera pan (LetterboxCamera.SetPositionImmediately). A click never moves the pointer, so it can never reach a drag handler — which is exactly why every Ctrl+Click attempt silently did nothing while the brush readout looked correct. DRIVING IT SYNTHETICALLY IS ONLY PARTLY SOLVED, and the honest numbers matter: Ctrl+drag DOES paint — objects appear on the canvas and the count climbs across runs — but it is INTERMITTENT, not reliable. Identical gestures at the same coordinates sometimes place an object (+57 px, one sprite) and sometimes place nothing. An earlier claim here that paint simply 'works' was too confident; it lands often enough to prove the verb, not often enough to script against yet. HOLD DURATION MEASURED: `hv drag --hold` sets the pause between press and first move. Longer is WORSE — at 0.5s and 1.2s a Ctrl+drag painted NOTHING in any trial, while the 0.08 default paints some of the time. A long press before movement stops registering as a drag at all. The default is therefore 0.08 and the flag exists to be lowered, not raised. MENU HOTKEYS from Update(), all Ctrl+<key>: Z undo, Y redo, N new, O open, S save, T test, A select-all, plus Ctrl+F1 overlay. UNDOCUMENTED FIND — Ctrl+C is handled in Update() and does Map/SelectedRegion -> MapFileRegion.GetRegion -> Clone -> SetBrush, i.e. it copies the SELECTED REGION into the brush as a multi-cell stamp. It appears in no menu and no hint text. RESOLUTION: rather than keep tuning injected input, the mod drives these verbs directly — MapEditorDriver.Paint/Select/Context (bridge `mapedit`). Reliable where synthetic input was intermittent or impossible, and it is the same precedent as EmbarkDriver.",
+                    "done": {
+                      "qud": 0.85,
+                      "raves": 0.6
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "me_context_menu",
+                    "label": "Cell/region context menu (SOLVED — raised via the mod's MapEditorDriver)",
+                    "note": "SOLVED AND SEEN (2026-08-06). Trigger, from IL: MapEditorSelectedObjectsRow.OnPointerClick is `if (eventData.button != InputButton.Right) return; MapEditorView.instance.DisplayContextInRegion(this.bp);` — a RIGHT-CLICK ON A ROW of the selected-contents list, not on the canvas. Rows come from SelectedCellContentsView, filled by UpdateSelectedContents from HasSelectedRegion/SelectedRegion, so a region containing objects is the precondition. MENU CONTENTS, now captured rather than inferred: Set owner | Set part | Add string property | Add int property | Remove property — matching SetOwnerForContext / SetPartForContext / AddPropertyForContext / AddIntPropertyForContext / RemovePropertyForContext. (Flood, DeleteInRegion and ReplaceInRegion exist on MapEditorView but are NOT on this menu.) HOW TO DRIVE IT: synthetic mouse input cannot — see me_controls. The mod now drives the editor through its own API instead (mod/MapEditorDriver.cs, bridge command `mapedit`, the same skip-the-UI approach EmbarkDriver uses for chargen): {\"name\":\"mapedit\",\"do\":\"paint\",\"x\":21,\"y\":8,\"bp\":\"Across1\"} then {\"do\":\"select\",\"x\":19,\"y\":7,\"x2\":22,\"y2\":9} then {\"do\":\"context\",\"x\":20,\"y\":8}. Verified end to end: canvas gains the objects, the readout reads 'Selected Cell: 19, 7 - 23, 10', the contents rows populate, and the menu appears at x862..988 y490..574. `{\"do\":\"state\"}` logs a JSON readback for asserts. GOTCHA worth keeping: MapFile is NOT a MapFileRegion — the cell grid is MapFile.Cells, and the driver's first version logged 'no GetOrCreateCellAt on MapFile' until that was fixed.",
+                    "done": {
+                      "qud": 0.95,
+                      "raves": 0.0
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "map_editor_exit_confirm",
+                    "label": "Exit confirm (lose unsaved changes? Yes/No)",
+                    "note": "File > Exit raises 'Are you sure you want to go back and lose any unsaved changes?' with Yes/No; Yes returns to the toolkit menu. Yes at [925,555] (1080p).",
+                    "done": {
+                      "qud": 0.95,
+                      "raves": 0.0
+                    },
+                    "detect": {}
+                  }
+                ]
+              },
+              {
+                "id": "mod_wiki_website",
+                "label": "Mod Wiki Website (external browser)",
+                "note": "EXTERNAL action — opens the wiki in the default browser; no in-game screen to reproduce. Excluded from capture walks.",
+                "done": {
+                  "qud": 1.0,
+                  "raves": 0.0
+                },
+                "detect": {}
+              },
+              {
+                "id": "blueprint_browser",
+                "label": "Blueprint Browser",
+                "note": "filterable collapsible tree of the full ObjectBlueprints hierarchy (Object, SultanMuralController expandable) — the natural UI mirror of the Object Checker enumeration. Back [3709,2068] returns to TITLE. RAVES: BlueprintBrowserScreen.gd — reads blueprints.json (BlueprintExporter walks GameObjectFactory.Factory.Blueprints, so a modded install shows its own; 5247 rows, and its 9 roots + expander set match Qud's screen exactly). PIXEL-DIFFED 2026-08-06: 99.77% content match, no divergent region. Layout MEASURED off Qud, not nudged — filter box x18..305 y12..38, row glyph tops 62/86/110 (pitch 24), expander x8..17, cube icon x27..43 (17x18, drawn as an isometric outline — a text glyph measured 9px against Qud's 17), text x48, Back glyph x1832..1884 y1026..1042; all now exact. The status line and opening row highlight are user-mode-only (Qud has neither). REMAINING (the whole residual): Qud's list font is ElliotSans, condensed — ~6.5px/char vs Atkinson's 8.4 at a matched cap height, so names run ~29% wide. The screen loads ElliotSans from title/chrome/ when present (correct on the Mac) and falls back otherwise; NO mod exporter for it exists yet — that is the next unit of work for this leaf, and it is shared with every other modern-UI screen.",
+                "done": {
+                  "qud": 0.9,
+                  "raves": 0.9
+                },
+                "detect": {
+                  "qud": [
+                    {
+                      "scene": "BrowseBlueprintsView"
+                    }
+                  ],
+                  "raves": [
+                    {
+                      "scene": "blueprint_browser"
+                    }
+                  ]
+                },
+                "goto": {
+                  "raves": [
+                    {
+                      "goto": "modding_toolkit"
+                    },
+                    {
+                      "key": "down",
+                      "window": "Raves of Qud",
+                      "note": "x4 to Blueprint Browser"
+                    },
+                    {
+                      "key": "down",
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "key": "down",
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "key": "down",
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "key": "enter",
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "assert": {
+                        "scene": "blueprint_browser"
+                      },
+                      "timeout": 12
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "open_save_folder",
+                "label": "Open Save Folder (external Explorer)",
+                "note": "EXTERNAL action — opens the data folder in the OS file manager. Excluded from capture walks.",
+                "done": {
+                  "qud": 1.0,
+                  "raves": 0.0
+                },
+                "detect": {}
+              },
+              {
+                "id": "write_csproj",
+                "label": "Write Mods.csproj File (side effect)",
+                "note": "SIDE-EFFECT action — writes a csproj into the mods folder; no screen. Excluded from capture walks.",
+                "done": {
+                  "qud": 1.0,
+                  "raves": 0.0
+                },
+                "detect": {}
+              },
+              {
+                "id": "histographicnomicon",
+                "label": "Histographicnomicon",
+                "note": "history-generation debug tool: Generate / Test Failure Redirect / Test Variable, scrollable output canvas, Reload + Back. Back [3717,2097] returns to TITLE.",
+                "done": {
+                  "qud": 0.9,
+                  "raves": 0.0
+                },
+                "detect": {
+                  "qud": [
+                    {
+                      "scene": "HistoryTestView"
+                    }
+                  ]
+                },
+                "goto": {
+                  "qud": [
+                    {
+                      "goto": "modding_toolkit"
+                    },
+                    {
+                      "click_hover": [
+                        862,
+                        619
+                      ],
+                      "window": "CavesOfQud"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "wfc_generator",
+                "label": "Waveform Collapse Map Generator",
+                "note": "white preview canvas + parameter console (default 'pass:temple,n=3,width=78,height=23'), Generate / Generate Fast / Reseed To Static / TTest. Back [3706,2090] returns to TITLE.",
+                "done": {
+                  "qud": 0.9,
+                  "raves": 0.0
+                },
+                "detect": {
+                  "qud": [
+                    {
+                      "scene": "WaveformTestView"
+                    }
+                  ]
+                },
+                "goto": {
+                  "qud": [
+                    {
+                      "goto": "modding_toolkit"
+                    },
+                    {
+                      "click_hover": [
+                        862,
+                        646
+                      ],
+                      "window": "CavesOfQud"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
             "id": "version",
             "label": "Version Corner (1.0.5 / build)",
             "done": {

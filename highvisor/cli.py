@@ -129,16 +129,16 @@ def _cmd_key(a):
 
 
 def _cmd_click(a):
-    req = {"op": P.OP_CLICK, "target": a.target, "x": a.x, "y": a.y,
-           "button": "right" if a.right else "left", "double": a.double,
-           "hover": a.hover}
-    if a.mods:
-        req["mods"] = a.mods
-    _print_json(_call(req))
+    _print_json(_call({"op": P.OP_CLICK, "target": a.target, "x": a.x, "y": a.y,
+                       "button": "right" if a.right else "left", "double": a.double,
+                       "hover": a.hover, "modifiers": a.mod}))
 
 
-def _cmd_mouse(a):
-    _print_json(_call({"op": P.OP_MOUSE, "target": a.target, "x": a.x, "y": a.y}))
+def _cmd_drag(a):
+    _print_json(_call({"op": P.OP_DRAG, "target": a.target,
+                       "x1": a.x1, "y1": a.y1, "x2": a.x2, "y2": a.y2,
+                       "button": "right" if a.right else "left",
+                       "steps": a.steps, "modifiers": a.mod, "hold": a.hold}))
 
 
 def _cmd_activate(a):
@@ -264,9 +264,9 @@ def _cmd_plan(a):
 
 
 def _cmd_scroll(a):
-    """Wheel event at a window point, e.g. `hv scroll raves 960 540 --dy 1 --mods ctrl`."""
+    """Wheel event at a window point, e.g. `hv scroll raves 960 540 --dy 1 --mod ctrl`."""
     res = _call({"op": P.OP_SCROLL, "target": a.target, "x": a.x, "y": a.y,
-                 "dy": a.dy, "dx": a.dx, "mods": a.mods or ""})
+                 "dy": a.dy, "dx": a.dx, "modifiers": a.mod or ""})
     _print_json(res)
     raise SystemExit(0 if res.get("ok") else 1)
 
@@ -948,9 +948,24 @@ def build_parser():
     s.add_argument("--double", action="store_true", help="double-click")
     s.add_argument("--hover", action="store_true",
                    help="post a real mouseMoved first (needed for Qud's legacy popups)")
-    s.add_argument("--mods", default="",
-                   help="modifier flags on the click, comma list: cmd,ctrl,shift,alt")
+    s.add_argument("--mod", default=None, metavar="ctrl+alt+shift",
+                   help="modifiers HELD across the click (Qud's Map Editor: "
+                        "ctrl=paint from palette, alt=sample to palette)")
     s.set_defaults(fn=_cmd_click)
+
+    s = sub.add_parser("drag", help="press, move, release (selection rectangles)")
+    s.add_argument("target")
+    for _a in ("x1", "y1", "x2", "y2"):
+        s.add_argument(_a, type=int)
+    s.add_argument("--right", action="store_true", help="drag with the right button")
+    s.add_argument("--steps", type=int, default=12, help="intermediate moves (default 12)")
+    s.add_argument("--mod", default=None, metavar="ctrl+alt+shift",
+                   help="modifiers held for the whole gesture")
+    s.add_argument("--hold", type=float, default=0.08,
+                   help="seconds to hold the button before moving (default 0.08). "
+                        "MEASURED: longer is WORSE — 0.5s stops Qud registering the "
+                        "gesture as a drag at all. Lower it, do not raise it blindly.")
+    s.set_defaults(fn=_cmd_drag)
 
     s = sub.add_parser("activate")
     s.add_argument("target")
@@ -1012,13 +1027,14 @@ def build_parser():
                         "'off' or 'unknown')")
     s.set_defaults(fn=_cmd_plan)
 
-    s = sub.add_parser("scroll", help="wheel event at a window point (dy in LINES, + = up), e.g. hv scroll raves 960 540 --dy 1 --mods ctrl")
+    s = sub.add_parser("scroll", help="wheel event at a window point (dy in LINES, + = up), e.g. hv scroll raves 960 540 --dy 1 --mod ctrl")
     s.add_argument("target")
     s.add_argument("x", type=int)
     s.add_argument("y", type=int)
     s.add_argument("--dy", type=int, default=1, help="lines; positive = wheel up/away")
     s.add_argument("--dx", type=int, default=0, help="lines; horizontal")
-    s.add_argument("--mods", default="", help="comma list applied as event FLAGS: ctrl,cmd,shift,alt")
+    s.add_argument("--mod", default=None, metavar="ctrl+alt+shift",
+                   help="modifiers HELD across the wheel (not just flagged — see backend.py)")
     s.set_defaults(fn=_cmd_scroll)
 
     s = sub.add_parser("wish", help="run a Caves of Qud wish via the Raves bridge, e.g. hv wish godmode")

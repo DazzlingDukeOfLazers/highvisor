@@ -376,6 +376,9 @@ function _isRaves(t) {
   // dev-run: a Godot process whose game window names Raves — but not the Godot
   // editor ("<project> - Godot Engine").
   if (owner === "godot" && /raves/.test(title) && !/godot engine/.test(title)) return true;
+  // Windows dev-run/export: Godot windows carry the Win32 class "Engine"; the
+  // editor is excluded by its "<project> - Godot Engine" title.
+  if (owner === "engine" && /raves/.test(title) && !/godot engine/.test(title)) return true;
   return false;
 }
 function _isQud(t) {
@@ -387,6 +390,13 @@ function _isQud(t) {
 // can spot duplicates).
 function classifyRavesQud(targets) {
   const list = targets || [];
+  // The daemon classifies (highvisor.apps.classify_target — ONE implementation,
+  // both OSes) and stamps `role` on every list_targets row. Trust it when
+  // present; the local regex rules remain only as the older-daemon fallback.
+  if (list.some(t => "role" in t)) {
+    return { raves: list.filter(t => t.role === "raves"),
+             qud: list.filter(t => t.role === "qud") };
+  }
   return { raves: list.filter(_isRaves), qud: list.filter(_isQud) };
 }
 
@@ -542,11 +552,54 @@ async function startRavesLatest() {
       setStatus("muted", "waiting for " + need.join(" + ") + "…");
       await new Promise(res => setTimeout(res, 1500));
     }
-    await userTestLayout(1920, 1080);   // both up → tile Raves ▲ / Qud ▼
+    // Machine override first (a user layout named "pair"), else the built-in slots.
+    if (!(await applyPairLayoutOverride())) await userTestLayout(1920, 1080);
   } catch (e) {
     alert("start Raves failed: " + (e.message || e));
   } finally {
     btn.disabled = false;
+  }
+}
+
+// Machine pair-stage override: if the user's layouts.json defines a layout named
+// "pair", it IS this machine's pair stage — apply it instead of the built-in
+// Mac-style slot math (standardSlots / userTestLayout). Lets a box with a different
+// monitor topology (e.g. Lumpy's two 4Ks: Raves on primary, Qud on secondary)
+// restage the pair without forking the cockpit. No "pair" layout -> false, callers
+// fall back to the built-ins; a solo window still lands in its pair position because
+// layout placements simply MISS absent windows.
+async function applyPairLayoutOverride() {
+  try {
+    const r = await rpc("layout_apply", { name: "pair" });
+    return !!(r && r.ok && r.applied > 0);
+  } catch (e) {
+    return false;
+  }
+}
+
+// The machine pair stage for W×H windows — non-null only when this machine
+// defines a "pair" layout. Stacks the column on the MAIN display when two rows
+// fit (Raves above Qud, centered, small margins — the portrait-monitor stage);
+// else one app per display; null → callers use the built-in Mac slot math.
+async function machinePairStage(W, H) {
+  try {
+    const l = await rpc("layouts");
+    const names = (l.ok && l.layouts ? l.layouts : []).map(x => x.name);
+    if (!names.includes("pair")) return null;
+    const d = await rpc("displays");
+    if (!d.ok || !d.displays || !d.displays.length) return null;
+    const main = d.displays.find(m => m.main) || d.displays[0];
+    const GAP = 8, TOP = 40;
+    if (main.h >= TOP + 2 * H + GAP && main.w >= W) {
+      const x = main.x + Math.floor((main.w - W) / 2);
+      return { ravesRect: { x, y: main.y + TOP, w: W, h: H },
+               qudRect:   { x, y: main.y + TOP + H + GAP, w: W, h: H } };
+    }
+    const other = d.displays.find(m => m !== main) || main;
+    return { ravesRect: { x: main.x, y: main.y, w: W, h: H },
+             qudRect:   { x: other.x, y: other.y, w: W, h: H } };
+  } catch (e) {
+    return null;
   }
 }
 
@@ -595,9 +648,13 @@ async function startSolo(which) {
       const now = which === "qud" ? c.qud : c.raves;
       if (now.length > 1) { alert(_dupMessage(c.raves, c.qud)); return; }
       if (now.length === 1) {
-        const slots = await standardSlots(1920, 1080);
-        const rect = which === "qud" ? slots.qudRect : slots.ravesRect;
-        await rpc("move", { target: now[0].id, ...rect, topmost: false });
+        // Machine "pair" layout override places the solo window in its pair slot too
+        // (placements just MISS the absent app); else the built-in standard slot.
+        if (!(await applyPairLayoutOverride())) {
+          const slots = await standardSlots(1920, 1080);
+          const rect = which === "qud" ? slots.qudRect : slots.ravesRect;
+          await rpc("move", { target: now[0].id, ...rect, topmost: false });
+        }
         setStatus("ok", `${which} up · standard slot`);
         return;
       }
@@ -628,10 +685,18 @@ async function userTestLayout(W, H) {
   const btns = document.querySelectorAll(".ut");
   btns.forEach(b => (b.disabled = true));
   try {
-    // Same slot math as the solo launches (standardSlots) — one source for the placement.
-    const slots = await standardSlots(W, H);
-    await rpc("move", { target: raves[0].id, ...slots.ravesRect, topmost: false });
-    await rpc("move", { target: qud[0].id, ...slots.qudRect, topmost: false });
+    // Machine pair-stage (a "pair" layout): the W×H column on the main display
+    // (or one app per monitor when the column doesn't fit) instead of Mac slots.
+    const pm = await machinePairStage(W, H);
+    if (pm) {
+      await rpc("move", { target: raves[0].id, ...pm.ravesRect, topmost: false });
+      await rpc("move", { target: qud[0].id, ...pm.qudRect, topmost: false });
+    } else {
+      // Same slot math as the solo launches (standardSlots) — one source for the placement.
+      const slots = await standardSlots(W, H);
+      await rpc("move", { target: raves[0].id, ...slots.ravesRect, topmost: false });
+      await rpc("move", { target: qud[0].id, ...slots.qudRect, topmost: false });
+    }
     await refreshWindows();
   } catch (e) {
     alert("user-test layout failed: " + (e.message || e));

@@ -106,6 +106,7 @@ def _configure_win32():
         fn.restype, fn.argtypes = res, args
 
 
+
 DPI_STATUS = "unset"
 
 
@@ -195,27 +196,13 @@ class WindowsBackend(PlatformBackend):
             raise BackendError("no window for pid %d" % pid)
         low = ref.lower()
         for w in self._toplevels():
-            if low in self._win_title(w).lower():
+            # Match the REAL Win32 caption first (what `ls` shows since the title
+            # fix — Godot's UIA Name says "Godot Engine" while the caption says
+            # "Raves of Qud (DEBUG)"), with the UIA Name as fallback.
+            title = self._win32_title(w.NativeWindowHandle) or w.Name or ""
+            if low in title.lower():
                 return w.NativeWindowHandle
         raise BackendError("no window matching title ~ %r" % ref)
-
-    @staticmethod
-    def _win_title(w) -> str:
-        """Fresh Win32 caption, falling back to the UIA Name. UIA caches Name at
-        element creation — Godot retitles AFTER creating its window ('Godot Engine'
-        -> 'Raves of Qud (DEBUG)') and UIA never notices, so profile matching by
-        title missed the viewer entirely."""
-        try:
-            hwnd = w.NativeWindowHandle
-            n = user32.GetWindowTextLengthW(hwnd)
-            if n > 0:
-                buf = ctypes.create_unicode_buffer(n + 1)
-                user32.GetWindowTextW(hwnd, buf, n + 1)
-                if buf.value:
-                    return buf.value
-        except Exception:
-            pass
-        return w.Name or ""
 
     def _find_editable(self, ctrl, depth=8):
         """DFS for an edit/document descendant (for text/key delivery)."""
@@ -237,6 +224,45 @@ class WindowsBackend(PlatformBackend):
         return None
 
     # ----------------------------------------------------------------- observe
+    def displays(self):
+        """Every active monitor in the physical-pixel virtual-desktop space that
+        ``move``/window rects use (we're DPI-aware), via EnumDisplayMonitors —
+        a secondary monitor reports its real origin (e.g. x=3840 to the right of
+        a 4K primary). ``main`` marks the primary (MONITORINFOF_PRIMARY)."""
+        out = []
+
+        class MONITORINFO(ctypes.Structure):
+            _fields_ = [("cbSize", wintypes.DWORD), ("rcMonitor", wintypes.RECT),
+                        ("rcWork", wintypes.RECT), ("dwFlags", wintypes.DWORD)]
+
+        MonitorEnumProc = ctypes.WINFUNCTYPE(
+            ctypes.c_int, wintypes.HMONITOR, wintypes.HDC,
+            ctypes.POINTER(wintypes.RECT), wintypes.LPARAM)
+
+        def _cb(hmon, _hdc, _lprc, _lparam):
+            mi = MONITORINFO()
+            mi.cbSize = ctypes.sizeof(MONITORINFO)
+            if user32.GetMonitorInfoW(hmon, ctypes.byref(mi)):
+                r = mi.rcMonitor
+                out.append({"id": len(out), "x": r.left, "y": r.top,
+                            "w": r.right - r.left, "h": r.bottom - r.top,
+                            "main": bool(mi.dwFlags & 1)})  # MONITORINFOF_PRIMARY
+            return 1
+
+        user32.EnumDisplayMonitors(None, None, MonitorEnumProc(_cb), 0)
+        return out
+
+    def _win32_title(self, hwnd) -> str:
+        """The real Win32 caption. UIA's Name can differ from it — Godot names its
+        accessibility root "Godot Engine" while the caption says "Raves of Qud
+        (DEBUG)" — and substring targeting must match what the titlebar shows."""
+        n = user32.GetWindowTextLengthW(hwnd)
+        if n <= 0:
+            return ""
+        buf = ctypes.create_unicode_buffer(n + 1)
+        user32.GetWindowTextW(hwnd, buf, n + 1)
+        return buf.value
+
     def list_targets(self) -> List[Target]:
         fg = user32.GetForegroundWindow()
         out = []
@@ -244,7 +270,7 @@ class WindowsBackend(PlatformBackend):
             try:
                 r = w.BoundingRectangle
                 hwnd = w.NativeWindowHandle
-                title = self._win_title(w)
+                title = self._win32_title(hwnd) or w.Name or ""
                 if not title and (r.width() <= 0 or r.height() <= 0):
                     continue
                 out.append(Target(
@@ -273,19 +299,9 @@ class WindowsBackend(PlatformBackend):
             return ActionResult.fail("launch failed: %s" % e)
         return ActionResult(ok=True, detail="launch %s" % " ".join([spec] + args))
 
-    def _move_abs(self, gx: int, gy: int) -> None:
-        # SetCursorPos warps the pointer, but some UIs (Qud's legacy console popups)
-        # only track a REAL move event's hover — post an absolute MOUSEEVENTF_MOVE
-        # (0..65535 normalized virtual-screen coords) on top of the warp.
-        user32.SetCursorPos(gx, gy)
-        sw = user32.GetSystemMetrics(0)
-        sh = user32.GetSystemMetrics(1)
-        nx = int(gx * 65535 / max(1, sw - 1))
-        ny = int(gy * 65535 / max(1, sh - 1))
-        user32.mouse_event(0x0001 | 0x8000, nx, ny, 0, 0)  # MOVE | ABSOLUTE
-
     def click(self, target: str, x: int, y: int, button: str = "left",
-              double: bool = False, hover: bool = False) -> ActionResult:
+              double: bool = False, hover: bool = False,
+              modifiers: Optional[str] = None) -> ActionResult:
         hwnd = self._resolve(target)
         if hwnd is None:
             return ActionResult.fail("click needs a window target")
@@ -294,27 +310,126 @@ class WindowsBackend(PlatformBackend):
         gx, gy = rect.left + int(x), rect.top + int(y)   # window-relative -> screen px
         self.activate(target)
         time.sleep(0.06)
-        # `hover=True`: same per-surface contract as darwin.py — legacy popups
-        # activate the item under the hovered position, so approach + settle with
-        # real move events before the click. OFF by default: a pre-move BREAKS
-        # world-cell clicks (Qud hovers-but-never-selects the tile).
+        # Move with a REAL injected event, not just SetCursorPos: SetCursorPos
+        # produces no raw input (WM_INPUT), and Unity's Input System only syncs
+        # its pointer from raw moves — a warp-then-click lands at Unity's STALE
+        # position (observed as "first click ignored" on Qud's title, Win11
+        # 2026-08-06). MOUSEEVENTF_ABSOLUTE coords are 0..65535 across the
+        # primary display.
+        MOVE_ABS = 0x0001 | 0x8000
+        sw, sh = self.screen_size()
+
+        def _move(px, py):
+            user32.SetCursorPos(px, py)
+            user32.mouse_event(MOVE_ABS, int(px * 65535 / max(sw - 1, 1)),
+                               int(py * 65535 / max(sh - 1, 1)), 0, 0)
+
+        # `hover=True` mirrors the darwin backend: Unity legacy-console UIs (Qud's
+        # menus) select the item under Input.mousePosition, which needs the cursor
+        # hovered and settled BEFORE the button pair — approach from above, then
+        # rest on the target. OFF by default: a pre-move breaks world-cell clicks.
         if hover:
-            self._move_abs(gx, gy - 24)
+            _move(gx, gy - 24)
             time.sleep(0.08)
-            self._move_abs(gx, gy)
+            _move(gx, gy)
             time.sleep(0.2)
         else:
-            user32.SetCursorPos(gx, gy)
+            _move(gx, gy)
             time.sleep(0.02)
-        dn, up = (0x0008, 0x0010) if button == "right" else (0x0002, 0x0004)
-        for _ in range(2 if double else 1):
-            user32.mouse_event(dn, 0, 0, 0, 0)
-            user32.mouse_event(up, 0, 0, 0, 0)
-            time.sleep(0.02)
+        # MODIFIERS held across the button pair (ctrl / alt / shift, "+"-joined).
+        # Qud's Map Editor makes these core verbs — Ctrl+Click paints from the
+        # palette, Alt+Click samples back into it — so a click without them can
+        # only ever look at that screen, never drive it. Scan-code SendInput for
+        # the same reason `key --focus` uses it: Unity's raw input drops VK-only
+        # synthetics. Always released in a finally, so a failure mid-click cannot
+        # leave a modifier stuck down for the whole desktop.
+        mods = [m.strip().lower() for m in (modifiers or "").split("+") if m.strip()]
+        vk_for = {"ctrl": 0x11, "control": 0x11, "alt": 0x12, "shift": 0x10}
+        held = [vk_for[m] for m in mods if m in vk_for]
+        try:
+            if held:
+                # The modifier must be delivered to a window that ALREADY has focus, and it
+                # must still be down when the app PROCESSES the click (message handling lags
+                # injection), or a message-tracking toolkit reports no modifier at all.
+                self._await_focus(hwnd)
+                for vk in held:
+                    self._send_modifier(vk, True)
+                time.sleep(0.06)
+            dn, up = (0x0008, 0x0010) if button == "right" else (0x0002, 0x0004)
+            for _ in range(2 if double else 1):
+                user32.mouse_event(dn, 0, 0, 0, 0)
+                user32.mouse_event(up, 0, 0, 0, 0)
+                time.sleep(0.02)
+            if held:
+                time.sleep(0.12)   # let the click be consumed before the modifier lifts
+        finally:
+            for vk in reversed(held):
+                self._send_modifier(vk, False)
         return ActionResult(ok=True, tier=4,
                             detail="%s%s%s click @ (%d,%d)"
-                                   % ("hover+" if hover else "", "double " if double else "",
-                                      button, gx, gy))
+                                   % ("+".join(mods) + " " if mods else "",
+                                      "double " if double else "", button, gx, gy))
+
+    def drag(self, target: str, x1: int, y1: int, x2: int, y2: int,
+             button: str = "left", steps: int = 12,
+             modifiers: Optional[str] = None, hold: float = 0.08) -> ActionResult:
+        """Press at (x1,y1), move in steps, release at (x2,y2) — window-relative.
+
+        A drag is not a click pair: apps that track a selection rectangle need the
+        INTERMEDIATE moves (Qud's Map Editor builds SelectedRegion from OnBeginDrag/
+        OnDragMove, and only a dragged region populates its selected-contents list),
+        and Unity only sees moves that carry raw input, hence mouse_event rather than
+        SetCursorPos. Modifiers are held for the whole gesture and released in a
+        finally, same contract as click()."""
+        hwnd = self._resolve(target)
+        if hwnd is None:
+            return ActionResult.fail("drag needs a window target")
+        rect = wintypes.RECT()
+        user32.GetWindowRect(hwnd, ctypes.byref(rect))
+        gx1, gy1 = rect.left + int(x1), rect.top + int(y1)
+        gx2, gy2 = rect.left + int(x2), rect.top + int(y2)
+        self.activate(target)
+        time.sleep(0.06)
+        MOVE_ABS = 0x0001 | 0x8000
+        sw, sh = self.screen_size()
+
+        def _move(px, py):
+            user32.SetCursorPos(px, py)
+            user32.mouse_event(MOVE_ABS, int(px * 65535 / max(sw - 1, 1)),
+                               int(py * 65535 / max(sh - 1, 1)), 0, 0)
+
+        mods = [m.strip().lower() for m in (modifiers or "").split("+") if m.strip()]
+        vk_for = {"ctrl": 0x11, "control": 0x11, "alt": 0x12, "shift": 0x10}
+        held = [vk_for[m] for m in mods if m in vk_for]
+        dn, up = (0x0008, 0x0010) if button == "right" else (0x0002, 0x0004)
+        try:
+            if held:
+                self._await_focus(hwnd)   # same rule as click(): focus first, then modifiers
+            for vk in held:
+                self._send_vk_scancode(vk, down=True, up=False)
+            _move(gx1, gy1)
+            time.sleep(0.08)
+            user32.mouse_event(dn, 0, 0, 0, 0)
+            # HOLD before moving, in seconds. MEASURED (Qud Map Editor, 2026-08-06):
+            # LONGER IS WORSE. At the 0.08 default a Ctrl+drag paints; at 0.5 or 1.2
+            # the identical gesture paints NOTHING — a long press before movement
+            # stops registering as a drag at all (it reads as press-and-hold). So do
+            # not raise this hoping to make a stubborn drag land; it is exposed to be
+            # LOWERED, or raised only for an app measured to want it.
+            time.sleep(max(0.0, float(hold)))
+            n = max(2, int(steps))
+            for i in range(1, n + 1):
+                _move(gx1 + (gx2 - gx1) * i // n, gy1 + (gy2 - gy1) * i // n)
+                time.sleep(0.03)
+            time.sleep(0.08)
+            user32.mouse_event(up, 0, 0, 0, 0)
+        finally:
+            for vk in reversed(held):
+                self._send_modifier(vk, False)
+        return ActionResult(ok=True, tier=4,
+                            detail="%sdrag %s (%d,%d)->(%d,%d)"
+                                   % ("+".join(mods) + " " if mods else "",
+                                      button, gx1, gy1, gx2, gy2))
 
     def screenshot(self, target: Optional[str], native: bool = False) -> bytes:
         # `native` is a macOS/ScreenCaptureKit distinction; the Windows path is
@@ -493,21 +608,100 @@ class WindowsBackend(PlatformBackend):
         return ActionResult(ok=False, tier=None,
                             error="tier1(%s); no child hwnd for tier2" % tier1_err)
 
+    def _await_focus(self, hwnd, timeout: float = 1.0) -> bool:
+        """Block until ``hwnd`` is actually the foreground window.
+
+        activate() returns as soon as it has ASKED Windows to raise the window; focus
+        lands a moment later. That gap matters for modifiers: a synthetic Ctrl goes to
+        whatever is focused RIGHT NOW, and an app that tracks modifier state from its own
+        WM_KEYDOWN messages (Godot) never sees a keystroke delivered before it had focus —
+        so InputEventMouseButton.ctrl_pressed stays false while the click itself still
+        lands. Unity hides this by polling global key state instead, which is why the same
+        gesture worked against Qud and silently failed against Raves."""
+        end = time.time() + timeout
+        while time.time() < end:
+            if user32.GetForegroundWindow() == hwnd:
+                return True
+            time.sleep(0.02)
+        return user32.GetForegroundWindow() == hwnd
+
+    def _send_modifier(self, vk: int, down: bool) -> None:
+        """Hold/release a modifier so BOTH toolkits see it.
+
+        MEASURED (2026-08-07): a scancode-only injection (KEYEVENTF_SCANCODE, which is what
+        Qud needs for Space/Escape) is invisible to Godot — Ctrl+click arrived with
+        ctrl_pressed false and Ctrl+A did nothing, while uiautomation's VK-based SendKeys
+        drove the same shortcut fine. Unity polls global key state and accepts either;
+        Godot tracks modifiers from the key messages it receives and wants the VK form.
+        Rather than pick a winner, emit BOTH: modifiers are level-triggered, so a doubled
+        press/release is harmless, and each toolkit sees the form it recognises."""
+        # uiautomation's PressKey/ReleaseKey is the delivery that DEMONSTRABLY reaches Godot
+        # (its SendKeys drove Ctrl+A when a raw keybd_event/scancode press did not), so use it
+        # for the VK half rather than rolling our own; the scancode half stays for Unity.
+        try:
+            if down:
+                auto.PressKey(vk)
+            else:
+                auto.ReleaseKey(vk)
+        except Exception:
+            KEYEVENTF_KEYUP = 0x0002
+            user32.keybd_event(vk, user32.MapVirtualKeyW(vk, 0),
+                               0 if down else KEYEVENTF_KEYUP, 0)
+        self._send_vk_scancode(vk, down=down, up=not down)               # scancode form (Unity)
+
+    def _send_vk_scancode(self, vk: int, down: bool = True, up: bool = True) -> None:
+        """Press and/or release one virtual key via SendInput WITH its hardware scan
+        code. ``down``/``up`` split the pair so a modifier can be HELD across another
+        event (Ctrl+Click); the default sends both, i.e. a tap.
+        Games reading raw input (Unity's Input System) need the scan code; a
+        VK-only event is silently dropped for some keys. Arrow/nav keys are
+        extended-flag keys — without KEYEVENTF_EXTENDEDKEY they alias numpad."""
+        KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE = 0x1, 0x2, 0x8
+        extended = {0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2D, 0x2E}
+
+        class KEYBDINPUT(ctypes.Structure):
+            _fields_ = [("wVk", wintypes.WORD), ("wScan", wintypes.WORD),
+                        ("dwFlags", wintypes.DWORD), ("time", wintypes.DWORD),
+                        ("dwExtraInfo", ctypes.POINTER(ctypes.c_ulong))]
+
+        class INPUT(ctypes.Structure):
+            class _U(ctypes.Union):
+                _fields_ = [("ki", KEYBDINPUT), ("pad", ctypes.c_byte * 32)]
+            _anonymous_ = ("u",)
+            _fields_ = [("type", wintypes.DWORD), ("u", _U)]
+
+        scan = user32.MapVirtualKeyW(vk, 0)  # MAPVK_VK_TO_VSC
+        flags = KEYEVENTF_SCANCODE | (KEYEVENTF_EXTENDEDKEY if vk in extended else 0)
+        down = INPUT(type=1)  # INPUT_KEYBOARD
+        down.ki = KEYBDINPUT(vk, scan, flags, 0, None)
+        up = INPUT(type=1)
+        up.ki = KEYBDINPUT(vk, scan, flags | KEYEVENTF_KEYUP, 0, None)
+        arr = (INPUT * 2)(down, up)
+        user32.SendInput(2, arr, ctypes.sizeof(INPUT))
+        time.sleep(0.03)
+
     def key(self, target: str, keys: str, focus: bool = False) -> ActionResult:
         hwnd = self._resolve(target)
         if hwnd is None:
             return ActionResult.fail("key needs a window target")
         name = keys.strip()
         upper = name.upper()
-        # Tier 4 (opt-in): activate + SendKeys for apps that ignore PostMessage
-        # (Unity/games). Named keys become SendKeys syntax ({DOWN}/{ENTER}/…).
+        # Tier 4 (opt-in): activate + SendInput for apps that ignore PostMessage
+        # (Unity/games). Named keys go out as REAL scan-code events — Unity's raw
+        # Input System drops some VK-only synthetics (Space/Esc arrived dead from
+        # SendKeys while Enter/arrows worked; scan codes fixed it, Qud 1.0.5,
+        # Win11 2026-08-06). Unnamed multi-char sequences still fall back to
+        # SendKeys.
         if focus:
             try:
                 self.activate(target)
                 time.sleep(0.06)
-                seq = ("{%s}" % upper) if upper in VK else keys
-                auto.SendKeys(seq, waitTime=0)
-                return ActionResult(ok=True, tier=4, detail="activate + SendKeys %s" % seq)
+                if upper in VK:
+                    self._send_vk_scancode(VK[upper])
+                    return ActionResult(ok=True, tier=4,
+                                        detail="activate + SendInput scancode VK 0x%02X" % VK[upper])
+                auto.SendKeys(keys, waitTime=0)
+                return ActionResult(ok=True, tier=4, detail="activate + SendKeys %s" % keys)
             except Exception as e:
                 return ActionResult.fail("SendKeys failed: %s" % e)
         # Deliver to the editable child if present, else the top-level window.

@@ -87,6 +87,13 @@ def _running_image() -> str:
     return sys.executable
 
 
+def _split_mods(spec):
+    """Modifier list, comma- OR plus-separated. The two platform lines grew different
+    spellings — `cmd,ctrl` on mac, `ctrl+alt+shift` on Windows — and unifying the name
+    without unifying the SEPARATOR would just move the bug."""
+    return [m.strip().lower() for m in str(spec or "").replace("+", ",").split(",") if m.strip()]
+
+
 class MacBackend(PlatformBackend):
     name = "macos"
 
@@ -446,7 +453,8 @@ class MacBackend(PlatformBackend):
             self._clear_stuck_mods(keep=0)
 
     def click(self, target: str, x: int, y: int, button: str = "left",
-              double: bool = False, hover: bool = False, mods: str = "") -> ActionResult:
+              double: bool = False, hover: bool = False,
+              modifiers: str = "") -> ActionResult:
         w = self._resolve(target)
         if w is None:
             return ActionResult.fail("click needs a window target")
@@ -487,11 +495,11 @@ class MacBackend(PlatformBackend):
         # Modifier-clicks (Cmd+Right-click = Raves' element-feedback gesture): set the flag on the
         # MOUSE events themselves. Flags-only is enough for Godot -- it reads event.meta_pressed off
         # the click -- and avoids the stuck-modifier class of bug entirely (nothing is ever held).
-        flags = self._mod_flags(mods)
+        flags = self._mod_flags(modifiers)
         # a stuck HID modifier (see _clear_stuck_mods) rides on mouse events too -- a plain
         # left click would arrive as Cmd+click. Clear anything we didn't ask for.
         self._clear_stuck_mods(keep=0)
-        held = self._hold_mods(src, mods)
+        held = self._hold_mods(src, modifiers)
         try:
             for _ in range(2 if double else 1):
                 ed = Quartz.CGEventCreateMouseEvent(src, down, pt, b)
@@ -510,7 +518,7 @@ class MacBackend(PlatformBackend):
                                       button, gx, gy))
 
     def scroll(self, target: str, x: int, y: int, dy: int = 1, dx: int = 0,
-               mods: str = "") -> ActionResult:
+               modifiers: str = "") -> ActionResult:
         """Post a scroll-wheel event at a window point, optionally modifier-flagged.
 
         Written for a gesture no other op could reach: Raves' state-graph panel opens on
@@ -540,7 +548,7 @@ class MacBackend(PlatformBackend):
             Quartz.CGEventCreateMouseEvent(src, Quartz.kCGEventMouseMoved, pt,
                                            Quartz.kCGMouseButtonLeft))
         time.sleep(0.05)
-        flags = self._mod_flags(mods)
+        flags = self._mod_flags(modifiers)
         self._clear_stuck_mods(keep=0)
         # MEASURED: flags alone are NOT enough for a modified WHEEL. Setting
         # kCGEventFlagMaskControl on the scroll event and posting it gets the wheel through to
@@ -553,7 +561,7 @@ class MacBackend(PlatformBackend):
         # so the release is in a `finally` and a belt-and-braces clear follows it: a modifier
         # orphaned DOWN makes every later synthetic key arrive modified and silently no-op,
         # surviving app restarts, and it is close to undiagnosable from the app side.
-        held = self._hold_mods(src, mods)
+        held = self._hold_mods(src, modifiers)
         try:
             ev = Quartz.CGEventCreateScrollWheelEvent(src, Quartz.kCGScrollEventUnitLine,
                                                       2, int(dy), int(dx))
@@ -568,7 +576,7 @@ class MacBackend(PlatformBackend):
         return ActionResult(ok=True, tier=4,
                             detail="scroll dy=%d dx=%d%s @ global (%d,%d)"
                                    % (int(dy), int(dx),
-                                      (" mods=%s" % mods) if mods else "", gx, gy))
+                                      (" mods=%s" % modifiers) if modifiers else "", gx, gy))
 
     # Virtual keycodes for the LEFT-hand modifier keys, for the cases where a flag on the
     # event is not enough and the key has to actually be held.
@@ -580,7 +588,7 @@ class MacBackend(PlatformBackend):
     @classmethod
     def _mod_keycodes(cls, mods: str) -> list:
         out = []
-        for m in (mods or "").split(","):
+        for m in _split_mods(mods):
             kc = cls._MOD_KEYCODE.get(m.strip().lower())
             if kc is not None and kc not in out:
                 out.append(kc)
@@ -591,7 +599,7 @@ class MacBackend(PlatformBackend):
         """Modifier names -> CGEventFlags. Shared by click and scroll so one spelling of
         'cmd'/'meta'/'command' works everywhere."""
         flags = 0
-        for m in (mods or "").split(","):
+        for m in _split_mods(mods):
             m = m.strip().lower()
             if m in ("cmd", "meta", "command"):
                 flags |= Quartz.kCGEventFlagMaskCommand
@@ -786,7 +794,7 @@ class MacBackend(PlatformBackend):
         name = keys.strip()
         parts = [p for p in name.replace("-", "+").split("+") if p]
         mods, base = parts[:-1], (parts[-1] if parts else "")
-        flags = self._mod_flags(mods)
+        flags = self._mod_flags(modifiers)
         code = self._keycode_for(base)
         if code is None:
             return ActionResult.fail("unknown key %r" % keys)

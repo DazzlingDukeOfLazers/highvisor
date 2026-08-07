@@ -165,7 +165,14 @@ class Engine:
             return resp
 
         if op == P.OP_LIST:
-            return {"ok": True, "targets": [t.to_dict() for t in b.list_targets()]}
+            from .apps import classify_target
+            rows = []
+            for t in b.list_targets():
+                d = t.to_dict()
+                d["role"] = classify_target(d.get("title"), d.get("class_name"),
+                                            d.get("path", ""))
+                rows.append(d)
+            return {"ok": True, "targets": rows}
 
         if op == P.OP_SHOT:
             png = b.screenshot(req.get("target"), native=bool(req.get("native")))
@@ -180,7 +187,7 @@ class Engine:
         # whether the action landed (RPC-level failures come back as exceptions).
         # Focus/mouse-stealing ops go through the TIMESHARE GUARD (audio countdown,
         # focus+mouse save/restore, abort channels, 20s cap — see guard.py).
-        if op in (P.OP_ACTIVATE, P.OP_TEXT, P.OP_KEY, P.OP_CLICK, P.OP_MOUSE, P.OP_SCROLL):
+        if op in (P.OP_ACTIVATE, P.OP_TEXT, P.OP_KEY, P.OP_CLICK, P.OP_MOUSE, P.OP_SCROLL, P.OP_DRAG):
             _gerr = self.guard.begin()
             if _gerr:
                 return {"ok": False, "error": _gerr}
@@ -199,18 +206,28 @@ class Engine:
                   "double": bool(req.get("double", False))}
             if req.get("hover"):   # only forward when asked — backends without the arg won't see it
                 kw["hover"] = True
-            if req.get("mods"):    # same contract: absent unless requested
-                kw["mods"] = str(req["mods"])
+            if req.get("modifiers"):   # same rule: absent unless asked
+                kw["modifiers"] = str(req["modifiers"])
             return b.click(req["target"], int(req.get("x", 0)), int(req.get("y", 0)),
                            **kw).to_dict()
 
+        if op == P.OP_DRAG:
+            kw = {"button": req.get("button", "left"),
+                  "steps": int(req.get("steps", 12))}
+            if req.get("hold") is not None:
+                kw["hold"] = float(req["hold"])
+            if req.get("modifiers"):
+                kw["modifiers"] = str(req["modifiers"])
+            return b.drag(req["target"], int(req.get("x1", 0)), int(req.get("y1", 0)),
+                          int(req.get("x2", 0)), int(req.get("y2", 0)), **kw).to_dict()
+
         if op == P.OP_SCROLL:
-            # A WHEEL event, optionally modifier-flagged. Distinct from click because a wheel
-            # carries no position: it lands under the OS cursor, so the backend warps first.
-            # Guarded like every other input op — it moves the mouse and takes focus.
+            # A WHEEL event, optionally modified. Distinct from click because a wheel carries
+            # no position: it lands under the OS cursor, so the backend warps first. Guarded
+            # like every other input op — it moves the mouse and takes focus.
             return b.scroll(req["target"], int(req.get("x", 0)), int(req.get("y", 0)),
                             dy=int(req.get("dy", 1)), dx=int(req.get("dx", 0)),
-                            mods=str(req.get("mods", ""))).to_dict()
+                            modifiers=str(req.get("modifiers", ""))).to_dict()
 
         if op == P.OP_MOUSE:
             # pure hover: warp + a real mouseMoved so engines that read
@@ -1712,6 +1729,10 @@ class Engine:
         if not lay:
             return {"ok": False, "error": "no layout %r" % name}
         sw, sh = b.screen_size()
+        try:
+            displays = b.displays()   # for "monitor" placements; optional per backend
+        except Exception:
+            displays = []
         wins = b.list_targets()
         used = set()
         results = []
@@ -1731,7 +1752,7 @@ class Engine:
                 continue
             used.add(win.id)
             try:
-                x, y, w, h = placement_rect(pl, sw, sh)
+                x, y, w, h = placement_rect(pl, sw, sh, displays)
             except Exception as e:
                 results.append({"match": pl.get("match"), "target": win.id,
                                 "ok": False, "error": str(e)})
