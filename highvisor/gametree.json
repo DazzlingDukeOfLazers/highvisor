@@ -2611,6 +2611,13 @@
       "cwd": "raves-of-qud",
       "cmd": "/Users/homefolder/Downloads/Godot.app/Contents/MacOS/Godot --headless --path godot/ --script res://tests/state_graph_render.gd",
       "note": "This panel's own text builders, against a fixture AND the real gametree.json. Found the GDScript `or`-is-boolean bug on its first run."
+    },
+    {
+      "id": "cli",
+      "tier": "spot",
+      "cwd": "highvisor",
+      "cmd": "python3 tools/selftest_cli.py",
+      "note": "Every hv subcommand resolves to a callable handler. A merge dropped one while leaving it registered; ast.parse and import both passed and `hv state` then died with NameError on the next call."
     }
   ]
 }

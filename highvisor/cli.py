@@ -134,6 +134,11 @@ def _cmd_click(a):
                        "hover": a.hover, "modifiers": a.mod}))
 
 
+def _cmd_mouse(a):
+    """Warp + a real mouseMoved, NO buttons — the tool for capturing hover states."""
+    _print_json(_call({"op": P.OP_MOUSE, "target": a.target, "x": a.x, "y": a.y}))
+
+
 def _cmd_drag(a):
     _print_json(_call({"op": P.OP_DRAG, "target": a.target,
                        "x1": a.x1, "y1": a.y1, "x2": a.x2, "y2": a.y2,
