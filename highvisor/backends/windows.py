@@ -191,6 +191,34 @@ class WindowsBackend(PlatformBackend):
         return None
 
     # ----------------------------------------------------------------- observe
+    def displays(self):
+        """Every active monitor in the physical-pixel virtual-desktop space that
+        ``move``/window rects use (we're DPI-aware), via EnumDisplayMonitors —
+        a secondary monitor reports its real origin (e.g. x=3840 to the right of
+        a 4K primary). ``main`` marks the primary (MONITORINFOF_PRIMARY)."""
+        out = []
+
+        class MONITORINFO(ctypes.Structure):
+            _fields_ = [("cbSize", wintypes.DWORD), ("rcMonitor", wintypes.RECT),
+                        ("rcWork", wintypes.RECT), ("dwFlags", wintypes.DWORD)]
+
+        MonitorEnumProc = ctypes.WINFUNCTYPE(
+            ctypes.c_int, wintypes.HMONITOR, wintypes.HDC,
+            ctypes.POINTER(wintypes.RECT), wintypes.LPARAM)
+
+        def _cb(hmon, _hdc, _lprc, _lparam):
+            mi = MONITORINFO()
+            mi.cbSize = ctypes.sizeof(MONITORINFO)
+            if user32.GetMonitorInfoW(hmon, ctypes.byref(mi)):
+                r = mi.rcMonitor
+                out.append({"id": len(out), "x": r.left, "y": r.top,
+                            "w": r.right - r.left, "h": r.bottom - r.top,
+                            "main": bool(mi.dwFlags & 1)})  # MONITORINFOF_PRIMARY
+            return 1
+
+        user32.EnumDisplayMonitors(None, None, MonitorEnumProc(_cb), 0)
+        return out
+
     def _win32_title(self, hwnd) -> str:
         """The real Win32 caption. UIA's Name can differ from it — Godot names its
         accessibility root "Godot Engine" while the caption says "Raves of Qud

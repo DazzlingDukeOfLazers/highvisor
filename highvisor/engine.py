@@ -718,6 +718,10 @@ class Engine:
         if not lay:
             return {"ok": False, "error": "no layout %r" % name}
         sw, sh = b.screen_size()
+        try:
+            displays = b.displays()   # for "monitor" placements; optional per backend
+        except Exception:
+            displays = []
         wins = b.list_targets()
         used = set()
         results = []
@@ -737,7 +741,7 @@ class Engine:
                 continue
             used.add(win.id)
             try:
-                x, y, w, h = placement_rect(pl, sw, sh)
+                x, y, w, h = placement_rect(pl, sw, sh, displays)
             except Exception as e:
                 results.append({"match": pl.get("match"), "target": win.id,
                                 "ok": False, "error": str(e)})

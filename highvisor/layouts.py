@@ -83,8 +83,28 @@ def save_layout(name: str, layout: dict) -> str:
     return path
 
 
-def placement_rect(pl: dict, sw: int, sh: int):
-    """Resolve one placement to an (x, y, w, h) pixel/point rect."""
+def placement_rect(pl: dict, sw: int, sh: int, displays=None):
+    """Resolve one placement to an (x, y, w, h) pixel/point rect.
+
+    ``monitor`` fills a whole display and survives the user rearranging their
+    monitors (unlike a frozen ``rect``): ``"main"`` = the primary, ``"other"`` =
+    the first non-primary, or an integer index into the backend's display list.
+    Falls back to the primary-display rect when the machine has no such monitor.
+    """
+    if "monitor" in pl:
+        mons = list(displays or [])
+        main = next((m for m in mons if m.get("main")), mons[0] if mons else None)
+        which = pl["monitor"]
+        if which == "main":
+            mon = main
+        elif which == "other":
+            mon = next((m for m in mons if m is not main), main)
+        else:
+            i = int(which)
+            mon = mons[i] if 0 <= i < len(mons) else None
+        if mon is None:
+            return (0, 0, sw, sh)
+        return (int(mon["x"]), int(mon["y"]), int(mon["w"]), int(mon["h"]))
     if "zone" in pl:
         return zone_rect(pl["zone"], sw, sh)
     if "frac" in pl:
@@ -92,4 +112,4 @@ def placement_rect(pl: dict, sw: int, sh: int):
         return (int(fx * sw), int(fy * sh), int(fw * sw), int(fh * sh))
     if "rect" in pl:
         return tuple(int(v) for v in pl["rect"])
-    raise ValueError("placement needs one of: zone, frac, rect")
+    raise ValueError("placement needs one of: monitor, zone, frac, rect")

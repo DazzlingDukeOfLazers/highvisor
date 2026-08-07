@@ -536,6 +536,24 @@ async function applyPairLayoutOverride() {
   }
 }
 
+// {raves, qud} monitor rects for the machine pair stage — non-null only when this
+// machine defines a "pair" layout AND has 2+ displays. Raves gets the main display,
+// Qud the other, mirroring the pair layout's monitor-per-app arrangement.
+async function machinePairMonitors() {
+  try {
+    const l = await rpc("layouts");
+    const names = (l.ok && l.layouts ? l.layouts : []).map(x => x.name);
+    if (!names.includes("pair")) return null;
+    const d = await rpc("displays");
+    if (!d.ok || !d.displays || d.displays.length < 2) return null;
+    const main = d.displays.find(m => m.main) || d.displays[0];
+    const other = d.displays.find(m => m !== main);
+    return { raves: main, qud: other };
+  } catch (e) {
+    return null;
+  }
+}
+
 // The standard pair slots at W×H on the roomiest display (shared by the pair launch, the
 // resolution buttons, and the solo launches — a solo window lands EXACTLY where the pair
 // layout would put it, so adding the second app later never moves the first).
@@ -618,10 +636,19 @@ async function userTestLayout(W, H) {
   const btns = document.querySelectorAll(".ut");
   btns.forEach(b => (b.disabled = true));
   try {
-    // Same slot math as the solo launches (standardSlots) — one source for the placement.
-    const slots = await standardSlots(W, H);
-    await rpc("move", { target: raves[0].id, ...slots.ravesRect, topmost: false });
-    await rpc("move", { target: qud[0].id, ...slots.qudRect, topmost: false });
+    // Machine pair-stage (a "pair" layout + 2+ displays): W×H each, anchored at its
+    // monitor's origin — Raves on the main display, Qud on the other. The windows
+    // keep the chosen test resolution instead of being stretched over the monitors.
+    const pm = await machinePairMonitors();
+    if (pm) {
+      await rpc("move", { target: raves[0].id, x: pm.raves.x, y: pm.raves.y, w: W, h: H, topmost: false });
+      await rpc("move", { target: qud[0].id, x: pm.qud.x, y: pm.qud.y, w: W, h: H, topmost: false });
+    } else {
+      // Same slot math as the solo launches (standardSlots) — one source for the placement.
+      const slots = await standardSlots(W, H);
+      await rpc("move", { target: raves[0].id, ...slots.ravesRect, topmost: false });
+      await rpc("move", { target: qud[0].id, ...slots.qudRect, topmost: false });
+    }
     await refreshWindows();
   } catch (e) {
     alert("user-test layout failed: " + (e.message || e));
