@@ -143,8 +143,14 @@
                         {
                           "scene": "chargen_game_mode"
                         }
+                      ],
+                      "qud": [
+                        {
+                          "scene": "QudGamemodeModuleWindow"
+                        }
                       ]
-                    }
+                    },
+                    "note": "Qud side had NO detector until the whole-tree FULL sweep 2026-08-07 exposed it: the chooser was open and `hv state` still said Title Screen (scene=QudGamemodeModuleWindow, via=live — an unmapped name falling back to title's game_live signal). Every consequence looked like a navigation bug: `goto new_game` reported landing on the title, and `goto game_mode` then tried to click 'New Game' on a screen already showing the chooser. The mod reports the window first-party, so take that rather than adding OCR substrings — Qud's title OCRs as 'New Kame' and 'Optlons' at this size anyway."
                   },
                   {
                     "id": "genotype",
@@ -1759,14 +1765,22 @@
       "to": "title",
       "steps": [
         {
-          "bridge": "uiback"
+          "activate": "CavesOfQud"
+        },
+        {
+          "click_text": "Back",
+          "window": "CavesOfQud",
+          "offset": [
+            0,
+            -40
+          ]
         }
       ],
       "verify": {
         "scene": "MainMenu"
       },
       "timeout": 12,
-      "note": "Qud's modern menus ignore ALL OS-synthesized keys; uiback is the mod's first-party back command and is the only thing that closes them."
+      "note": "CLICK, not uiback — the SECOND modern screen to ignore the mod's back command (ModernHighScores was the first). Found by the whole-tree FULL sweep 2026-08-07: uiback left Qud sitting on ModernSaveManagement, and because five other targets route through the title, one stuck screen failed all of them. Measured the same way Records was: the '[Esc] Back' caption OCRs at [33,570,92,13] and clicking it does nothing; clicking 40px ABOVE it returned scene=MainMenu on the first try. Two screens with the same 40px offset is a pattern, not a coincidence — assume any modern screen's caption sits below its hit area. Priced dear because click_text depends on OCR."
     },
     {
       "app": "qud",
@@ -1941,9 +1955,11 @@
           "window": "Raves of Qud"
         },
         {
-          "key": "space",
-          "window": "Raves of Qud",
-          "note": "ACTIVATE. Raves' main menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted Continue and stopped there."
+          "dismiss": {
+            "scene": "title",
+            "key": "space"
+          },
+          "note": "ACTIVATE, CONDITIONALLY. Raves' title menu is keyboard-first — a click on an UNSELECTED item only moves the selection ('[Space] select'), which is why these edges carry a space at all. But a click on an ALREADY-SELECTED item activates it outright, and the selection persists across a screen round-trip (MainMenu._close_overlay deliberately does not clear it). So the same steps activate once or twice depending on what the previous drive left selected — measured 2026-08-07 in the whole-tree FULL sweep: `goto game_mode` opened the mode card on the click and the unconditional space then confirmed Classic, landing on Choose Genotype. Reproduced from a fresh restart, so it is not drift. `dismiss` presses space ONLY if we are still on the title, which makes the edge idempotent under both behaviours — the same shape the in_game edge already used for the load picker."
         },
         {
           "dismiss": {
@@ -1971,9 +1987,11 @@
           "window": "Raves of Qud"
         },
         {
-          "key": "space",
-          "window": "Raves of Qud",
-          "note": "ACTIVATE. Raves' title menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted the item and stopped there — the recipe then failed its own assert while sitting on the title. Only the in_game edge carried this, which is why that one worked and every other title edge did not. An older note claimed a hover-click self-activates here; that stopped being true when the menus went 1:1 keyboard-first, and nothing re-drove them until this FULL run."
+          "dismiss": {
+            "scene": "title",
+            "key": "space"
+          },
+          "note": "ACTIVATE, CONDITIONALLY. Raves' title menu is keyboard-first — a click on an UNSELECTED item only moves the selection ('[Space] select'), which is why these edges carry a space at all. But a click on an ALREADY-SELECTED item activates it outright, and the selection persists across a screen round-trip (MainMenu._close_overlay deliberately does not clear it). So the same steps activate once or twice depending on what the previous drive left selected — measured 2026-08-07 in the whole-tree FULL sweep: `goto game_mode` opened the mode card on the click and the unconditional space then confirmed Classic, landing on Choose Genotype. Reproduced from a fresh restart, so it is not drift. `dismiss` presses space ONLY if we are still on the title, which makes the edge idempotent under both behaviours — the same shape the in_game edge already used for the load picker."
         }
       ],
       "verify": {
@@ -2013,9 +2031,11 @@
           "window": "Raves of Qud"
         },
         {
-          "key": "space",
-          "window": "Raves of Qud",
-          "note": "ACTIVATE. Raves' title menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted the item and stopped there — the recipe then failed its own assert while sitting on the title. Only the in_game edge carried this, which is why that one worked and every other title edge did not. An older note claimed a hover-click self-activates here; that stopped being true when the menus went 1:1 keyboard-first, and nothing re-drove them until this FULL run."
+          "dismiss": {
+            "scene": "title",
+            "key": "space"
+          },
+          "note": "ACTIVATE, CONDITIONALLY. Raves' title menu is keyboard-first — a click on an UNSELECTED item only moves the selection ('[Space] select'), which is why these edges carry a space at all. But a click on an ALREADY-SELECTED item activates it outright, and the selection persists across a screen round-trip (MainMenu._close_overlay deliberately does not clear it). So the same steps activate once or twice depending on what the previous drive left selected — measured 2026-08-07 in the whole-tree FULL sweep: `goto game_mode` opened the mode card on the click and the unconditional space then confirmed Classic, landing on Choose Genotype. Reproduced from a fresh restart, so it is not drift. `dismiss` presses space ONLY if we are still on the title, which makes the edge idempotent under both behaviours — the same shape the in_game edge already used for the load picker."
         }
       ],
       "verify": {
@@ -2054,9 +2074,11 @@
           "window": "Raves of Qud"
         },
         {
-          "key": "space",
-          "window": "Raves of Qud",
-          "note": "ACTIVATE. Raves' title menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted the item and stopped there — the recipe then failed its own assert while sitting on the title. Only the in_game edge carried this, which is why that one worked and every other title edge did not. An older note claimed a hover-click self-activates here; that stopped being true when the menus went 1:1 keyboard-first, and nothing re-drove them until this FULL run."
+          "dismiss": {
+            "scene": "title",
+            "key": "space"
+          },
+          "note": "ACTIVATE, CONDITIONALLY. Raves' title menu is keyboard-first — a click on an UNSELECTED item only moves the selection ('[Space] select'), which is why these edges carry a space at all. But a click on an ALREADY-SELECTED item activates it outright, and the selection persists across a screen round-trip (MainMenu._close_overlay deliberately does not clear it). So the same steps activate once or twice depending on what the previous drive left selected — measured 2026-08-07 in the whole-tree FULL sweep: `goto game_mode` opened the mode card on the click and the unconditional space then confirmed Classic, landing on Choose Genotype. Reproduced from a fresh restart, so it is not drift. `dismiss` presses space ONLY if we are still on the title, which makes the edge idempotent under both behaviours — the same shape the in_game edge already used for the load picker."
         }
       ],
       "verify": {
@@ -2095,9 +2117,11 @@
           "window": "Raves of Qud"
         },
         {
-          "key": "space",
-          "window": "Raves of Qud",
-          "note": "ACTIVATE. Raves' title menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted the item and stopped there — the recipe then failed its own assert while sitting on the title. Only the in_game edge carried this, which is why that one worked and every other title edge did not. An older note claimed a hover-click self-activates here; that stopped being true when the menus went 1:1 keyboard-first, and nothing re-drove them until this FULL run."
+          "dismiss": {
+            "scene": "title",
+            "key": "space"
+          },
+          "note": "ACTIVATE, CONDITIONALLY. Raves' title menu is keyboard-first — a click on an UNSELECTED item only moves the selection ('[Space] select'), which is why these edges carry a space at all. But a click on an ALREADY-SELECTED item activates it outright, and the selection persists across a screen round-trip (MainMenu._close_overlay deliberately does not clear it). So the same steps activate once or twice depending on what the previous drive left selected — measured 2026-08-07 in the whole-tree FULL sweep: `goto game_mode` opened the mode card on the click and the unconditional space then confirmed Classic, landing on Choose Genotype. Reproduced from a fresh restart, so it is not drift. `dismiss` presses space ONLY if we are still on the title, which makes the edge idempotent under both behaviours — the same shape the in_game edge already used for the load picker."
         }
       ],
       "verify": {
@@ -2154,9 +2178,11 @@
           "window": "Raves of Qud"
         },
         {
-          "key": "space",
-          "window": "Raves of Qud",
-          "note": "ACTIVATE. Raves' title menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted the item and stopped there — the recipe then failed its own assert while sitting on the title. Only the in_game edge carried this, which is why that one worked and every other title edge did not. An older note claimed a hover-click self-activates here; that stopped being true when the menus went 1:1 keyboard-first, and nothing re-drove them until this FULL run."
+          "dismiss": {
+            "scene": "title",
+            "key": "space"
+          },
+          "note": "ACTIVATE, CONDITIONALLY. Raves' title menu is keyboard-first — a click on an UNSELECTED item only moves the selection ('[Space] select'), which is why these edges carry a space at all. But a click on an ALREADY-SELECTED item activates it outright, and the selection persists across a screen round-trip (MainMenu._close_overlay deliberately does not clear it). So the same steps activate once or twice depending on what the previous drive left selected — measured 2026-08-07 in the whole-tree FULL sweep: `goto game_mode` opened the mode card on the click and the unconditional space then confirmed Classic, landing on Choose Genotype. Reproduced from a fresh restart, so it is not drift. `dismiss` presses space ONLY if we are still on the title, which makes the edge idempotent under both behaviours — the same shape the in_game edge already used for the load picker."
         }
       ],
       "verify": {
@@ -2417,7 +2443,7 @@
         }
       ],
       "verify": {
-        "ocr_contains": "game mode"
+        "node": "game_mode"
       },
       "timeout": 15,
       "note": "Qud shows game mode and the rest of character creation as ONE screen, so this is the same move as title->new_game. Spelled out rather than aliased: an edge whose steps you have to look somewhere else to read is how recipes drifted."
@@ -2435,9 +2461,11 @@
           "window": "Raves of Qud"
         },
         {
-          "key": "space",
-          "window": "Raves of Qud",
-          "note": "ACTIVATE. Raves' title menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted the item and stopped there — the recipe then failed its own assert while sitting on the title. Only the in_game edge carried this, which is why that one worked and every other title edge did not. An older note claimed a hover-click self-activates here; that stopped being true when the menus went 1:1 keyboard-first, and nothing re-drove them until this FULL run."
+          "dismiss": {
+            "scene": "title",
+            "key": "space"
+          },
+          "note": "ACTIVATE, CONDITIONALLY. Raves' title menu is keyboard-first — a click on an UNSELECTED item only moves the selection ('[Space] select'), which is why these edges carry a space at all. But a click on an ALREADY-SELECTED item activates it outright, and the selection persists across a screen round-trip (MainMenu._close_overlay deliberately does not clear it). So the same steps activate once or twice depending on what the previous drive left selected — measured 2026-08-07 in the whole-tree FULL sweep: `goto game_mode` opened the mode card on the click and the unconditional space then confirmed Classic, landing on Choose Genotype. Reproduced from a fresh restart, so it is not drift. `dismiss` presses space ONLY if we are still on the title, which makes the edge idempotent under both behaviours — the same shape the in_game edge already used for the load picker."
         }
       ],
       "verify": {
