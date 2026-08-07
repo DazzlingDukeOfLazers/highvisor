@@ -330,3 +330,39 @@ copy-pasted dismiss steps.
 Legacy `goto[app]` recipes still run for any node the graph cannot reach, and the result says
 which driver was used — a node driven by a recipe is a node whose transitions nobody has written
 yet, and that should be visible rather than silent.
+
+### Two live findings from the first planned runs (2026-08-06)
+
+Both were pre-existing and both had been invisible, which is the argument for `hv plan` and
+for edges that verify.
+
+**`click_text` was reading a stale frame.** `goto qud in_game` from the title reported
+`text 'continue' not on screen (14 ocr lines)` while looking straight at Continue. Qud does not
+repaint while unfocused (the ~2s settle documented in CLAUDE.md); `activate` waits 0.6s and
+`click_text` then OCR'd **once**, so it read the screen Qud had been on before — the 14 lines
+were the in-game HUD. It now polls the OCR to a deadline (default 6s) instead of snapshotting,
+which also covers a menu still animating in and costs nothing on the normal path. Deliberately
+not fixed by sleeping longer after `activate`: that taxes every step to serve the one that reads
+pixels. The error now prints the lines it *did* see, so the next stale frame is obvious.
+
+**The top-row roulette was still in a recipe.** With the OCR fixed, `title → in_game` failed at
+the next step: a blind `{"click_hover": [900, 190]}` labelled "top save row". That is precisely
+what `hv loadsave` was written to end — and it had been sitting inside the one recipe nobody had
+re-driven since. The edge now uses a `{"load_save": {"row": 0}}` step, which goes through the
+mod's own `loadsave {id}` bridge command with the id resolved from **disk** metadata: exact
+match, no coordinates, no OCR, and it opens Qud's picker itself. `{"row": n}` rather than a
+character name so the graph does not hardcode a save.
+
+Verified live, all planned, no fallbacks: Raves tab→tab ×4 consecutively (the case that used to
+alternate pass/fail), Raves tab→in_game, Qud in_game→status_screens→tab, Qud tab→tab as a single
+`statustab` call, Qud status→title (`uiback` then `CmdQuit` + two answers), Qud title→in_game,
+Raves title→in_game.
+
+### The recipes are gone
+
+With the graph covering every node that had one, all 20 `goto[app]` recipes were deleted. They
+were already unreachable — the fallback can only fire where the planner has no route — and two
+descriptions of the same move is the drift this refactor existed to end. Every note worth
+keeping was carried into the transitions verbatim. `selftest_plan.py` now fails if a recipe
+reappears for a node the graph can already reach. The fallback **code** stays: adding a recipe
+for a node the graph cannot yet reach must still work.

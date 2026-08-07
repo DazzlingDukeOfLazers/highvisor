@@ -65,185 +65,6 @@
             }
           ]
         },
-        "goto": {
-          "qud": [
-            {
-              "dismiss": {
-                "scene": "StatusScreensScreen",
-                "bridge": "uiback"
-              },
-              "note": "CLOSE THE STATUS SCREENS FIRST. Nothing dismissed them on the way out, so a Qud parked on any of the eight tabs could not reach in_game or title -- the recipe just failed its own assert and left the screen up. Worse than a plain failure: a capture taken after it looks like a map shot and is actually a status screen, which is how a 'the world shows through Qud's status backdrop' reading came out of comparing one status screen against another. uiback routes StatusScreensScreen to its unguarded Exit()."
-            },
-            {
-              "launch": "qud_solo",
-              "unless_running": true
-            },
-            {
-              "wait_window": "CavesOfQud",
-              "timeout": 60
-            },
-            {
-              "dismiss": {
-                "scene": "play",
-                "command": "CmdQuit",
-                "answers": [
-                  "Yes",
-                  "No"
-                ]
-              },
-              "note": "LEAVE A LIVE GAME, first-party throughout: CmdQuit is pushed through Qud's own command path and the confirms are answered by BUTTON via the mod, so nothing here depends on synthesized keys -- which Qud's modern UI ignores outright. Yes to 'are you sure you want to quit', then NO to 'do you want to save first': Yes there would overwrite the fixture save with whatever state the harness drove the character into, destroying the reference every parity capture is measured against. Previously the only way out of a live game was a restart (see _load_save)."
-            },
-            {
-              "dismiss": {
-                "scene": "PopupMessage",
-                "bridge": "uiback"
-              },
-              "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up. That is what made the equipment key look broken for a whole session. Driving popups over the bridge is what leaves them, so any recipe that may follow one should clear it first; uiback does, verified."
-            },
-            {
-              "dismiss": {
-                "scene": "DynamicPopupMessage",
-                "bridge": "uiback"
-              },
-              "note": "self-heal: cancel a stray popup (quit-confirm etc.)"
-            },
-            {
-              "dismiss": {
-                "scene": "ModernHighScores",
-                "bridge": "uiback"
-              },
-              "note": "self-heal: back out of a submenu left open"
-            },
-            {
-              "dismiss": {
-                "scene": "ModernOptionsMenu",
-                "bridge": "uiback"
-              },
-              "note": "self-heal: back out of a submenu left open"
-            },
-            {
-              "dismiss": {
-                "scene": "ModManager",
-                "bridge": "uiback"
-              },
-              "note": "self-heal: back out of a submenu left open"
-            },
-            {
-              "dismiss": {
-                "scene": "ModernSaveManagement",
-                "bridge": "uiback"
-              },
-              "note": "self-heal: back out of a submenu left open"
-            },
-            {
-              "assert": {
-                "scene": "MainMenu"
-              },
-              "timeout": 20
-            }
-          ],
-          "raves": [
-            {
-              "launch": "raves_solo",
-              "unless_running": true
-            },
-            {
-              "wait_window": "Raves of Qud",
-              "timeout": 30
-            },
-            {
-              "dock": "Raves of Qud",
-              "note": "stack into the standard slot above Qud (fresh launches land off-slot)"
-            },
-            {
-              "dismiss": {
-                "scene": [
-                  "status_skills",
-                  "status_attributes",
-                  "status_equipment",
-                  "status_tinkering",
-                  "status_journal",
-                  "status_quests",
-                  "status_reputation",
-                  "status_messagelog"
-                ],
-                "key": "Escape"
-              },
-              "note": "Raves' status screens close on Escape. Without this the recipe had no way out of one, so a Raves parked on any status tab could not reach title -- and every tab recipe chains through in_game -> title, so ALL of them failed until the app was restarted."
-            },
-            {
-              "dismiss": {
-                "popup": "message",
-                "key": "Escape"
-              },
-              "note": "CANCEL a stray modal first. A popup left over from an earlier run blocks CmdQuit entirely -- the command goes nowhere and the step then fails for lack of any change. Escape is Qud's Cancel on these confirms, so this clears the way without ANSWERING anything."
-            },
-            {
-              "dismiss": {
-                "scene": "in_game",
-                "command": "CmdQuit"
-              },
-              "note": "LEAVE A LIVE GAME. Neither app's title recipe could, so `goto title` from in_game failed and left the game running -- and every recipe that starts with {goto: title} inherited that. CmdQuit runs Qud's own quit, whose UI mirrors into Raves, so the confirms below are answered on the Raves window."
-            },
-            {
-              "dismiss": {
-                "popup": "message",
-                "key": "space"
-              },
-              "note": "'Are you sure you want to quit?' -> [Space] Yes"
-            },
-            {
-              "dismiss": {
-                "popup": "message",
-                "keys": [
-                  "Right",
-                  "space"
-                ]
-              },
-              "note": "'Do you want to save first?' -> Right moves off Yes, Space answers NO. Deliberate: Yes would overwrite the fixture save with whatever state the harness drove the character into, quietly destroying the reference every parity capture is measured against. One step, because Right alone changes nothing observable."
-            },
-            {
-              "dismiss": {
-                "scene": "mods",
-                "key": "Escape"
-              },
-              "note": "self-heal: back out of a submenu left open"
-            },
-            {
-              "dismiss": {
-                "scene": "options",
-                "key": "Escape"
-              },
-              "note": "self-heal: back out of a submenu left open"
-            },
-            {
-              "dismiss": {
-                "scene": "records",
-                "key": "Escape"
-              },
-              "note": "self-heal: back out of a submenu left open"
-            },
-            {
-              "dismiss": {
-                "scene": "loadgame",
-                "key": "Escape"
-              },
-              "note": "self-heal: back out of the Continue/Load Game picker. Its omission is why goto got STUCK there: the picker is a descendant of title, so the recipe's final assert passed by containment while the app never left, and the next step then clicked for a 'Continue' that is not on the picker."
-            },
-            {
-              "dismiss": {
-                "scene": "quit_dialog",
-                "key": "Escape"
-              }
-            },
-            {
-              "assert": {
-                "node": "title"
-              },
-              "timeout": 20
-            }
-          ]
-        },
         "children": [
           {
             "id": "background",
@@ -323,47 +144,6 @@
                           "scene": "chargen_game_mode"
                         }
                       ]
-                    },
-                    "goto": {
-                      "raves": [
-                        {
-                          "goto": "title"
-                        },
-                        {
-                          "activate": "Raves of Qud"
-                        },
-                        {
-                          "click_text": "New Game",
-                          "window": "Raves of Qud"
-                        },
-                        {
-                          "assert": {
-                            "scene": "chargen_game_mode"
-                          },
-                          "timeout": 12
-                        }
-                      ],
-                      "qud": [
-                        {
-                          "goto": "title"
-                        },
-                        {
-                          "activate": "CavesOfQud"
-                        },
-                        {
-                          "click_text": "New Game",
-                          "window": "CavesOfQud"
-                        },
-                        {
-                          "sleep": 1.0
-                        },
-                        {
-                          "assert": {
-                            "ocr_contains": "game mode"
-                          },
-                          "timeout": 15
-                        }
-                      ]
                     }
                   },
                   {
@@ -379,24 +159,6 @@
                           "scene": "chargen_genotype"
                         }
                       ]
-                    },
-                    "goto": {
-                      "raves": [
-                        {
-                          "goto": "game_mode"
-                        },
-                        {
-                          "key": "enter",
-                          "window": "Raves of Qud",
-                          "note": "confirm the default card (Classic)"
-                        },
-                        {
-                          "assert": {
-                            "scene": "chargen_genotype"
-                          },
-                          "timeout": 10
-                        }
-                      ]
                     }
                   },
                   {
@@ -410,24 +172,6 @@
                       "raves": [
                         {
                           "scene": "chargen_subtype"
-                        }
-                      ]
-                    },
-                    "goto": {
-                      "raves": [
-                        {
-                          "goto": "genotype"
-                        },
-                        {
-                          "key": "enter",
-                          "window": "Raves of Qud",
-                          "note": "confirm the default genotype"
-                        },
-                        {
-                          "assert": {
-                            "scene": "chargen_subtype"
-                          },
-                          "timeout": 10
                         }
                       ]
                     }
@@ -450,35 +194,7 @@
                     },
                     "detect": {}
                   }
-                ],
-                "goto": {
-                  "raves": [
-                    {
-                      "goto": "game_mode"
-                    }
-                  ],
-                  "qud": [
-                    {
-                      "goto": "title"
-                    },
-                    {
-                      "activate": "CavesOfQud"
-                    },
-                    {
-                      "click_text": "New Game",
-                      "window": "CavesOfQud"
-                    },
-                    {
-                      "sleep": 1.0
-                    },
-                    {
-                      "assert": {
-                        "ocr_contains": "game mode"
-                      },
-                      "timeout": 15
-                    }
-                  ]
-                }
+                ]
               },
               {
                 "id": "continue",
@@ -518,48 +234,7 @@
                     "detect": {}
                   }
                 ],
-                "note": "the Load Game picker; qud reports scene=ModernSaveManagement first-party (OCR fallback kept)",
-                "goto": {
-                  "qud": [
-                    {
-                      "goto": "title"
-                    },
-                    {
-                      "activate": "CavesOfQud"
-                    },
-                    {
-                      "click_text": "Continue",
-                      "window": "CavesOfQud"
-                    },
-                    {
-                      "sleep": 1.0
-                    },
-                    {
-                      "assert": {
-                        "scene": "ModernSaveManagement"
-                      },
-                      "timeout": 15
-                    }
-                  ],
-                  "raves": [
-                    {
-                      "goto": "title"
-                    },
-                    {
-                      "activate": "Raves of Qud"
-                    },
-                    {
-                      "click_text": "Continue",
-                      "window": "Raves of Qud"
-                    },
-                    {
-                      "assert": {
-                        "scene": "loadgame"
-                      },
-                      "timeout": 12
-                    }
-                  ]
-                }
+                "note": "the Load Game picker; qud reports scene=ModernSaveManagement first-party (OCR fallback kept)"
               },
               {
                 "id": "records",
@@ -579,47 +254,6 @@
                       "scene": [
                         "ModernHighScores"
                       ]
-                    }
-                  ]
-                },
-                "goto": {
-                  "raves": [
-                    {
-                      "goto": "title"
-                    },
-                    {
-                      "activate": "Raves of Qud"
-                    },
-                    {
-                      "click_text": "Records",
-                      "window": "Raves of Qud"
-                    },
-                    {
-                      "assert": {
-                        "scene": "records"
-                      },
-                      "timeout": 12
-                    }
-                  ],
-                  "qud": [
-                    {
-                      "goto": "title"
-                    },
-                    {
-                      "activate": "CavesOfQud"
-                    },
-                    {
-                      "click_text": "Records",
-                      "window": "CavesOfQud"
-                    },
-                    {
-                      "sleep": 1.0
-                    },
-                    {
-                      "assert": {
-                        "scene": "ModernHighScores"
-                      },
-                      "timeout": 15
                     }
                   ]
                 }
@@ -644,47 +278,6 @@
                       ]
                     }
                   ]
-                },
-                "goto": {
-                  "raves": [
-                    {
-                      "goto": "title"
-                    },
-                    {
-                      "activate": "Raves of Qud"
-                    },
-                    {
-                      "click_text": "Options",
-                      "window": "Raves of Qud"
-                    },
-                    {
-                      "assert": {
-                        "scene": "options"
-                      },
-                      "timeout": 12
-                    }
-                  ],
-                  "qud": [
-                    {
-                      "goto": "title"
-                    },
-                    {
-                      "activate": "CavesOfQud"
-                    },
-                    {
-                      "click_text": "Options",
-                      "window": "CavesOfQud"
-                    },
-                    {
-                      "sleep": 1.0
-                    },
-                    {
-                      "assert": {
-                        "scene": "ModernOptionsMenu"
-                      },
-                      "timeout": 15
-                    }
-                  ]
                 }
               },
               {
@@ -705,47 +298,6 @@
                       "scene": [
                         "ModManager"
                       ]
-                    }
-                  ]
-                },
-                "goto": {
-                  "raves": [
-                    {
-                      "goto": "title"
-                    },
-                    {
-                      "activate": "Raves of Qud"
-                    },
-                    {
-                      "click_text": "Mods",
-                      "window": "Raves of Qud"
-                    },
-                    {
-                      "assert": {
-                        "scene": "mods"
-                      },
-                      "timeout": 12
-                    }
-                  ],
-                  "qud": [
-                    {
-                      "goto": "title"
-                    },
-                    {
-                      "activate": "CavesOfQud"
-                    },
-                    {
-                      "click_text": "Mods",
-                      "window": "CavesOfQud"
-                    },
-                    {
-                      "sleep": 1.0
-                    },
-                    {
-                      "assert": {
-                        "scene": "ModManager"
-                      },
-                      "timeout": 15
                     }
                   ]
                 }
@@ -851,78 +403,6 @@
                 "message log",
                 "sprint"
               ]
-            }
-          ]
-        },
-        "goto": {
-          "qud": [
-            {
-              "dismiss": {
-                "scene": "StatusScreensScreen",
-                "bridge": "uiback"
-              },
-              "note": "CLOSE THE STATUS SCREENS FIRST. Nothing dismissed them on the way out, so a Qud parked on any of the eight tabs could not reach in_game or title -- the recipe just failed its own assert and left the screen up. Worse than a plain failure: a capture taken after it looks like a map shot and is actually a status screen, which is how a 'the world shows through Qud's status backdrop' reading came out of comparing one status screen against another. uiback routes StatusScreensScreen to its unguarded Exit()."
-            },
-            {
-              "goto": "title"
-            },
-            {
-              "activate": "CavesOfQud"
-            },
-            {
-              "click_text": "Continue",
-              "window": "CavesOfQud"
-            },
-            {
-              "sleep": 1.0
-            },
-            {
-              "click_hover": [
-                900,
-                190
-              ],
-              "window": "CavesOfQud",
-              "note": "top save row in the Load Game picker"
-            },
-            {
-              "assert": {
-                "node": "in_game"
-              },
-              "timeout": 30
-            }
-          ],
-          "raves": [
-            {
-              "goto": "title"
-            },
-            {
-              "activate": "Raves of Qud"
-            },
-            {
-              "sleep": 2.5,
-              "note": "let Continue enable (heartbeat poll) after a fresh launch"
-            },
-            {
-              "click_text": "Continue",
-              "window": "Raves of Qud"
-            },
-            {
-              "key": "space",
-              "window": "Raves of Qud",
-              "note": "ACTIVATE. Raves' main menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted Continue and stopped there. The recipe then sat at the title forever, which reads as 'Raves won't connect to the bridge' -- it had simply never left the menu."
-            },
-            {
-              "dismiss": {
-                "scene": "loadgame",
-                "key": "space"
-              },
-              "note": "CONDITIONAL: Raves' Continue opens the LOAD GAME picker when there is a choice to make and goes straight in-game when there is not, so this presses the picker's [Space] select only if we actually landed there. The recipe predated the picker entirely, which is how a run could stop at it -- and the title recipe, equally unaware, could not back out."
-            },
-            {
-              "assert": {
-                "node": "in_game"
-              },
-              "timeout": 60
             }
           ]
         },
@@ -1050,76 +530,6 @@
                       "tab": "SkillsAndPowers"
                     }
                   ]
-                },
-                "goto": {
-                  "qud": [
-                    {
-                      "dismiss": {
-                        "scene": "PopupMessage",
-                        "bridge": "uiback"
-                      },
-                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up."
-                    },
-                    {
-                      "dismiss": {
-                        "scene": "DynamicPopupMessage",
-                        "bridge": "uiback"
-                      }
-                    },
-                    {
-                      "goto": "status_screens",
-                      "unless_within": true,
-                      "note": "skip when we are already inside the status screens: status_screens' own recipe starts at in_game, which cannot be reached from in here without closing them."
-                    },
-                    {
-                      "bridge": "statustab",
-                      "args": {
-                        "tab": "SkillsAndPowers"
-                      },
-                      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab."
-                    },
-                    {
-                      "assert": {
-                        "node": "status_skills"
-                      },
-                      "timeout": 8
-                    }
-                  ],
-                  "raves": [
-                    {
-                      "dismiss": {
-                        "scene": [
-                          "status_skills",
-                          "status_attributes",
-                          "status_equipment",
-                          "status_tinkering",
-                          "status_journal",
-                          "status_quests",
-                          "status_reputation",
-                          "status_messagelog"
-                        ],
-                        "key": "Escape"
-                      },
-                      "note": "LEAVE THE TAB WE ARE ON FIRST. Raves reaches each tab by pressing its key from in_game, and the chain step below cannot do it: in_game's own recipe routes through `title`, which from a status screen dismisses it, lands in the game, and then fails its own assert -- so the FIRST switch failed and left Raves at in_game, and the next one worked. Tab-to-tab alternated pass/fail. One Escape here and the chain step is a no-op."
-                    },
-                    {
-                      "goto": "in_game"
-                    },
-                    {
-                      "activate": "Raves of Qud"
-                    },
-                    {
-                      "key": "k",
-                      "window": "Raves of Qud"
-                    },
-                    {
-                      "assert": {
-                        "scene": "status_skills",
-                        "app": "raves"
-                      },
-                      "timeout": 8
-                    }
-                  ]
                 }
               },
               {
@@ -1141,76 +551,6 @@
                       "tab": "Character"
                     }
                   ]
-                },
-                "goto": {
-                  "qud": [
-                    {
-                      "dismiss": {
-                        "scene": "PopupMessage",
-                        "bridge": "uiback"
-                      },
-                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up."
-                    },
-                    {
-                      "dismiss": {
-                        "scene": "DynamicPopupMessage",
-                        "bridge": "uiback"
-                      }
-                    },
-                    {
-                      "goto": "status_screens",
-                      "unless_within": true,
-                      "note": "skip when we are already inside the status screens: status_screens' own recipe starts at in_game, which cannot be reached from in here without closing them."
-                    },
-                    {
-                      "bridge": "statustab",
-                      "args": {
-                        "tab": "Character"
-                      },
-                      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab."
-                    },
-                    {
-                      "assert": {
-                        "node": "status_attributes"
-                      },
-                      "timeout": 8
-                    }
-                  ],
-                  "raves": [
-                    {
-                      "dismiss": {
-                        "scene": [
-                          "status_skills",
-                          "status_attributes",
-                          "status_equipment",
-                          "status_tinkering",
-                          "status_journal",
-                          "status_quests",
-                          "status_reputation",
-                          "status_messagelog"
-                        ],
-                        "key": "Escape"
-                      },
-                      "note": "LEAVE THE TAB WE ARE ON FIRST. Raves reaches each tab by pressing its key from in_game, and the chain step below cannot do it: in_game's own recipe routes through `title`, which from a status screen dismisses it, lands in the game, and then fails its own assert -- so the FIRST switch failed and left Raves at in_game, and the next one worked. Tab-to-tab alternated pass/fail. One Escape here and the chain step is a no-op."
-                    },
-                    {
-                      "goto": "in_game"
-                    },
-                    {
-                      "activate": "Raves of Qud"
-                    },
-                    {
-                      "key": "x",
-                      "window": "Raves of Qud"
-                    },
-                    {
-                      "assert": {
-                        "scene": "status_attributes",
-                        "app": "raves"
-                      },
-                      "timeout": 8
-                    }
-                  ]
                 }
               },
               {
@@ -1230,76 +570,6 @@
                     {
                       "scene": "StatusScreensScreen",
                       "tab": "InventoryAndEquipment"
-                    }
-                  ]
-                },
-                "goto": {
-                  "qud": [
-                    {
-                      "dismiss": {
-                        "scene": "PopupMessage",
-                        "bridge": "uiback"
-                      },
-                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up."
-                    },
-                    {
-                      "dismiss": {
-                        "scene": "DynamicPopupMessage",
-                        "bridge": "uiback"
-                      }
-                    },
-                    {
-                      "goto": "status_screens",
-                      "unless_within": true,
-                      "note": "skip when we are already inside the status screens: status_screens' own recipe starts at in_game, which cannot be reached from in here without closing them."
-                    },
-                    {
-                      "bridge": "statustab",
-                      "args": {
-                        "tab": "InventoryAndEquipment"
-                      },
-                      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab."
-                    },
-                    {
-                      "assert": {
-                        "node": "status_equipment"
-                      },
-                      "timeout": 8
-                    }
-                  ],
-                  "raves": [
-                    {
-                      "dismiss": {
-                        "scene": [
-                          "status_skills",
-                          "status_attributes",
-                          "status_equipment",
-                          "status_tinkering",
-                          "status_journal",
-                          "status_quests",
-                          "status_reputation",
-                          "status_messagelog"
-                        ],
-                        "key": "Escape"
-                      },
-                      "note": "LEAVE THE TAB WE ARE ON FIRST. Raves reaches each tab by pressing its key from in_game, and the chain step below cannot do it: in_game's own recipe routes through `title`, which from a status screen dismisses it, lands in the game, and then fails its own assert -- so the FIRST switch failed and left Raves at in_game, and the next one worked. Tab-to-tab alternated pass/fail. One Escape here and the chain step is a no-op."
-                    },
-                    {
-                      "goto": "in_game"
-                    },
-                    {
-                      "activate": "Raves of Qud"
-                    },
-                    {
-                      "key": "e",
-                      "window": "Raves of Qud"
-                    },
-                    {
-                      "assert": {
-                        "scene": "status_equipment",
-                        "app": "raves"
-                      },
-                      "timeout": 8
                     }
                   ]
                 },
@@ -1578,76 +848,6 @@
                       "tab": "Tinkering"
                     }
                   ]
-                },
-                "goto": {
-                  "qud": [
-                    {
-                      "dismiss": {
-                        "scene": "PopupMessage",
-                        "bridge": "uiback"
-                      },
-                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up."
-                    },
-                    {
-                      "dismiss": {
-                        "scene": "DynamicPopupMessage",
-                        "bridge": "uiback"
-                      }
-                    },
-                    {
-                      "goto": "status_screens",
-                      "unless_within": true,
-                      "note": "skip when we are already inside the status screens: status_screens' own recipe starts at in_game, which cannot be reached from in here without closing them."
-                    },
-                    {
-                      "bridge": "statustab",
-                      "args": {
-                        "tab": "Tinkering"
-                      },
-                      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab."
-                    },
-                    {
-                      "assert": {
-                        "node": "status_tinkering"
-                      },
-                      "timeout": 8
-                    }
-                  ],
-                  "raves": [
-                    {
-                      "dismiss": {
-                        "scene": [
-                          "status_skills",
-                          "status_attributes",
-                          "status_equipment",
-                          "status_tinkering",
-                          "status_journal",
-                          "status_quests",
-                          "status_reputation",
-                          "status_messagelog"
-                        ],
-                        "key": "Escape"
-                      },
-                      "note": "LEAVE THE TAB WE ARE ON FIRST. Raves reaches each tab by pressing its key from in_game, and the chain step below cannot do it: in_game's own recipe routes through `title`, which from a status screen dismisses it, lands in the game, and then fails its own assert -- so the FIRST switch failed and left Raves at in_game, and the next one worked. Tab-to-tab alternated pass/fail. One Escape here and the chain step is a no-op."
-                    },
-                    {
-                      "goto": "in_game"
-                    },
-                    {
-                      "activate": "Raves of Qud"
-                    },
-                    {
-                      "key": "n",
-                      "window": "Raves of Qud"
-                    },
-                    {
-                      "assert": {
-                        "scene": "status_tinkering",
-                        "app": "raves"
-                      },
-                      "timeout": 8
-                    }
-                  ]
                 }
               },
               {
@@ -1667,76 +867,6 @@
                     {
                       "scene": "StatusScreensScreen",
                       "tab": "Journal"
-                    }
-                  ]
-                },
-                "goto": {
-                  "qud": [
-                    {
-                      "dismiss": {
-                        "scene": "PopupMessage",
-                        "bridge": "uiback"
-                      },
-                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up."
-                    },
-                    {
-                      "dismiss": {
-                        "scene": "DynamicPopupMessage",
-                        "bridge": "uiback"
-                      }
-                    },
-                    {
-                      "goto": "status_screens",
-                      "unless_within": true,
-                      "note": "skip when we are already inside the status screens: status_screens' own recipe starts at in_game, which cannot be reached from in here without closing them."
-                    },
-                    {
-                      "bridge": "statustab",
-                      "args": {
-                        "tab": "Journal"
-                      },
-                      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab."
-                    },
-                    {
-                      "assert": {
-                        "node": "status_journal"
-                      },
-                      "timeout": 8
-                    }
-                  ],
-                  "raves": [
-                    {
-                      "dismiss": {
-                        "scene": [
-                          "status_skills",
-                          "status_attributes",
-                          "status_equipment",
-                          "status_tinkering",
-                          "status_journal",
-                          "status_quests",
-                          "status_reputation",
-                          "status_messagelog"
-                        ],
-                        "key": "Escape"
-                      },
-                      "note": "LEAVE THE TAB WE ARE ON FIRST. Raves reaches each tab by pressing its key from in_game, and the chain step below cannot do it: in_game's own recipe routes through `title`, which from a status screen dismisses it, lands in the game, and then fails its own assert -- so the FIRST switch failed and left Raves at in_game, and the next one worked. Tab-to-tab alternated pass/fail. One Escape here and the chain step is a no-op."
-                    },
-                    {
-                      "goto": "in_game"
-                    },
-                    {
-                      "activate": "Raves of Qud"
-                    },
-                    {
-                      "key": "j",
-                      "window": "Raves of Qud"
-                    },
-                    {
-                      "assert": {
-                        "scene": "status_journal",
-                        "app": "raves"
-                      },
-                      "timeout": 8
                     }
                   ]
                 }
@@ -1760,76 +890,6 @@
                       "tab": "Quests"
                     }
                   ]
-                },
-                "goto": {
-                  "qud": [
-                    {
-                      "dismiss": {
-                        "scene": "PopupMessage",
-                        "bridge": "uiback"
-                      },
-                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up."
-                    },
-                    {
-                      "dismiss": {
-                        "scene": "DynamicPopupMessage",
-                        "bridge": "uiback"
-                      }
-                    },
-                    {
-                      "goto": "status_screens",
-                      "unless_within": true,
-                      "note": "skip when we are already inside the status screens: status_screens' own recipe starts at in_game, which cannot be reached from in here without closing them."
-                    },
-                    {
-                      "bridge": "statustab",
-                      "args": {
-                        "tab": "Quests"
-                      },
-                      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab."
-                    },
-                    {
-                      "assert": {
-                        "node": "status_quests"
-                      },
-                      "timeout": 8
-                    }
-                  ],
-                  "raves": [
-                    {
-                      "dismiss": {
-                        "scene": [
-                          "status_skills",
-                          "status_attributes",
-                          "status_equipment",
-                          "status_tinkering",
-                          "status_journal",
-                          "status_quests",
-                          "status_reputation",
-                          "status_messagelog"
-                        ],
-                        "key": "Escape"
-                      },
-                      "note": "LEAVE THE TAB WE ARE ON FIRST. Raves reaches each tab by pressing its key from in_game, and the chain step below cannot do it: in_game's own recipe routes through `title`, which from a status screen dismisses it, lands in the game, and then fails its own assert -- so the FIRST switch failed and left Raves at in_game, and the next one worked. Tab-to-tab alternated pass/fail. One Escape here and the chain step is a no-op."
-                    },
-                    {
-                      "goto": "in_game"
-                    },
-                    {
-                      "activate": "Raves of Qud"
-                    },
-                    {
-                      "key": "q",
-                      "window": "Raves of Qud"
-                    },
-                    {
-                      "assert": {
-                        "scene": "status_quests",
-                        "app": "raves"
-                      },
-                      "timeout": 8
-                    }
-                  ]
                 }
               },
               {
@@ -1849,76 +909,6 @@
                     {
                       "scene": "StatusScreensScreen",
                       "tab": "Factions"
-                    }
-                  ]
-                },
-                "goto": {
-                  "qud": [
-                    {
-                      "dismiss": {
-                        "scene": "PopupMessage",
-                        "bridge": "uiback"
-                      },
-                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up."
-                    },
-                    {
-                      "dismiss": {
-                        "scene": "DynamicPopupMessage",
-                        "bridge": "uiback"
-                      }
-                    },
-                    {
-                      "goto": "status_screens",
-                      "unless_within": true,
-                      "note": "skip when we are already inside the status screens: status_screens' own recipe starts at in_game, which cannot be reached from in here without closing them."
-                    },
-                    {
-                      "bridge": "statustab",
-                      "args": {
-                        "tab": "Factions"
-                      },
-                      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab."
-                    },
-                    {
-                      "assert": {
-                        "node": "status_reputation"
-                      },
-                      "timeout": 8
-                    }
-                  ],
-                  "raves": [
-                    {
-                      "dismiss": {
-                        "scene": [
-                          "status_skills",
-                          "status_attributes",
-                          "status_equipment",
-                          "status_tinkering",
-                          "status_journal",
-                          "status_quests",
-                          "status_reputation",
-                          "status_messagelog"
-                        ],
-                        "key": "Escape"
-                      },
-                      "note": "LEAVE THE TAB WE ARE ON FIRST. Raves reaches each tab by pressing its key from in_game, and the chain step below cannot do it: in_game's own recipe routes through `title`, which from a status screen dismisses it, lands in the game, and then fails its own assert -- so the FIRST switch failed and left Raves at in_game, and the next one worked. Tab-to-tab alternated pass/fail. One Escape here and the chain step is a no-op."
-                    },
-                    {
-                      "goto": "in_game"
-                    },
-                    {
-                      "activate": "Raves of Qud"
-                    },
-                    {
-                      "key": "ctrl+f",
-                      "window": "Raves of Qud"
-                    },
-                    {
-                      "assert": {
-                        "scene": "status_reputation",
-                        "app": "raves"
-                      },
-                      "timeout": 8
                     }
                   ]
                 }
@@ -1942,116 +932,9 @@
                       "tab": "MessageLog"
                     }
                   ]
-                },
-                "goto": {
-                  "qud": [
-                    {
-                      "dismiss": {
-                        "scene": "PopupMessage",
-                        "bridge": "uiback"
-                      },
-                      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up."
-                    },
-                    {
-                      "dismiss": {
-                        "scene": "DynamicPopupMessage",
-                        "bridge": "uiback"
-                      }
-                    },
-                    {
-                      "goto": "status_screens",
-                      "unless_within": true,
-                      "note": "skip when we are already inside the status screens: status_screens' own recipe starts at in_game, which cannot be reached from in here without closing them."
-                    },
-                    {
-                      "bridge": "statustab",
-                      "args": {
-                        "tab": "MessageLog"
-                      },
-                      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab."
-                    },
-                    {
-                      "assert": {
-                        "node": "status_messagelog"
-                      },
-                      "timeout": 8
-                    }
-                  ],
-                  "raves": [
-                    {
-                      "dismiss": {
-                        "scene": [
-                          "status_skills",
-                          "status_attributes",
-                          "status_equipment",
-                          "status_tinkering",
-                          "status_journal",
-                          "status_quests",
-                          "status_reputation",
-                          "status_messagelog"
-                        ],
-                        "key": "Escape"
-                      },
-                      "note": "LEAVE THE TAB WE ARE ON FIRST. Raves reaches each tab by pressing its key from in_game, and the chain step below cannot do it: in_game's own recipe routes through `title`, which from a status screen dismisses it, lands in the game, and then fails its own assert -- so the FIRST switch failed and left Raves at in_game, and the next one worked. Tab-to-tab alternated pass/fail. One Escape here and the chain step is a no-op."
-                    },
-                    {
-                      "goto": "in_game"
-                    },
-                    {
-                      "activate": "Raves of Qud"
-                    },
-                    {
-                      "key": "f2",
-                      "window": "Raves of Qud"
-                    },
-                    {
-                      "sleep": 0.6
-                    },
-                    {
-                      "click": [
-                        1615,
-                        136
-                      ],
-                      "window": "Raves of Qud"
-                    },
-                    {
-                      "assert": {
-                        "scene": "status_messagelog",
-                        "app": "raves"
-                      },
-                      "timeout": 8
-                    }
-                  ]
                 }
               }
-            ],
-            "goto": {
-              "qud": [
-                {
-                  "goto": "in_game"
-                },
-                {
-                  "activate": "CavesOfQud"
-                },
-                {
-                  "click_hover": [
-                    1729,
-                    70
-                  ],
-                  "window": "CavesOfQud"
-                },
-                {
-                  "sleep": 1.2
-                },
-                {
-                  "assert": {
-                    "scene": "StatusScreensScreen",
-                    "app": "qud"
-                  },
-                  "timeout": 10
-                }
-              ]
-            }
+            ]
           },
           {
             "id": "control_mapping",
@@ -2073,43 +956,6 @@
                     "control mapping",
                     "configuring controller"
                   ]
-                }
-              ]
-            },
-            "goto": {
-              "raves": [
-                {
-                  "goto": "in_game"
-                },
-                {
-                  "activate": "Raves of Qud"
-                },
-                {
-                  "sleep": 2.0,
-                  "note": "post-restart settle — the bridge client needs a beat before Esc lands as CmdSystemMenu"
-                },
-                {
-                  "key": "escape",
-                  "window": "Raves of Qud",
-                  "note": "1:1 Esc = CmdSystemMenu; the popup mirrors back"
-                },
-                {
-                  "assert": {
-                    "popup": "menu",
-                    "app": "raves"
-                  },
-                  "timeout": 8
-                },
-                {
-                  "click_text": "Control Mapping",
-                  "window": "Raves of Qud"
-                },
-                {
-                  "assert": {
-                    "scene": "control_mapping",
-                    "app": "raves"
-                  },
-                  "timeout": 8
                 }
               ]
             }
@@ -2429,28 +1275,16 @@
       "to": "in_game",
       "steps": [
         {
-          "activate": "CavesOfQud"
-        },
-        {
-          "click_text": "Continue",
-          "window": "CavesOfQud"
-        },
-        {
-          "sleep": 1.0
-        },
-        {
-          "click_hover": [
-            900,
-            190
-          ],
-          "window": "CavesOfQud",
-          "note": "top save row in the Load Game picker"
+          "load_save": {
+            "row": 0
+          }
         }
       ],
       "verify": {
         "node": "in_game"
       },
-      "timeout": 35
+      "timeout": 60,
+      "note": "First-party load through the mod's `loadsave {id}` bridge command, with the id resolved from DISK metadata -- no coordinates, no OCR. It replaced {click_text Continue, sleep, click_hover [900,190]}: the blind 'top save row' click failed on the planner's first live run, which is the same top-row roulette `hv loadsave` was built to end, still hiding in the one recipe nobody had re-driven. row 0 rather than a character name so the graph stays generic."
     },
     {
       "app": "qud",
@@ -3169,6 +2003,47 @@
         "app": "raves"
       },
       "timeout": 10
+    },
+    {
+      "app": "qud",
+      "from": "title",
+      "to": "game_mode",
+      "steps": [
+        {
+          "activate": "CavesOfQud"
+        },
+        {
+          "click_text": "New Game",
+          "window": "CavesOfQud"
+        },
+        {
+          "sleep": 1.0
+        }
+      ],
+      "verify": {
+        "ocr_contains": "game mode"
+      },
+      "timeout": 15,
+      "note": "Qud shows game mode and the rest of character creation as ONE screen, so this is the same move as title->new_game. Spelled out rather than aliased: an edge whose steps you have to look somewhere else to read is how recipes drifted."
+    },
+    {
+      "app": "raves",
+      "from": "title",
+      "to": "new_game",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "click_text": "New Game",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "node": "new_game"
+      },
+      "timeout": 12,
+      "note": "new_game is the chargen CONTAINER; detection reports the deepest match (game_mode), and assert passes a node that is on the current path, so landing on the first card satisfies this."
     }
   ]
 }

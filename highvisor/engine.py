@@ -38,6 +38,22 @@ def _slim_state(st):
             "extra": st.get("extra")}
 
 
+def _step_ok(ok, detail=None, error=None):
+    """A step result that carries `error` ONLY when it failed.
+
+    Trivial, and worth a name: the obvious `{"ok": r.ok, "error": r.error or "key failed"}`
+    stamps a fallback message onto SUCCESSES too, so a passing route prints a column of
+    "activate failed / key failed" next to ok=True. Read six months from now that is a
+    bug report about a working feature.
+    """
+    out = {"ok": bool(ok)}
+    if detail:
+        out["detail"] = detail
+    if not ok and error:
+        out["error"] = error
+    return out
+
+
 def _ocr_find(boxes, want):
     """Find the OCR line for a UI label. Space-insensitive: Vision splits tight
     monospace ('Options' -> 'Opti ons' on Raves' Source Code Pro), so compare with
@@ -1293,8 +1309,7 @@ class Engine:
                     if step["goto"] in (cur.get("path") or []):
                         return {"ok": True, "detail": "already within"}
                 r = self._gamego(b, app, step["goto"], _depth + 1)
-                return {"ok": bool(r.get("ok")), "detail": r.get("detail", ""),
-                        "error": r.get("error", "goto failed")}
+                return _step_ok(r.get("ok"), r.get("detail"), r.get("error") or "goto failed")
 
             if "launch" in step:
                 cfg = gametree.apps(tree).get(app, {})
@@ -1305,7 +1320,7 @@ class Engine:
                 if not spec:
                     return {"ok": False, "error": "no launcher %r" % step["launch"]}
                 r = b.launch(spec, largs)
-                return {"ok": bool(r.ok), "detail": r.detail, "error": r.error or "launch failed"}
+                return _step_ok(r.ok, r.detail, r.error or "launch failed")
 
             if "restart" in step:
                 # The last-resort edge: kills every instance (duplicates included), relaunches,
@@ -1313,8 +1328,8 @@ class Engine:
                 # 120 in the cost table so the planner reaches for it only when nothing else can
                 # get out of where we are.
                 r = self._restart_app(b, step["restart"])
-                return {"ok": bool(r.get("ok")), "detail": "restarted %s" % step["restart"],
-                        "error": r.get("error", "restart failed")}
+                return _step_ok(r.get("ok"), "restarted %s" % step["restart"],
+                                r.get("error") or "restart failed")
 
             if "wait_window" in step:
                 deadline = time.monotonic() + float(step.get("timeout", 30))
@@ -1331,7 +1346,7 @@ class Engine:
                     return {"ok": False, "error": "no window %r" % step["activate"]}
                 r = b.activate(win.id)
                 time.sleep(0.6)
-                return {"ok": bool(r.ok), "error": r.error or "activate failed"}
+                return _step_ok(r.ok, None, r.error or "activate failed")
 
             if "click_hover" in step or "click" in step:
                 key = "click_hover" if "click_hover" in step else "click"
@@ -1351,15 +1366,36 @@ class Engine:
                 if win is None:
                     return {"ok": False, "error": "no window %r" % step.get("window")}
                 want = str(step["click_text"]).strip().lower()
-                try:
-                    ocr = b.ocr(win.id)
-                except Exception as e:
-                    return {"ok": False, "error": "ocr failed: %s" % e}
-                boxes = ocr.get("boxes") or []
-                hit = _ocr_find(boxes, want)
+                # POLL, don't snapshot. Qud's window does not repaint while unfocused, so the
+                # first frame after an `activate` is whatever was on screen BEFORE — the
+                # documented settle is ~2s and `activate` waits 0.6. A single OCR therefore
+                # read the old screen and failed to find a label that was plainly there:
+                # `goto qud in_game` from the title reported "text 'continue' not on screen
+                # (14 ocr lines)" while looking straight at Continue. The 14 lines were the
+                # in-game HUD it had just left.
+                #
+                # Retrying also covers the honest second case -- a menu still animating in --
+                # and costs nothing when the text is already up, which is the normal path.
+                # Deliberately NOT fixed by sleeping longer after activate: that taxes every
+                # step to serve the one that reads pixels.
+                deadline = time.monotonic() + float(step.get("timeout", 6.0))
+                hit, boxes, tries = None, [], 0
+                while True:
+                    tries += 1
+                    try:
+                        ocr = b.ocr(win.id)
+                    except Exception as e:
+                        return {"ok": False, "error": "ocr failed: %s" % e}
+                    boxes = ocr.get("boxes") or []
+                    hit = _ocr_find(boxes, want)
+                    if hit is not None or time.monotonic() >= deadline:
+                        break
+                    time.sleep(0.5)
                 if hit is None:
                     return {"ok": False,
-                            "error": "text %r not on screen (%d ocr lines)" % (want, len(boxes))}
+                            "error": "text %r not on screen after %d OCR passes (%d lines: %s)"
+                            % (want, tries, len(boxes),
+                               ", ".join(x.get("text", "") for x in boxes[:8]))}
                 bx, by, bw, bh = hit["bbox"]
                 # ocr bbox is in CAPTURE px; clicks are window points (Retina shot = 2x)
                 scale = (float(ocr.get("w") or win.w) / float(win.w)) if win.w else 1.0
@@ -1380,7 +1416,7 @@ class Engine:
                     return {"ok": False, "error": "no window %r" % step.get("window")}
                 r = b.key(win.id, step["key"], focus=True)
                 time.sleep(0.4)
-                return {"ok": bool(r.ok), "error": r.error or "key failed"}
+                return _step_ok(r.ok, None, r.error or "key failed")
 
             if "sleep" in step:
                 time.sleep(float(step["sleep"]))
@@ -1413,13 +1449,39 @@ class Engine:
                 return {"ok": True,
                         "detail": "%s + %d answer(s)" % (step["command"], len(answers))}
 
+            if "load_save" in step:
+                # Load a save through the mod's own `loadsave {id}` bridge command: exact ID,
+                # no coordinates, no OCR, and it opens Qud's picker itself from the title.
+                #
+                # This replaced a blind {"click_hover": [900, 190]} "top save row" that the
+                # recipe had carried for months and that failed here on the first live run of
+                # the planner -- the same top-row roulette `hv loadsave` was written to end,
+                # still hiding inside the one recipe nobody had re-driven. Take the value as a
+                # NAME, or {"row": n} to resolve it from DISK metadata (which is what makes it
+                # generic: the graph should not hardcode a character).
+                sel = step["load_save"]
+                name = sel
+                if not isinstance(sel, str):
+                    row = int((sel or {}).get("row", 0))
+                    saves = self._qud_saves()
+                    if not saves.get("ok"):
+                        return _step_ok(False, None, saves.get("error", "save list failed"))
+                    match = next((s for s in saves.get("saves") or [] if s.get("row") == row), None)
+                    if match is None:
+                        return _step_ok(False, None, "no save at row %d (%d saves)"
+                                        % (row, len(saves.get("saves") or [])))
+                    name = match["name"]
+                r = self._load_save(b, name)
+                return _step_ok(r.get("ok"), "loaded %r via %s" % (name, r.get("via", "")),
+                                r.get("error") or "load failed")
+
             if "dock" in step:
                 # place the window by its standing dock rule (Raves stacks above Qud with the
                 # anchor's size) -- a fresh solo launch otherwise lands wherever the OS puts it
                 # and window-relative clicks assume the standard 1920x1080 slot.
                 r = self._dock(b, step["dock"])
                 time.sleep(0.4)
-                return {"ok": bool(r.get("ok")), "error": r.get("error", "dock failed")}
+                return _step_ok(r.get("ok"), None, r.get("error") or "dock failed")
 
             if "dismiss" in step:
                 return self._run_dismiss(b, app, tree, step)

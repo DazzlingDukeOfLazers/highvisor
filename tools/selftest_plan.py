@@ -195,7 +195,24 @@ def real():
           r["ok"] and [e["to"] for e in r["route"]] == ["title", "in_game", "status_skills"],
           plan.summarize(r))
 
-    # 6. preflight rules are well-formed (they run before every driven route)
+    # 6. no node should carry a legacy `goto` recipe the graph can already reach. The
+    #    recipes were all removed once the transitions covered them; one reappearing means
+    #    two descriptions of the same move, which is the drift this refactor existed to end.
+    #    (A recipe for a node the graph CANNOT reach is legitimate — that is the fallback.)
+    dupes = []
+
+    def walk(n):
+        for app in (n.get("goto") or {}):
+            if plan.route(tree, app, plan.UNKNOWN, n["id"]).get("ok"):
+                dupes.append("%s:%s" % (app, n["id"]))
+        for c in n.get("children") or []:
+            walk(c)
+
+    walk(tree["root"])
+    check("no legacy recipe duplicates a route the graph already has", not dupes,
+          ", ".join(dupes))
+
+    # 7. preflight rules are well-formed (they run before every driven route)
     for app in apps:
         for rule in plan.preflight(tree, app):
             check("%s preflight rule has when+steps" % app,

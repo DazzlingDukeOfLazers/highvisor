@@ -109,8 +109,14 @@ the standard 1920×1080 slots; re-measure if the layout changes.
 - `hv plan <app> <node> [--from <state>]` — the route `hv goto` would take, driving NOTHING.
 - `python3 tools/selftest_plan.py` — stdlib only, no daemon, no apps. Proves every target is
   reachable from every state we might be found in. Run it with any transition edit.
-- Legacy `goto[app]` recipes still run for nodes the graph cannot reach, and the result says
-  which driver was used. Full write-up: `docs/05-driving-input.md`.
+- The 20 legacy `goto[app]` recipes are GONE (2026-08-06) — the graph covers every node that
+  had one. The fallback code stays, so adding a recipe for an unmodelled node still works,
+  but `selftest_plan.py` fails if one reappears for a node the graph can already reach.
+- `click_text` POLLS the OCR to a deadline: Qud does not repaint unfocused, so a single
+  snapshot read the previous screen and "Continue is not on screen" meant "I am looking at
+  a stale frame". Never load a save by clicking a row — `{"load_save": {"row": n}}` goes
+  through the mod's `loadsave {id}` with the id resolved from DISK.
+- Full write-up: `docs/05-driving-input.md`.
 
 ## hv assert — the TDD primitive
 

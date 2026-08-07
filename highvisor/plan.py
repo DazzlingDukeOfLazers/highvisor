@@ -62,6 +62,7 @@ DEFAULT_COSTS = {
     "command": 4,
     "dismiss": 4,
     "wait_window": 5,
+    "load_save": 6,
     "click_text": 10,
     "launch": 60,
     "restart": 120,
