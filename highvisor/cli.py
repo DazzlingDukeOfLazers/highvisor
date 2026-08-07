@@ -67,6 +67,24 @@ def _cmd_ping(a):
     _print_json(_call({"op": P.OP_PING}))
 
 
+def _screen_recording_warning(targets):
+    """A one-line diagnosis for the failure that otherwise surfaces three layers away.
+
+    Without the Screen Recording grant macOS does not refuse the window list — it returns it
+    with every TITLE blanked, and captures come back empty. Downstream that reads as
+    "no window for app 'raves'", or an OCR step reporting "text 'continue' not on screen"
+    while looking straight at Continue. Several windows and not one title is the signature;
+    say so HERE, where it is one fact, instead of leaving it to be rediscovered.
+    """
+    named = [t for t in targets if (t.get("title") or "").strip()]
+    if len(targets) >= 3 and not named:
+        return ("!! %d windows, NONE with a title — the daemon has no Screen Recording grant.\n"
+                "   Captures and OCR will return nothing. Grant it to whatever runs the daemon:\n"
+                "   System Settings > Privacy & Security > Screen Recording (the bundle is "
+                "\"Highvisor\" if installed via `hv install-daemon`)." % len(targets))
+    return None
+
+
 def _cmd_ls(a):
     resp = _call({"op": P.OP_LIST})
     if not resp.get("ok"):
@@ -76,6 +94,9 @@ def _cmd_ls(a):
         mark = "*" if t.get("focused") else " "
         print("%s %-16s pid=%-6d %4dx%-4d  %s"
               % (mark, t["id"], t["pid"], t["w"], t["h"], t["title"]))
+    warn = _screen_recording_warning(resp.get("targets", []))
+    if warn:
+        print("\n" + warn)
 
 
 def _cmd_shot(a):
@@ -315,17 +336,39 @@ def _cmd_abort(a):
 
 
 def _cmd_install_daemon(a):
-    """Write + bootstrap the launchd KeepAlive agent so the daemon restarts itself on
-    crash (code changes already re-exec in place). Stops any manually-run daemon first."""
+    """Write + bootstrap the launchd KeepAlive agent so the daemon restarts itself on crash
+    (code changes already re-exec in place).
+
+    Runs it through **Highvisor.app**, and that is the whole point of the bundle. macOS
+    attributes Screen Recording to a "responsible process": a daemon started from a terminal
+    inherits the terminal's grant, and the identical binary started by launchd does not — so
+    the first version of this command traded screen capture for crash survival, and the
+    symptom was three layers away (blank window titles -> "no window for app 'raves'" ->
+    "text 'continue' not on screen"). The bundle gives macOS ONE thing to grant that survives
+    venv rebuilds, Python upgrades and every source edit. Built here if missing.
+    """
     import os
     import plistlib
     import subprocess
     import sys
+    import time
     repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    app = os.path.join(repo, "build", "Highvisor.app")
+    exe = os.path.join(app, "Contents", "MacOS", "Highvisor")
+    if not os.path.exists(exe):
+        print("building %s …" % app)
+        b = subprocess.run([os.path.join(repo, "tools", "make_app.sh")],
+                           capture_output=True, text=True)
+        print((b.stdout or "").rstrip())
+        if b.returncode != 0:
+            print("could not build the app bundle:\n%s" % (b.stderr or "").rstrip())
+            print("falling back to the bare interpreter — expect NO screen capture under launchd")
+    program = [exe] if os.path.exists(exe) else [sys.executable, "-m", "highvisor.server"]
+
     label = "com.highvisor.daemon"
     plist = {
         "Label": label,
-        "ProgramArguments": [sys.executable, "-m", "highvisor.server"],
+        "ProgramArguments": program,
         "WorkingDirectory": repo,
         "KeepAlive": True,
         "RunAtLoad": True,
@@ -336,14 +379,40 @@ def _cmd_install_daemon(a):
     with open(path, "wb") as fh:
         plistlib.dump(plist, fh)
     uid = os.getuid()
-    subprocess.run(["launchctl", "bootout", "gui/%d/%s" % (uid, label)],
-                   capture_output=True)
+    # A manually-run daemon would hold port 48720 and the launchd job would die on every
+    # restart attempt — which looks exactly like a broken agent. Clear it first rather than
+    # telling the user about it afterwards.
+    subprocess.run(["pkill", "-f", "highvisor.server"], capture_output=True)
+    subprocess.run(["launchctl", "bootout", "gui/%d/%s" % (uid, label)], capture_output=True)
+    time.sleep(1.5)
     r = subprocess.run(["launchctl", "bootstrap", "gui/%d" % uid, path],
                        capture_output=True, text=True)
-    print("plist: %s" % path)
-    print("interpreter: %s" % sys.executable)
+    print("plist:   %s" % path)
+    print("program: %s" % " ".join(program))
     print("bootstrap: %s" % ("ok" if r.returncode == 0 else (r.stderr.strip() or "failed")))
-    print("NOTE: stop any manually-run daemon first (port clash); logs -> ~/Library/Logs/highvisor.log")
+    print("logs -> ~/Library/Logs/highvisor.log")
+    if r.returncode != 0:
+        return 1
+
+    # VERIFY, do not assume. The agent can be running perfectly and still be unable to see a
+    # single window title, which is the failure this whole bundle exists to make fixable.
+    for _ in range(12):
+        time.sleep(1.0)
+        resp = _call({"op": P.OP_LIST})
+        if resp.get("ok"):
+            break
+    else:
+        print("\n!! the agent is bootstrapped but the daemon is not answering on 48720 — "
+              "check the log")
+        return 1
+    warn = _screen_recording_warning(resp.get("targets", []))
+    if warn:
+        print("\n" + warn)
+        print("\n   The bundle is now registered, so \"Highvisor\" should be listed there.\n"
+              "   Enable it, then re-run `hv install-daemon` — it boots the agent out and back\n"
+              "   in, which is what makes the new grant take effect.")
+        return 1
+    print("\nscreen capture: OK (%d windows, titles readable)" % len(resp.get("targets", [])))
 
 
 def _cmd_diff(a):

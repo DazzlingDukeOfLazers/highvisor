@@ -23,11 +23,22 @@ fix compounds. Concretely:
 | blind top-row Continue clicks | `hv loadsave <name>` (row computed from DISK metadata — `hv saves` lists them, no game launch) |
 
 The daemon **self-restarts** (2026-08-03): a source watcher re-execs it when any highvisor `.py`
-changes (edit → it picks itself up in ~2s), and the launchd KeepAlive agent is INSTALLED (2026-08-06,
-`com.highvisor.daemon`) so a crash respawns it — verified by `kill -9`: new pid, port
-listening ~5s later. Its plist pins the interpreter to `.venv/bin/python`, so rebuilding
-the venv at a different path means re-running `hv install-daemon`. Logs:
-`~/Library/Logs/highvisor.log`. **You cannot check that by PID or uptime** — `os.execv` replaces the
+changes (edit → it picks itself up in ~2s), and the launchd KeepAlive agent is INSTALLED
+(`com.highvisor.daemon`) so a crash respawns it — verified by `kill -9`: new pid, port listening
+~5s later. Logs: `~/Library/Logs/highvisor.log`.
+
+**The agent runs Highvisor.app, and that is not cosmetic.** macOS attributes Screen Recording to
+a *responsible process*: a daemon started from a terminal inherits the terminal's grant, the
+identical binary started by launchd does not. Measured A/B, same venv interpreter: launchd-spawned
+saw every window title as blank, shell-spawned read them fine — and the symptom surfaces three
+layers away as `no window for app 'raves'` or `text 'continue' not on screen` while looking
+straight at Continue. `tools/make_app.sh` builds `build/Highvisor.app`: an ad-hoc-signed bundle
+whose tiny C stub **forks** the venv python and stays alive as its parent (an `execv` stub would
+defeat the point — the process image would become the interpreter again, and responsibility flows
+parent→child). Grant "Highvisor" Screen Recording ONCE and it survives venv rebuilds, Python
+upgrades and every source edit. `hv install-daemon` builds it if missing, kills any manually-run
+daemon (port clash), bootstraps, then **verifies capture works** and prints the remedy if not.
+`hv ls` warns too: several windows and not one title is the signature. **You cannot check that by PID or uptime** — `os.execv` replaces the
 process image in place, so both are PRESERVED across a re-exec. A daemon showing hours of uptime
 may well be running code you saved a minute ago. To tell, grep the daemon log for
 `source changed: … — re-exec`, or call an op and look for behaviour only the new code has. (Cost
