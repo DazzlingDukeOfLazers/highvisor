@@ -271,7 +271,8 @@ class WindowsBackend(PlatformBackend):
         return ActionResult(ok=True, detail="launch %s" % " ".join([spec] + args))
 
     def click(self, target: str, x: int, y: int, button: str = "left",
-              double: bool = False, hover: bool = False) -> ActionResult:
+              double: bool = False, hover: bool = False,
+              modifiers: Optional[str] = None) -> ActionResult:
         hwnd = self._resolve(target)
         if hwnd is None:
             return ActionResult.fail("click needs a window target")
@@ -306,14 +307,33 @@ class WindowsBackend(PlatformBackend):
         else:
             _move(gx, gy)
             time.sleep(0.02)
-        dn, up = (0x0008, 0x0010) if button == "right" else (0x0002, 0x0004)
-        for _ in range(2 if double else 1):
-            user32.mouse_event(dn, 0, 0, 0, 0)
-            user32.mouse_event(up, 0, 0, 0, 0)
-            time.sleep(0.02)
+        # MODIFIERS held across the button pair (ctrl / alt / shift, "+"-joined).
+        # Qud's Map Editor makes these core verbs — Ctrl+Click paints from the
+        # palette, Alt+Click samples back into it — so a click without them can
+        # only ever look at that screen, never drive it. Scan-code SendInput for
+        # the same reason `key --focus` uses it: Unity's raw input drops VK-only
+        # synthetics. Always released in a finally, so a failure mid-click cannot
+        # leave a modifier stuck down for the whole desktop.
+        mods = [m.strip().lower() for m in (modifiers or "").split("+") if m.strip()]
+        vk_for = {"ctrl": 0x11, "control": 0x11, "alt": 0x12, "shift": 0x10}
+        held = [vk_for[m] for m in mods if m in vk_for]
+        try:
+            for vk in held:
+                self._send_vk_scancode(vk, down=True, up=False)
+            if held:
+                time.sleep(0.04)
+            dn, up = (0x0008, 0x0010) if button == "right" else (0x0002, 0x0004)
+            for _ in range(2 if double else 1):
+                user32.mouse_event(dn, 0, 0, 0, 0)
+                user32.mouse_event(up, 0, 0, 0, 0)
+                time.sleep(0.02)
+        finally:
+            for vk in reversed(held):
+                self._send_vk_scancode(vk, down=False, up=True)
         return ActionResult(ok=True, tier=4,
-                            detail="%s%s click @ (%d,%d)"
-                                   % ("double " if double else "", button, gx, gy))
+                            detail="%s%s%s click @ (%d,%d)"
+                                   % ("+".join(mods) + " " if mods else "",
+                                      "double " if double else "", button, gx, gy))
 
     def screenshot(self, target: Optional[str], native: bool = False) -> bytes:
         # `native` is a macOS/ScreenCaptureKit distinction; the Windows path is
@@ -492,8 +512,10 @@ class WindowsBackend(PlatformBackend):
         return ActionResult(ok=False, tier=None,
                             error="tier1(%s); no child hwnd for tier2" % tier1_err)
 
-    def _send_vk_scancode(self, vk: int) -> None:
-        """Press+release one virtual key via SendInput WITH its hardware scan code.
+    def _send_vk_scancode(self, vk: int, down: bool = True, up: bool = True) -> None:
+        """Press and/or release one virtual key via SendInput WITH its hardware scan
+        code. ``down``/``up`` split the pair so a modifier can be HELD across another
+        event (Ctrl+Click); the default sends both, i.e. a tap.
         Games reading raw input (Unity's Input System) need the scan code; a
         VK-only event is silently dropped for some keys. Arrow/nav keys are
         extended-flag keys — without KEYEVENTF_EXTENDEDKEY they alias numpad."""

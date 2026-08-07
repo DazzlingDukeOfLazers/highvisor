@@ -714,9 +714,9 @@
               {
                 "id": "map_editor",
                 "label": "Map Editor",
-                "note": "80x25 canvas + searchable blueprint palette (In Use filter) + File/Edit/Transform/View/Recent menu bar; Ctrl+Click paint, Alt+Click pick, Ctrl+Z/Y. Exit: File [90,33] > Exit [129,520] > confirm Yes [1851,1110] -> returns to the TOOLKIT menu (unlike the Back-to-title tools). Also flips the legacy view to 'MapEditor' — which then STAYS stale after exit; trust `scene` (window-priority), not `view`.",
+                "note": "Qud's map editor: an 80x25 cell canvas with a blueprint palette. WALKED LIVE at 1920x1080 on Lumpy (Qud 1.0.5, 2026-08-06) — every menu opened and captured; the command surface below is cross-checked against Overlay.MapEditor.MapEditorView by reflection, so it includes verbs that have no menu entry. LAYOUT: menu bar y=16 (File x46, Edit x112, Transform x203, View x293, Recent x369), title 'Map Editor' centred x959; canvas x50..1470 y208..872 (80x25 => cell ~17.7x26.6) with a green cell cursor; palette panel x1524..1920 — filter field 'Enter text...' at y4..30, a '[ ] In Use' toggle at y46 (right edge), the blueprint list with per-row tile icons, and readouts at the bottom: 'Mouse Position: X, Y' + 'Brush: <name>' (y695) and 'Selected Cell: X, Y|none' (y716); control hints bottom-left y1029/y1045. EXIT: File > Exit > confirm Yes returns to the TOOLKIT menu, and it leaves the legacy view string stuck at 'MapEditor' — trust `scene` (window-priority), not `view`.",
                 "done": {
-                  "qud": 0.9,
+                  "qud": 0.95,
                   "raves": 0.0
                 },
                 "detect": {
@@ -742,10 +742,171 @@
                 },
                 "children": [
                   {
-                    "id": "map_editor_file_menu",
-                    "label": "File menu (New/Load/Test/Save/Save As/Reload Blueprints/Exit)",
+                    "id": "me_menu_file",
+                    "label": "File menu",
+                    "note": "New map (Ctrl+N) · Load map... (Ctrl+O) · Test (Ctrl+T) · Save (Ctrl+S) · Save As... | Reload Blueprints | Exit. Captured; MapEditorView backs these with NewMap/LoadMap/RunTest+BuildTestZone/Save/SaveAs/_ReloadBlueprints/Exit. Open at [46,16]; Exit at [64,260], confirm Yes at [925,555].",
                     "done": {
-                      "qud": 0.7,
+                      "qud": 0.95,
+                      "raves": 0.0
+                    },
+                    "detect": {},
+                    "goto": {
+                      "qud": [
+                        {
+                          "goto": "map_editor"
+                        },
+                        {
+                          "click_hover": [
+                            46,
+                            16
+                          ],
+                          "window": "CavesOfQud"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "me_menu_edit",
+                    "label": "Edit menu",
+                    "note": "Select All (Ctrl+A) · Undo (Ctrl+Z) · Redo (Ctrl+Y). Captured. MapEditorView: SelectAll/Undo/Redo over UndoStack+RedoStack, with ReverseAction as the primitive.",
+                    "done": {
+                      "qud": 0.95,
+                      "raves": 0.0
+                    },
+                    "detect": {},
+                    "goto": {
+                      "qud": [
+                        {
+                          "goto": "map_editor"
+                        },
+                        {
+                          "click_hover": [
+                            112,
+                            16
+                          ],
+                          "window": "CavesOfQud"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "me_menu_transform",
+                    "label": "Transform menu",
+                    "note": "Flip Horizontal · Flip Vertical (no hotkeys). Captured. MapEditorView: FlipHorizontal/FlipVertical — they act on SelectedRegion when one is set.",
+                    "done": {
+                      "qud": 0.95,
+                      "raves": 0.0
+                    },
+                    "detect": {},
+                    "goto": {
+                      "qud": [
+                        {
+                          "goto": "map_editor"
+                        },
+                        {
+                          "click_hover": [
+                            203,
+                            16
+                          ],
+                          "window": "CavesOfQud"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "me_menu_view",
+                    "label": "View menu",
+                    "note": "Toggle NorthSheva Overlay (Ctrl+F1) — the ONLY item. It overlays the NorthSheva artwork as a tracing guide (MapEditorView.ToggleOverlay); that same sprite, NorthShevaTransparent, is the BackdropWindow asset found during the toolkit backdrop hunt.",
+                    "done": {
+                      "qud": 0.95,
+                      "raves": 0.0
+                    },
+                    "detect": {},
+                    "goto": {
+                      "qud": [
+                        {
+                          "goto": "map_editor"
+                        },
+                        {
+                          "click_hover": [
+                            293,
+                            16
+                          ],
+                          "window": "CavesOfQud"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "me_menu_recent",
+                    "label": "Recent menu",
+                    "note": "Recently-opened maps (MapEditorView RecentMenu/AddRecentFile/UpdateRecent/RecentClick, persisted via WriteModSettings). EMPTY on a fresh install — verified: opening it drew no panel, which is the expected zero-state, not a failure.",
+                    "done": {
+                      "qud": 0.9,
+                      "raves": 0.0
+                    },
+                    "detect": {},
+                    "goto": {
+                      "qud": [
+                        {
+                          "goto": "map_editor"
+                        },
+                        {
+                          "click_hover": [
+                            369,
+                            16
+                          ],
+                          "window": "CavesOfQud"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "me_canvas",
+                    "label": "Canvas (80x25 cell grid)",
+                    "note": "x50..1470 y208..872; green cell cursor follows the mouse; left-click sets Selected Cell (readout updates), drag sets SelectedRegion (MapEditorView _dragStart/_dragDelta/isDragging, RenderSelectionFrame).",
+                    "done": {
+                      "qud": 0.9,
+                      "raves": 0.0
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "me_palette",
+                    "label": "Blueprint palette + filter",
+                    "note": "Right panel: a text filter ('Enter text...', MapEditorView UpdateFilter/_DataFilter) over the full blueprint list with per-row tile icons, plus an 'In Use' checkbox (SetFilterUsed/_FilterUsed) limiting the list to blueprints already placed. Clicking a row sets the brush — VERIFIED: clicking row 'Across1' made the readout show 'Brush: Across1' (SetBrush/SetSelectedBlueprint/GetBrushText).",
+                    "done": {
+                      "qud": 0.9,
+                      "raves": 0.0
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "me_status",
+                    "label": "Status readouts (mouse / brush / selected cell)",
+                    "note": "'Mouse Position: X, Y' + 'Brush: <name>' at y695, 'Selected Cell: X, Y' (or 'none') at y716 — MapEditorView UpdateHoverXY/UpdateSelectedXY/GetBrushText. These are the cheapest live assertions for a driven map-editor test.",
+                    "done": {
+                      "qud": 0.95,
+                      "raves": 0.0
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "me_controls",
+                    "label": "Mouse + keyboard controls",
+                    "note": "On-screen hints: Ctrl+Click = paint from palette, Alt+Click = sample cell into palette, Ctrl+Z = undo, Ctrl+Y = redo. Menu hotkeys add Ctrl+N/O/T/S/A and Ctrl+F1. DRIVABLE since hv click grew --mod (ctrl/alt/shift held across the click) — added for exactly this screen.",
+                    "done": {
+                      "qud": 0.9,
+                      "raves": 0.0
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "me_context_menu",
+                    "label": "Cell/region context menu (right-click)",
+                    "note": "NOT YET CAPTURED — an honest gap. Right-click over an empty cell, and over one after a Ctrl+Click paint, both produced no panel in this pass, so its trigger is still unknown (needs a placed object confirmed present, or a dragged region). Its CONTENTS are known from MapEditorView regardless: DisplayContextInRegion, Flood, DeleteInRegion, ReplaceInRegion, SetOwnerInRegion/SetOwnerForContext, AddPropertyForContext, AddIntPropertyForContext, RemovePropertyForContext, SetPartForContext — i.e. the per-cell/region editing verbs that appear nowhere in the menu bar. Next step for this leaf.",
+                    "done": {
+                      "qud": 0.3,
                       "raves": 0.0
                     },
                     "detect": {}
@@ -753,8 +914,9 @@
                   {
                     "id": "map_editor_exit_confirm",
                     "label": "Exit confirm (lose unsaved changes? Yes/No)",
+                    "note": "File > Exit raises 'Are you sure you want to go back and lose any unsaved changes?' with Yes/No; Yes returns to the toolkit menu. Yes at [925,555] (1080p).",
                     "done": {
-                      "qud": 0.7,
+                      "qud": 0.95,
                       "raves": 0.0
                     },
                     "detect": {}
