@@ -1124,6 +1124,28 @@ class Engine:
                 return False
         return True
 
+    @staticmethod
+    def _dismiss_fingerprint(st, scene=None):
+        """What "the screen changed" MEANS for a dismiss step.
+
+        The kind of popup is not enough to tell one modal from the next of the same kind, and
+        the quit chain is exactly that: "are you sure you want to quit?" then "do you want to
+        save first?", both reported as `message`. Answering the first raises the second, the
+        (scene, popup) pair comes back identical, and the step reports "dismiss ran but popup
+        message is still up" about an answer that landed — measured 2026-08-07, and it failed
+        the whole route roughly every other attempt depending on which confirm was up when the
+        drive started.
+
+        `popup_n` is Raves' count of popups RAISED this run, so a replacement modal moves it.
+        Apps that do not report one degrade to the old pair, which is what Qud does (it reports
+        no popup state of its own, which is why its edges answer blind chains instead).
+        """
+        sig = st.get("signals") or {}
+        extra = st.get("extra") or {}
+        return (str(scene if scene is not None else (sig.get("scene") or "")).lower(),
+                str(extra.get("popup") or "").lower(),
+                str(extra.get("popup_n") or ""))
+
     def _preflight(self, b, app, tree):
         """Clear conditions that sit ON TOP of a state, before planning against it.
 
@@ -1684,8 +1706,7 @@ class Engine:
         # branch serve all three shapes: closing a screen moves the scene, raising a confirm
         # moves the popup, and answering one moves the popup back -- CmdQuit does the middle,
         # and demanding a scene change failed it even though it had worked.
-        before = (str(scene).lower(),
-                  str(((cur.get("extra") or {}).get("popup")) or "").lower())
+        before = self._dismiss_fingerprint(cur, scene)
         if not hit:
             return {"ok": True, "detail": "not present"}
         cfg = gametree.apps(tree).get(app, {})
@@ -1753,8 +1774,7 @@ class Engine:
         for _ in range(8):
             time.sleep(0.7)
             cur2 = (self._gamestate(b).get("states", {}).get(app) or {})
-            now = (str((cur2.get("signals") or {}).get("scene") or "").lower(),
-                   str(((cur2.get("extra") or {}).get("popup")) or "").lower())
+            now = self._dismiss_fingerprint(cur2)
             if now != before:
                 return {"ok": True, "detail": "dismissed %s" % what}
         return {"ok": False, "error": "dismiss ran but %s is still up" % what}
