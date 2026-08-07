@@ -128,7 +128,14 @@ class Engine:
             return {"ok": True, "backend": b.name, "version": __version__}
 
         if op == P.OP_LIST:
-            return {"ok": True, "targets": [t.to_dict() for t in b.list_targets()]}
+            from .apps import classify_target
+            rows = []
+            for t in b.list_targets():
+                d = t.to_dict()
+                d["role"] = classify_target(d.get("title"), d.get("class_name"),
+                                            d.get("path", ""))
+                rows.append(d)
+            return {"ok": True, "targets": rows}
 
         if op == P.OP_SHOT:
             png = b.screenshot(req.get("target"), native=bool(req.get("native")))

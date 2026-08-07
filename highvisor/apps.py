@@ -21,3 +21,37 @@ PROFILES = {
         "off_state": "off",
     },
 }
+
+# ---------------------------------------------------------------- classification
+
+import re
+
+_RAVES_OWNER = re.compile(r"raves.?of.?qud|ravesofqud", re.I)
+_QUD_OWNER = re.compile(r"caves ?of ?qud|cavesofqud", re.I)
+
+
+def classify_target(title, class_name="", path=""):
+    """``"raves"`` / ``"qud"`` / ``None`` for one window record — THE pair
+    classifier, one implementation for every consumer on every OS (the cockpit's
+    classifyRavesQud reads the ``role`` field this stamps onto list_targets rows;
+    JS-side rules previously drifted per-OS and broke the Start flow on Windows).
+
+    Title-only matching is never trusted alone — a browser tab or terminal
+    showing "raves-of-qud" must not classify (the exception: Qud's EXACT caption
+    on its Unity window class). macOS reports the owning app in class_name/path
+    ("RavesOfQud", "CavesOfQud", "CoQ.app"); Windows reports the Win32 window
+    class (Godot = "Engine", Unity = "UnityWndClass") with the caption in title;
+    the Godot EDITOR is excluded by its "<project> - Godot Engine" title.
+    Verified fixtures: tools/test_cockpit_classify.py (SPOT tier)."""
+    t = (title or "").lower()
+    o = (class_name or "").lower()
+    p = (path or "").lower()
+    if _RAVES_OWNER.search(o) or _RAVES_OWNER.search(p):
+        return "raves"
+    if o in ("godot", "engine") and "raves" in t and "godot engine" not in t:
+        return "raves"
+    if _QUD_OWNER.search(o) or "coq.app" in p or _QUD_OWNER.search(p):
+        return "qud"
+    if o == "unitywndclass" and t == "cavesofqud":
+        return "qud"
+    return None

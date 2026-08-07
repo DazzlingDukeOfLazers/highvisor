@@ -390,6 +390,13 @@ function _isQud(t) {
 // can spot duplicates).
 function classifyRavesQud(targets) {
   const list = targets || [];
+  // The daemon classifies (highvisor.apps.classify_target — ONE implementation,
+  // both OSes) and stamps `role` on every list_targets row. Trust it when
+  // present; the local regex rules remain only as the older-daemon fallback.
+  if (list.some(t => "role" in t)) {
+    return { raves: list.filter(t => t.role === "raves"),
+             qud: list.filter(t => t.role === "qud") };
+  }
   return { raves: list.filter(_isRaves), qud: list.filter(_isQud) };
 }
 
@@ -536,19 +543,27 @@ async function applyPairLayoutOverride() {
   }
 }
 
-// {raves, qud} monitor rects for the machine pair stage — non-null only when this
-// machine defines a "pair" layout AND has 2+ displays. Raves gets the main display,
-// Qud the other, mirroring the pair layout's monitor-per-app arrangement.
-async function machinePairMonitors() {
+// The machine pair stage for W×H windows — non-null only when this machine
+// defines a "pair" layout. Stacks the column on the MAIN display when two rows
+// fit (Raves above Qud, centered, small margins — the portrait-monitor stage);
+// else one app per display; null → callers use the built-in Mac slot math.
+async function machinePairStage(W, H) {
   try {
     const l = await rpc("layouts");
     const names = (l.ok && l.layouts ? l.layouts : []).map(x => x.name);
     if (!names.includes("pair")) return null;
     const d = await rpc("displays");
-    if (!d.ok || !d.displays || d.displays.length < 2) return null;
+    if (!d.ok || !d.displays || !d.displays.length) return null;
     const main = d.displays.find(m => m.main) || d.displays[0];
-    const other = d.displays.find(m => m !== main);
-    return { raves: main, qud: other };
+    const GAP = 8, TOP = 40;
+    if (main.h >= TOP + 2 * H + GAP && main.w >= W) {
+      const x = main.x + Math.floor((main.w - W) / 2);
+      return { ravesRect: { x, y: main.y + TOP, w: W, h: H },
+               qudRect:   { x, y: main.y + TOP + H + GAP, w: W, h: H } };
+    }
+    const other = d.displays.find(m => m !== main) || main;
+    return { ravesRect: { x: main.x, y: main.y, w: W, h: H },
+             qudRect:   { x: other.x, y: other.y, w: W, h: H } };
   } catch (e) {
     return null;
   }
@@ -636,13 +651,12 @@ async function userTestLayout(W, H) {
   const btns = document.querySelectorAll(".ut");
   btns.forEach(b => (b.disabled = true));
   try {
-    // Machine pair-stage (a "pair" layout + 2+ displays): W×H each, anchored at its
-    // monitor's origin — Raves on the main display, Qud on the other. The windows
-    // keep the chosen test resolution instead of being stretched over the monitors.
-    const pm = await machinePairMonitors();
+    // Machine pair-stage (a "pair" layout): the W×H column on the main display
+    // (or one app per monitor when the column doesn't fit) instead of Mac slots.
+    const pm = await machinePairStage(W, H);
     if (pm) {
-      await rpc("move", { target: raves[0].id, x: pm.raves.x, y: pm.raves.y, w: W, h: H, topmost: false });
-      await rpc("move", { target: qud[0].id, x: pm.qud.x, y: pm.qud.y, w: W, h: H, topmost: false });
+      await rpc("move", { target: raves[0].id, ...pm.ravesRect, topmost: false });
+      await rpc("move", { target: qud[0].id, ...pm.qudRect, topmost: false });
     } else {
       // Same slot math as the solo launches (standardSlots) — one source for the placement.
       const slots = await standardSlots(W, H);
