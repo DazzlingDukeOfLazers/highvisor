@@ -119,6 +119,24 @@ def toy():
 
 
 # ------------------------------------------------------------------- real tree
+def _detectable(tree, app):
+    """Every node id the tree can RECOGNISE for `app` — i.e. every state we can be found in.
+
+    Distinct from the set of transition targets (the states we aim at), and the difference is
+    where the interesting failures live: a state nothing drives to still has to be leavable.
+    """
+    found = set()
+
+    def walk(n):
+        if n.get("id") and app in (n.get("detect") or {}):
+            found.add(n["id"])
+        for c in n.get("children") or []:
+            walk(c)
+
+    walk(tree["root"])
+    return found
+
+
 def real():
     tree = gametree.load_tree(force=True)
     apps = sorted(gametree.apps(tree))
@@ -145,7 +163,13 @@ def real():
     #    in one assertion.
     for app in apps:
         targets = sorted({t["to"] for t in plan.transitions(tree, app)})
-        starts = sorted(set(targets) | {plan.OFF, plan.UNKNOWN})
+        # Starts are not just the places we DRIVE to. Anything the tree can DETECT is
+        # somewhere we can be found, and several such nodes are never any edge's `to`:
+        # states you fall into rather than aim for (`quit_dialog`, `summary`, and
+        # `stranded_stage` -- a game that ended with the view stuck on the stage). Deriving
+        # starts from targets alone left exactly those untested for "can we get out?", which
+        # is the only question that matters about a state you cannot aim at.
+        starts = sorted(set(targets) | _detectable(tree, app) | {plan.OFF, plan.UNKNOWN})
         misses = []
         for start in starts:
             for goal in targets:

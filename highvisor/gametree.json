@@ -731,12 +731,12 @@
             {
               "scene": [
                 "play",
-                "Stage",
                 "in_game",
                 "PopupMessage",
                 "PopupText",
                 "PopupYesNo"
-              ]
+              ],
+              "note": "`Stage` is NOT here, and that is load-bearing. The mod folds liveness into this field (StartupHook heartbeat: `live && view in (Stage, \"\", MainMenu) -> \"play\"`), so a LIVE game always reports `play` and the bare view name `Stage` can only mean the opposite -- the view never left the stage after the game ENDED. Measured across 913 recorded observations: scene=play was live 251/251, scene=Stage was not-live 49/49, never once the other way. See the `stranded_stage` node."
             },
             {
               "game_live": true
@@ -1333,6 +1333,18 @@
         ]
       },
       {
+        "id": "stranded_stage",
+        "label": "Stranded stage (game over, view stuck)",
+        "detect": {
+          "qud": [
+            {
+              "scene": "Stage"
+            }
+          ]
+        },
+        "note": "A game that ENDED whose view never returned to the menu: The.Game is gone (`live: false`) while _ActiveGameView is still `Stage`. It used to read as In-Game, because in_game listed `Stage` among its scenes, and that mislabelling did the real damage: `hv goto qud in_game` from here planned ZERO steps and reported ok, so every 'retry on a fresh load' re-tested the same dead game. That is what disguised the Classic-save ABANDON bug as progressive process ageing for most of a session -- the retries were never reloading anything. Recorded evidence, 30 runs entered here: all 10 `goto in_game` calls planned 0 steps and returned ok; the other 20 failed and left the state exactly as they found it. It is ABSORBING -- 20/20 with no self-recovery -- which is why its only exit is a restart.\n\nTOP LEVEL, deliberately: as a child of in_game it would sit on in_game's path, and `assert node=in_game` tolerates landing deeper, so the edge that is supposed to catch 'the game never started' would pass here.\n\nNOT included: `StageWindow`, the other stage-ish scene the reporter can emit (view went vague, window still the stage). It is also always not-live, but it behaves differently in the record -- both runs that drove from it reached MainMenu, so it looks transient rather than absorbing, and naming it here would restart Qud for a state that settles on its own. Left as-is with the evidence written down rather than guessed at."
+      },
+      {
         "id": "summary",
         "label": "Game over / summary",
         "note": "the tombstone + GameSummaryScreen after a death (Wander mode returns to the picker afterwards). Injected Esc is IGNORED here — a restart is the reliable exit.",
@@ -1392,6 +1404,22 @@
       },
       "timeout": 25,
       "note": "COLD START. No `unless_running` guard any more: the planner only picks this edge from `off`, which is exactly what that flag was hand-checking on every run."
+    },
+    {
+      "app": "qud",
+      "from": "stranded_stage",
+      "to": "title",
+      "steps": [
+        {
+          "restart": "qud"
+        }
+      ],
+      "verify": {
+        "scene": "MainMenu"
+      },
+      "timeout": 120,
+      "cost": 120,
+      "note": "RESTART IS THE ONLY WAY OUT, and this edge exists to say so explicitly rather than let the route fall through to the universal `* -> title` hatch -- where picking it is supposed to mean 'a real exit edge is missing'. Here nothing is missing: the game object is gone, so no first-party command can rebuild it, and 20 recorded drive attempts from this state changed nothing. Priced the same as the hatch because it costs the same; nothing routes THROUGH a stranded stage, so the price only affects getting out."
     },
     {
       "app": "qud",
@@ -1918,6 +1946,14 @@
             "key": "Escape"
           },
           "note": "THE THIRD PROMPT. CmdQuit is two confirms for a Wander/Roleplay save and THREE for a Classic one (decompiled XRL.Core.XRLCore: the extra one is raised unless Options.DisablePermadeath or CheckpointingSystem.IsCheckpointingEnabled(), and checkpointing is on only for GameMode Wander/Roleplay). The third is Popup.AskString, mirrored into Raves as popup kind `input`, which the two `popup: message` steps above do not match -- so before this step every one of them reported ok and the edge died 25s later at its verify naming nothing. Measured live 2026-08-07 on the Classic save: message at 2.0s, message at 4.9s, input at 9.2s and still up at 40s."
+        },
+        {
+          "assert": {
+            "app": "qud",
+            "node": "title",
+            "timeout": 20
+          },
+          "note": "CROSS-APP, because this edge does not actually drive Raves -- it drives QUD's quit through the mirrored modals, and Raves returning to its title only means Raves noticed the game ended. Verifying Raves alone let the edge report SUCCESS with Qud stranded on a dead stage (observed 2026-08-07: `hv goto raves title` exit 0, qud_state.json {scene: Stage, live: false}). Qud is the app whose state this edge changes, so Qud is what it has to check.\n\nSafe to demand, and measured rather than assumed: on a healthy quit Qud reaches MainMenu at 8.8s and Raves reaches its title at 12.1s, so Qud LEADS by ~3s and this assert passes on its first poll. The 20s allowance is slack, not a race."
         }
       ],
       "verify": {
