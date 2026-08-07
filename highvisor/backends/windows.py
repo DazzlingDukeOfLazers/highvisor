@@ -191,6 +191,17 @@ class WindowsBackend(PlatformBackend):
         return None
 
     # ----------------------------------------------------------------- observe
+    def _win32_title(self, hwnd) -> str:
+        """The real Win32 caption. UIA's Name can differ from it — Godot names its
+        accessibility root "Godot Engine" while the caption says "Raves of Qud
+        (DEBUG)" — and substring targeting must match what the titlebar shows."""
+        n = user32.GetWindowTextLengthW(hwnd)
+        if n <= 0:
+            return ""
+        buf = ctypes.create_unicode_buffer(n + 1)
+        user32.GetWindowTextW(hwnd, buf, n + 1)
+        return buf.value
+
     def list_targets(self) -> List[Target]:
         fg = user32.GetForegroundWindow()
         out = []
@@ -198,7 +209,7 @@ class WindowsBackend(PlatformBackend):
             try:
                 r = w.BoundingRectangle
                 hwnd = w.NativeWindowHandle
-                title = w.Name or ""
+                title = self._win32_title(hwnd) or w.Name or ""
                 if not title and (r.width() <= 0 or r.height() <= 0):
                     continue
                 out.append(Target(

@@ -376,6 +376,9 @@ function _isRaves(t) {
   // dev-run: a Godot process whose game window names Raves — but not the Godot
   // editor ("<project> - Godot Engine").
   if (owner === "godot" && /raves/.test(title) && !/godot engine/.test(title)) return true;
+  // Windows dev-run/export: Godot windows carry the Win32 class "Engine"; the
+  // editor is excluded by its "<project> - Godot Engine" title.
+  if (owner === "engine" && /raves/.test(title) && !/godot engine/.test(title)) return true;
   return false;
 }
 function _isQud(t) {
@@ -508,11 +511,28 @@ async function startRavesLatest() {
       setStatus("muted", "waiting for " + need.join(" + ") + "…");
       await new Promise(res => setTimeout(res, 1500));
     }
-    await userTestLayout(1920, 1080);   // both up → tile Raves ▲ / Qud ▼
+    // Machine override first (a user layout named "pair"), else the built-in slots.
+    if (!(await applyPairLayoutOverride())) await userTestLayout(1920, 1080);
   } catch (e) {
     alert("start Raves failed: " + (e.message || e));
   } finally {
     btn.disabled = false;
+  }
+}
+
+// Machine pair-stage override: if the user's layouts.json defines a layout named
+// "pair", it IS this machine's pair stage — apply it instead of the built-in
+// Mac-style slot math (standardSlots / userTestLayout). Lets a box with a different
+// monitor topology (e.g. Lumpy's two 4Ks: Raves on primary, Qud on secondary)
+// restage the pair without forking the cockpit. No "pair" layout -> false, callers
+// fall back to the built-ins; a solo window still lands in its pair position because
+// layout placements simply MISS absent windows.
+async function applyPairLayoutOverride() {
+  try {
+    const r = await rpc("layout_apply", { name: "pair" });
+    return !!(r && r.ok && r.applied > 0);
+  } catch (e) {
+    return false;
   }
 }
 
@@ -561,9 +581,13 @@ async function startSolo(which) {
       const now = which === "qud" ? c.qud : c.raves;
       if (now.length > 1) { alert(_dupMessage(c.raves, c.qud)); return; }
       if (now.length === 1) {
-        const slots = await standardSlots(1920, 1080);
-        const rect = which === "qud" ? slots.qudRect : slots.ravesRect;
-        await rpc("move", { target: now[0].id, ...rect, topmost: false });
+        // Machine "pair" layout override places the solo window in its pair slot too
+        // (placements just MISS the absent app); else the built-in standard slot.
+        if (!(await applyPairLayoutOverride())) {
+          const slots = await standardSlots(1920, 1080);
+          const rect = which === "qud" ? slots.qudRect : slots.ravesRect;
+          await rpc("move", { target: now[0].id, ...rect, topmost: false });
+        }
         setStatus("ok", `${which} up · standard slot`);
         return;
       }
