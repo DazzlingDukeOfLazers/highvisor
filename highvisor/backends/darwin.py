@@ -594,22 +594,6 @@ class MacBackend(PlatformBackend):
                 out.append(kc)
         return out
 
-    @staticmethod
-    def _mod_flags(mods: str) -> int:
-        """Modifier names -> CGEventFlags. Shared by click and scroll so one spelling of
-        'cmd'/'meta'/'command' works everywhere."""
-        flags = 0
-        for m in _split_mods(mods):
-            m = m.strip().lower()
-            if m in ("cmd", "meta", "command"):
-                flags |= Quartz.kCGEventFlagMaskCommand
-            elif m in ("ctrl", "control"):
-                flags |= Quartz.kCGEventFlagMaskControl
-            elif m == "shift":
-                flags |= Quartz.kCGEventFlagMaskShift
-            elif m in ("alt", "opt", "option"):
-                flags |= Quartz.kCGEventFlagMaskAlternate
-        return flags
 
     def mouse_move(self, target: str, x: int, y: int) -> ActionResult:
         """Warp + post a real mouseMoved at a window point — NO buttons. Activates
@@ -794,7 +778,7 @@ class MacBackend(PlatformBackend):
         name = keys.strip()
         parts = [p for p in name.replace("-", "+").split("+") if p]
         mods, base = parts[:-1], (parts[-1] if parts else "")
-        flags = self._mod_flags(modifiers)
+        flags = self._mod_flags(mods)
         code = self._keycode_for(base)
         if code is None:
             return ActionResult.fail("unknown key %r" % keys)
@@ -815,8 +799,15 @@ class MacBackend(PlatformBackend):
 
     # ---- CGEvent helpers ----
     def _mod_flags(self, mods) -> int:
+        """Modifier NAMES (a list) or a spec string ("cmd,ctrl" / "ctrl+alt") -> CGEvent flags.
+
+        Takes both because it has two kinds of caller: `key()` parses "ctrl+m" itself and hands
+        over a list, while click/scroll receive the raw `modifiers` string off the wire. A second,
+        string-only copy of this used to exist above; being defined FIRST it was shadowed by this
+        one, so click/scroll were quietly iterating a string character by character.
+        """
         m = 0
-        for name in mods:
+        for name in (_split_mods(mods) if isinstance(mods, str) else mods):
             u = name.upper()
             if u in ("CMD", "COMMAND", "META"): m |= Quartz.kCGEventFlagMaskCommand
             elif u in ("SHIFT",): m |= Quartz.kCGEventFlagMaskShift
