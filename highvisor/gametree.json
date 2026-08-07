@@ -1938,8 +1938,9 @@
           "note": "let Continue enable (heartbeat poll) after a fresh launch"
         },
         {
-          "click_text": "Continue",
-          "window": "Raves of Qud"
+          "key": "down",
+          "window": "Raves of Qud",
+          "note": "select Continue by KEYBOARD. This was click_text, which needs OCR — and ocr() exists only in the darwin backend, so this edge could not run on Windows at all. Raves' title menu is keyboard-first (the edge's own note says so), and New Game -> Continue is one step down, so the keyboard form is both cross-platform AND closer to how the menu works."
         },
         {
           "key": "space",
@@ -2456,7 +2457,10 @@
           "activate": "Raves of Qud"
         },
         {
-          "click_text": "Modding Toolkit",
+          "click_hover": [
+            150,
+            902
+          ],
           "window": "Raves of Qud"
         }
       ],
@@ -2464,7 +2468,7 @@
         "scene": "modding_toolkit"
       },
       "timeout": 12,
-      "note": "Raves' Modding Toolkit link is NOT part of the keyboard-first title menu — it is one of the bottom-left LINK_ITEMS, and MainMenu wires it as a mouse-only gui_input that opens the overlay on the click itself. So this edge has no `key space`, unlike every other raves title edge, where a click only moves the selection."
+      "note": "Windows-viable: the click_text form this carried needs OCR, and ocr() exists only in the darwin backend, so every Raves menu route failed here with 'ocr failed:'. Coordinates work on both, which is why Qud's twin edge already used them. y=902 is MEASURED and is now the SAME as Qud's — the 2026-08-07 title fix lifted Raves' link column one row pitch to match. Raves' Modding Toolkit link is NOT part of the keyboard-first title menu — it is one of the bottom-left LINK_ITEMS, and MainMenu wires it as a mouse-only gui_input that opens the overlay on the click itself. So this edge has no `key space`, unlike every other raves title edge, where a click only moves the selection."
     },
     {
       "app": "raves",
@@ -2472,7 +2476,10 @@
       "to": "blueprint_browser",
       "steps": [
         {
-          "click_text": "Blueprint Browser",
+          "click_hover": [
+            866,
+            537
+          ],
           "window": "Raves of Qud"
         }
       ],
@@ -2480,7 +2487,7 @@
         "scene": "blueprint_browser"
       },
       "timeout": 15,
-      "note": "A toolkit row's own gui_input does `_select(idx)` AND `_activate()`, so the click IS the activation — no Enter. Clicked by LABEL rather than the old recipe's four `down`s plus Enter, which silently depended on Blueprint Browser being the fifth row."
+      "note": "Windows-viable coordinates: click_text needs OCR and ocr() exists only in the darwin backend, so this edge could not run on Windows at all. Measured and driven live. A toolkit row's own gui_input does `_select(idx)` AND `_activate()`, so the click IS the activation — no Enter. Clicked by LABEL rather than the old recipe's four `down`s plus Enter, which silently depended on Blueprint Browser being the fifth row."
     },
     {
       "app": "raves",
@@ -2765,6 +2772,25 @@
       },
       "timeout": 15,
       "note": "Converted 2026-08-07 after re-measuring. The coordinates were never the problem — they were within 2px — and the clicks always worked; the earlier conversion attempt was driven from a Qud stuck on a stale 'Stage' scene, which invalidated the whole run. map_editor's DETECTOR was the real defect: it named the UI sampler's window ('MapEditorWindow') while the mod reports the legacy view ('MapEditor'), which is the more specific of the two and therefore wins."
+    },
+    {
+      "app": "raves",
+      "from": "modding_toolkit",
+      "to": "map_editor",
+      "steps": [
+        {
+          "click_hover": [
+            866,
+            480
+          ],
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "map_editor"
+      },
+      "timeout": 15,
+      "note": "Added 2026-08-07: map_editor had inbound edges for QUD only, so nothing in the graph could produce this state for Raves. Coordinate measured and driven live."
     }
   ],
   "tests": [
