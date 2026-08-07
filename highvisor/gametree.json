@@ -1882,10 +1882,10 @@
       "steps": [
         {
           "dismiss": {
-            "popup": "message",
+            "popup": true,
             "key": "Escape"
           },
-          "note": "CANCEL a stray modal first. A popup left over from an earlier run blocks CmdQuit entirely -- the command goes nowhere and the step then fails for lack of any change. Escape is Cancel on these confirms, so this clears the way without ANSWERING anything."
+          "note": "CANCEL a stray modal first -- ANY kind. A popup left over from an earlier run blocks CmdQuit entirely: the command goes nowhere and the step then fails for lack of any change. Escape is Cancel on all of Raves' modals, so this clears the way without ANSWERING anything. It said `popup: message` until 2026-08-07, which meant a stray `input`/`menu`/`itempicker` modal -- four of the five kinds Raves reports -- read as 'not present' and was left sitting in the way."
         },
         {
           "dismiss": {
@@ -1910,6 +1910,14 @@
             ]
           },
           "note": "'Do you want to save first?' -> Right moves off Yes, Space answers NO. Deliberate: Yes would overwrite the fixture save. One step, because Right alone changes nothing observable."
+        },
+        {
+          "dismiss": {
+            "popup": "input",
+            "refuse": "Qud asks for a typed confirmation ('type ABANDON to confirm') when the save has no checkpointing -- a Classic character -- and completing it quits WITHOUT SAVING, ending a permadeath run. This edge will not type it",
+            "key": "Escape"
+          },
+          "note": "THE THIRD PROMPT. CmdQuit is two confirms for a Wander/Roleplay save and THREE for a Classic one (decompiled XRL.Core.XRLCore: the extra one is raised unless Options.DisablePermadeath or CheckpointingSystem.IsCheckpointingEnabled(), and checkpointing is on only for GameMode Wander/Roleplay). The third is Popup.AskString, mirrored into Raves as popup kind `input`, which the two `popup: message` steps above do not match -- so before this step every one of them reported ok and the edge died 25s later at its verify naming nothing. Measured live 2026-08-07 on the Classic save: message at 2.0s, message at 4.9s, input at 9.2s and still up at 40s."
         }
       ],
       "verify": {

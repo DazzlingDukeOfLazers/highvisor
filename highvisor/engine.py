@@ -1257,11 +1257,9 @@ class Engine:
             if (st.get("signals", {}).get("scene") or "") != want["scene"]:
                 return False
         if "popup" in want:
-            popup = (st.get("extra") or {}).get("popup")
-            if want["popup"] is True:
-                if not popup:
-                    return False
-            elif str(popup or "") != str(want["popup"]):
+            # Engine., not self. -- `_assert_holds` is deliberately pure over (want, state)
+            # so tools/selftest_evaluate.py can exercise it with no daemon and no instance.
+            if not Engine._popup_matches((st.get("extra") or {}).get("popup"), want["popup"]):
                 return False
         if "ocr_contains" in want:
             # _gamestate stored no raw text; re-derive from the evaluate input is overkill —
@@ -1347,6 +1345,36 @@ class Engine:
             if str(have or "").lower() not in [str(w).lower() for w in want_list]:
                 return False
         return True
+
+    @staticmethod
+    def _popup_matches(have, want):
+        """Does the app's reported modal KIND satisfy a `popup` condition?
+
+        One matcher for all three callers (`hv assert`, an `assert` step, a `dismiss`
+        condition) because they were drifting: the assert path already understood
+        `popup: true` = "any modal", the dismiss path compared strings only, so
+        `{"dismiss": {"popup": true}}` silently never matched.
+
+        Naming ONE kind is the trap this exists to make avoidable. Raves reports
+        `message` / `menu` / `input` / `itempicker` / `feedback`, so a condition that
+        says `message` is stepped past by any of the other four -- which is exactly how
+        Qud's ABANDON confirm (an AskString, mirrored as `input`) walked through all
+        four steps of `raves in_game -> title` while every one reported ok. Accepts:
+
+            true              any modal at all -- the kind-agnostic form, prefer it for
+                              "clear whatever is in the way" steps
+            "message"         that kind
+            ["message","menu"] any of these
+        """
+        have = str(have or "")
+        if want is True:
+            return bool(have)
+        if want is False:
+            return not have          # "and nothing is up" -- assertable, so a chain can
+                                     # end by proving it left no modal behind
+        if isinstance(want, (list, tuple)):
+            return have.lower() in [str(w).lower() for w in want]
+        return have.lower() == str(want).lower()
 
     @staticmethod
     def _dismiss_fingerprint(st, scene=None):
@@ -1882,8 +1910,14 @@ class Engine:
                 a["timeout"] = step.get("timeout", a.get("timeout", 15))
                 r = self._assert_state(b, a)
                 if not r.get("passed"):
-                    return {"ok": False, "error": "assert failed: wanted %s, got %s"
-                            % (a, (r.get("actual") or {}).get("label"))}
+                    act = r.get("actual") or {}
+                    # NAME the modal. The label alone reads "In-Game" for every stage of a
+                    # quit chain, so an assert that failed because a prompt was still up
+                    # said nothing about which prompt -- the same silence this whole edge
+                    # has been debugged through twice.
+                    up = ((act.get("extra") or {}).get("popup")) or ""
+                    return {"ok": False, "error": "assert failed: wanted %s, got %s%s"
+                            % (a, act.get("label"), (" with a %r modal up" % up) if up else "")}
                 return {"ok": True}
 
             if set(step) <= {"note"}:
@@ -1913,9 +1947,9 @@ class Engine:
         # Leaving a live game means answering a chain of confirms while the scene stays
         # "in_game" throughout, so scene alone cannot tell the steps apart.
         want_popup = cond.get("popup")
+        have_popup = str(((cur.get("extra") or {}).get("popup")) or "")
         if want_popup is not None:
-            have = str(((cur.get("extra") or {}).get("popup")) or "")
-            hit = have.lower() == str(want_popup).lower()
+            hit = self._popup_matches(have_popup, want_popup)
         else:
             # A LIST of scenes is one condition, not several steps: Raves reports its status
             # screens as eight distinct scenes that all clear the same way, and spelling out
@@ -1928,9 +1962,76 @@ class Engine:
         # moves the popup, and answering one moves the popup back -- CmdQuit does the middle,
         # and demanding a scene change failed it even though it had worked.
         before = self._dismiss_fingerprint(cur, scene)
-        if not hit:
-            return {"ok": True, "detail": "not present"}
         cfg = gametree.apps(tree).get(app, {})
+
+        # A REFUSAL step: "if this is up, we cannot go on -- clear it and say why."
+        # An answer chain is a fixed length, so the thing it cannot express is a prompt it
+        # did not plan for; without a trailing refusal that prompt is simply left standing
+        # and the edge dies at its verify, blaming nothing. Cancelling (rather than only
+        # reporting) is what keeps the failure from poisoning the next attempt -- a modal
+        # left up eats every later keystroke and makes the NEXT run fail for a different,
+        # wrong-looking reason.
+        if hit and cond.get("refuse"):
+            win0 = self._find_win(b.list_targets(), cfg.get("window"))
+            cancelled = False
+            if win0 is not None:
+                try:
+                    b.key(win0.id, cond.get("key", "Escape"), focus=True)
+                    time.sleep(0.8)
+                    cancelled = True
+                except Exception:
+                    cancelled = False
+            return {"ok": False,
+                    "error": "refusing to continue: a %r modal is up -- %s. %s"
+                             % (have_popup or scene, cond["refuse"],
+                                "Cancelled it; the app is left clean." if cancelled
+                                else "Could not reach the window to cancel it.")}
+
+        if not hit:
+            # "Not the modal I name" is NOT the same as "no modal", and conflating them is
+            # how a step that cannot fail gets written. `{"popup": "message"}` matched none
+            # of Qud's ABANDON confirm (an AskString, mirrored by Raves as `input`), so all
+            # four steps of `raves in_game -> title` reported ok while the prompt sat there
+            # and the route died 25s later at its verify with nothing naming the cause --
+            # the same shape as the Qud-side bug this pattern already produced once.
+            #
+            # A condition that wants "whatever is in the way" should say `popup: true`; one
+            # that names a kind is claiming to answer THAT prompt, so another modal being up
+            # is a real error and is reported as one.
+            if want_popup is not None and have_popup:
+                detail = ("dismiss expects popup %r but a %r modal is up"
+                          % (want_popup, have_popup))
+                if str(have_popup).lower() == "input":
+                    # A TEXT-INPUT modal. Never send this step's keys at it: `space` types a
+                    # space into the box and `Right` moves the caret, so an answer chain aimed
+                    # at a button confirm silently edits someone's text field. For the quit
+                    # chain that field is Qud's "type ABANDON to confirm", whose completion
+                    # ends a permadeath run -- refuse it, cancel it so the app is left clean
+                    # and not poisoned for the next attempt, and say why.
+                    win0 = self._find_win(b.list_targets(), cfg.get("window"))
+                    cancelled = False
+                    if win0 is not None:
+                        try:
+                            b.key(win0.id, "Escape", focus=True)
+                            time.sleep(0.8)
+                            cancelled = True
+                        except Exception:
+                            cancelled = False
+                    return {"ok": False,
+                            "error": "%s. That is a text-input confirmation this step must "
+                                     "not type into -- Qud asks one ('type ABANDON to "
+                                     "confirm') when the save has no checkpointing, i.e. a "
+                                     "Classic character, and completing it quits WITHOUT "
+                                     "SAVING and ends a permadeath run. %s"
+                                     % (detail,
+                                        "Cancelled it; the game is still live."
+                                        if cancelled else
+                                        "Could not reach the window to cancel it.")}
+                return {"ok": False,
+                        "error": "%s -- refusing to press this step's affordance at a modal "
+                                 "it was not written for. Use `popup: true` if the step is "
+                                 "meant to clear whatever is up." % detail}
+            return {"ok": True, "detail": "not present"}
         win = self._find_win(b.list_targets(), cfg.get("window"))
         if win is None:
             return {"ok": False, "error": "dismiss: no window for %s" % app}

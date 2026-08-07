@@ -194,6 +194,54 @@ def assert_tolerance():
     r = Engine._assert_state(eng, None, {"app": "qud", "exact": True})
     check("`exact` alone is not a condition", r.get("ok") is False, str(r))
 
+    popup_conditions()
+
+
+def popup_conditions():
+    """A `popup` condition that names ONE kind must not read as "no modal is up".
+
+    THE BUG (measured live 2026-08-07). `raves in_game -> title` conditioned three of its
+    four steps on `popup: "message"`. Qud's third quit confirm — the ABANDON AskString it
+    raises for a Classic (non-checkpointing) save — mirrors into Raves as kind `input`, so
+    every one of those conditions evaluated "not present", reported ok, and the route died
+    25s later at its verify naming nothing. Raves reports FIVE kinds (message / menu /
+    input / itempicker / feedback), so naming one leaves four that can step past.
+
+    Two things are pinned here: `true`/`false`/list forms exist so a step can say "whatever
+    is up" or "nothing is up" instead of guessing a kind, and the same matcher backs every
+    caller (`hv assert`, an `assert` step, a `dismiss` condition) so they cannot drift
+    apart again — the dismiss path used to compare strings only, which silently made
+    `{"dismiss": {"popup": true}}` match nothing at all.
+    """
+    from highvisor.engine import Engine
+    m = Engine._popup_matches
+
+    print("\npopup conditions (kind-agnostic forms)")
+    check("`true` matches ANY modal kind",
+          m("input", True) and m("message", True) and m("itempicker", True))
+    check("`true` does not match when nothing is up", not m("", True) and not m(None, True))
+    check("`false` matches only when nothing is up",
+          m("", False) and m(None, False) and not m("input", False))
+    check("a named kind still matches itself", m("message", "message"))
+    check("a named kind is CASE-insensitive", m("Message", "message"))
+    check("a named kind does NOT match another kind — the ABANDON hole",
+          not m("input", "message"))
+    check("a LIST matches any member", m("menu", ["message", "menu"]))
+    check("a LIST rejects a non-member", not m("input", ["message", "menu"]))
+
+    # the assert path must go through the same matcher
+    holds = Engine._assert_holds
+    st_input = {"node": "in_game", "path": ["in_game"], "extra": {"popup": "input"}}
+    st_clear = {"node": "title", "path": ["title"], "extra": {}}
+    check("assert popup=true holds while an input modal is up",
+          holds(None, {"popup": True}, st_input))
+    check("assert popup=false REJECTS a lingering modal",
+          not holds(None, {"popup": False}, st_input))
+    check("assert popup=false passes once nothing is up",
+          holds(None, {"popup": False}, st_clear))
+    check("assert popup='message' rejects an input modal",
+          not holds(None, {"popup": "message"}, st_input))
+
 
 if __name__ == "__main__":
     sys.exit(main())
