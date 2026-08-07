@@ -153,7 +153,12 @@ the standard 1920×1080 slots; re-measure if the layout changes.
   caller names WHICH check; the command text lives in `gametree.json` under version control,
   next to the state it covers, so "run this node's check" can never become "run this string".
   Harness-wide checks sit at the tree's top level (`tests`); screen-specific ones on the node.
-  Raves' state-graph panel renders both as clickable `[T]` markers.
+  Raves' state-graph panel AND the cockpit both render them as clickable `[T]` markers —
+  same marker, same gesture, two surfaces.
+- **The cockpit gates click-to-drive on REACHABILITY**, not on a stored recipe. It used to read
+  `node.goto[app]`, so deleting the legacy recipes silently made every cell unclickable while
+  the panel looked fine. If a UI ever needs "can this app get there?", ask `plan_route` — with
+  no node it returns the cost to every reachable state in one call.
 - `python3 tools/selftest_plan.py` — stdlib only, no daemon, no apps. Proves every target is
   reachable from every state we might be found in. Run it with any transition edit.
 - The 20 legacy `goto[app]` recipes are GONE (2026-08-06) — the graph covers every node that
