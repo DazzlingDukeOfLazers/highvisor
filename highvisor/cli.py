@@ -250,6 +250,11 @@ def _cmd_plan(a):
         print("no route: %s" % res.get("error"))
         raise SystemExit(1)
     print("%s" % res.get("summary"))
+    if a.node is None:
+        # bulk mode: every reachable state and what it would cost, cheapest first
+        for node, cost in sorted((res.get("costs") or {}).items(), key=lambda kv: (kv[1], kv[0])):
+            print("  %-6s %s" % (cost, node))
+        raise SystemExit(0)
     for i, e in enumerate(res.get("steps") or [], 1):
         print("  %d. -> %-22s cost %-4s %s" % (
             i, e.get("to"), e.get("cost"),
@@ -405,14 +410,36 @@ def _cmd_install_daemon(a):
         print("\n!! the agent is bootstrapped but the daemon is not answering on 48720 — "
               "check the log")
         return 1
+    problems = []
     warn = _screen_recording_warning(resp.get("targets", []))
     if warn:
-        print("\n" + warn)
-        print("\n   The bundle is now registered, so \"Highvisor\" should be listed there.\n"
+        problems.append(("Screen Recording", warn))
+    else:
+        print("\nscreen capture:  OK (%d windows, titles readable)" % len(resp.get("targets", [])))
+
+    # ACCESSIBILITY IS A SEPARATE GRANT, and its absence is far nastier than Screen
+    # Recording's: CGEventPost does not fail without it, so every click and keypress returns
+    # ok:true and goes nowhere. Checking capture alone once let an install pass while the
+    # harness could not drive a single thing — an hour went into suspecting the app.
+    ax = _call({"op": P.OP_INSPECT, "target": (resp.get("targets") or [{}])[0].get("id", ""),
+                "depth": 1})
+    if "Accessibility permission" in str(ax.get("error", "")):
+        problems.append(("Accessibility",
+            "!! synthetic input is DEAD — the daemon has no Accessibility grant.\n"
+            "   click/key/scroll will report success and do nothing (CGEventPost does not\n"
+            "   fail without it). System Settings > Privacy & Security > Accessibility."))
+    else:
+        print("synthetic input: OK (Accessibility granted)")
+
+    if problems:
+        print()
+        for _, text in problems:
+            print(text)
+        print("\n   The bundle is registered, so \"Highvisor\" should be listed under %s.\n"
               "   Enable it, then re-run `hv install-daemon` — it boots the agent out and back\n"
-              "   in, which is what makes the new grant take effect.")
+              "   in, which is what makes a new grant take effect."
+              % " AND ".join(name for name, _ in problems))
         return 1
-    print("\nscreen capture: OK (%d windows, titles readable)" % len(resp.get("targets", [])))
 
 
 def _cmd_diff(a):
@@ -936,7 +963,9 @@ def build_parser():
 
     s = sub.add_parser("plan", help="show the route `hv goto` would take, WITHOUT driving anything")
     s.add_argument("app", help="qud | raves")
-    s.add_argument("node", help="tree node id, e.g. title | in_game")
+    s.add_argument("node", nargs="?", default=None,
+                   help="tree node id, e.g. title | in_game. OMIT it to list EVERY "
+                        "reachable state and its cost")
     s.add_argument("--from", dest="frm", default=None,
                    help="plan from this state instead of the detected one (a node id, "
                         "'off' or 'unknown')")

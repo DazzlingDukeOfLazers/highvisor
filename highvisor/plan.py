@@ -270,6 +270,37 @@ def route(tree, app, start, goal, signals=None, heuristic=None):
             "reached": sorted(seen)}
 
 
+def reachable(tree, app, start, signals=None):
+    """{state: cheapest cost} for EVERY state reachable from ``start``. ``start`` maps to 0.
+
+    Same search as ``route``, without a goal — Dijkstra settles every node on the way to any
+    particular one, so this is the answer we were already computing and throwing away.
+
+    It exists for the UI. Raves' state-graph panel greys the states it cannot drive to and shows
+    what a click would cost; asking ``route`` per node would be one round trip per node per app
+    (132 on the current tree) to learn something one search already knows.
+    """
+    adj = graph(tree, app, signals)
+    best = {start: 0}
+    seen = set()
+    seq = 0
+    pq = [(0, seq, start)]
+    while pq:
+        g, _, state = heapq.heappop(pq)
+        if state in seen:
+            continue
+        seen.add(state)
+        for cost, edge in adj.get(state, []):
+            nxt = edge.get("to")
+            ng = g + cost
+            if nxt in best and best[nxt] <= ng:
+                continue
+            best[nxt] = ng
+            seq += 1
+            heapq.heappush(pq, (ng, seq, nxt))
+    return best
+
+
 def _why_unreachable(tree, app, start, goal, adj, reached):
     """Name the actual gap. Three different repairs hide behind "no route"."""
     entering = [e for st in adj for _, e in adj[st] if e.get("to") == goal]

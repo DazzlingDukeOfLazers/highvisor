@@ -37,8 +37,15 @@ whose tiny C stub **forks** the venv python and stays alive as its parent (an `e
 defeat the point — the process image would become the interpreter again, and responsibility flows
 parent→child). Grant "Highvisor" Screen Recording ONCE and it survives venv rebuilds, Python
 upgrades and every source edit. `hv install-daemon` builds it if missing, kills any manually-run
-daemon (port clash), bootstraps, then **verifies capture works** and prints the remedy if not.
-`hv ls` warns too: several windows and not one title is the signature. **You cannot check that by PID or uptime** — `os.execv` replaces the
+daemon (port clash), bootstraps, then **verifies BOTH grants** and prints the remedy if either
+is missing. `hv ls` warns too: several windows and not one title is the signature.
+
+**TWO grants, not one.** *Screen Recording* covers window titles, captures and OCR. **Accessibility** covers synthetic INPUT (click/key/scroll/text) and the AX tree — and its
+absence is the nastier one: `CGEventPost` does **not** fail without it, so every click and
+keypress returned `ok: true` and went nowhere. That cost an hour of suspecting the app while
+Raves' title menu ignored everything and screenshots worked perfectly. Those ops now check
+`AXIsProcessTrusted()` first and fail loudly. **If input is being ignored, check the grant
+before the app.** **You cannot check that by PID or uptime** — `os.execv` replaces the
 process image in place, so both are PRESERVED across a re-exec. A daemon showing hours of uptime
 may well be running code you saved a minute ago. To tell, grep the daemon log for
 `source changed: … — re-exec`, or call an op and look for behaviour only the new code has. (Cost

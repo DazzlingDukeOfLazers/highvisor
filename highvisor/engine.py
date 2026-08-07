@@ -1123,6 +1123,10 @@ class Engine:
 
         ``start`` overrides the detected state, so a route can be checked for a screen we
         are not currently on — including with nothing running at all.
+
+        With NO ``node_id`` it returns ``costs``: the cheapest cost to every reachable state
+        at once. That is one call instead of one per node per app (132 on the current tree),
+        and it is what lets Raves' panel grey the states it cannot drive to.
         """
         from . import gametree, plan
         tree = gametree.load_tree()
@@ -1133,6 +1137,10 @@ class Engine:
             st = self._gamestate(b).get("states", {}).get(app) or {}
             start = self._planner_state(st)
             signals = st.get("signals")
+        if not node_id:
+            costs = plan.reachable(tree, app, start, signals=signals)
+            return {"ok": True, "app": app, "from": start, "costs": costs,
+                    "summary": "%d states reachable from %s" % (len(costs), start)}
         rt = plan.route(tree, app, start, node_id, signals=signals)
         rt["app"] = app
         rt["summary"] = plan.summarize(rt)

@@ -348,11 +348,30 @@ class MacBackend(PlatformBackend):
         data = rep.representationUsingType_properties_(_PNG, None)
         return bytes(data)
 
+    _AX_INPUT_NOTE = (
+        "Accessibility permission is not granted to this process, so synthetic input goes "
+        "NOWHERE. Grant it in System Settings > Privacy & Security > Accessibility (the bundle "
+        "is \"Highvisor\" if the daemon was installed with `hv install-daemon`), then retry.")
+
+    def _require_ax_input(self):
+        """Refuse to pretend. CGEventPost does NOT fail when Accessibility is missing — it
+        returns cleanly and the event is dropped, so click/key/scroll all reported ok:true
+        while the target sat there doing nothing.
+
+        That cost an hour: Raves' title menu ignored every click and keypress, the app was
+        healthy, screenshots worked (Screen Recording is a SEPARATE grant and was in place),
+        and every layer in between said success. Screen capture already fails loudly; input
+        must too, or the first suspect is always the app.
+        """
+        if not AXIsProcessTrusted():
+            raise BackendError(self._AX_INPUT_NOTE)
+
     def click(self, target: str, x: int, y: int, button: str = "left",
               double: bool = False, hover: bool = False, mods: str = "") -> ActionResult:
         w = self._resolve(target)
         if w is None:
             return ActionResult.fail("click needs a window target")
+        self._require_ax_input()
         wx, wy, ww, wh = self._bounds(w)
         gx, gy = wx + int(x), wy + int(y)          # window-relative -> global points
         self.activate(target)                       # a click on a bg app should focus it
@@ -426,6 +445,7 @@ class MacBackend(PlatformBackend):
         w = self._resolve(target)
         if w is None:
             return ActionResult.fail("scroll needs a window target")
+        self._require_ax_input()
         wx, wy, ww, wh = self._bounds(w)
         gx, gy = wx + int(x), wy + int(y)
         self.activate(target)
@@ -516,6 +536,7 @@ class MacBackend(PlatformBackend):
         w = self._resolve(target)
         if w is None:
             return ActionResult.fail("mouse needs a window target")
+        self._require_ax_input()
         wx, wy, ww, wh = self._bounds(w)
         gx, gy = wx + int(x), wy + int(y)
         self.activate(target)
@@ -687,6 +708,7 @@ class MacBackend(PlatformBackend):
         w = self._resolve(target)
         if w is None:
             return ActionResult.fail("key needs a window target")
+        self._require_ax_input()
         pid = int(w["kCGWindowOwnerPID"])
         name = keys.strip()
         parts = [p for p in name.replace("-", "+").split("+") if p]
