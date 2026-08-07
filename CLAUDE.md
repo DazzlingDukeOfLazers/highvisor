@@ -66,6 +66,16 @@ action instead of screenshot-guess loops:
 
 - `hv move` verifies by READBACK (CG window frame) — raw AX error codes lie for Godot's
   borderless window (kAXErrorFailure from sets that landed, and vice versa).
+- **`hv text` does not work on Godot** — it types into an editable element found through the
+  accessibility layer, and Godot publishes none, so a Raves `LineEdit` fails with `no editable
+  element found in target`. Type with **`hv key <target> <string>`** instead: an unnamed
+  multi-char string falls through to `uiautomation.SendKeys`, which reaches the focused control
+  whatever the toolkit. (Click the field first — SendKeys goes to focus, not to a target.)
+- **`hv key` modifiers are SendKeys syntax: `{Ctrl}a`, not `ctrl+a`.** The `+` form isn't
+  rejected, it's TYPED — `hv key win ctrl+a` puts the six characters "ctrl+a" in the field, which
+  looks like a silently ignored hotkey. Verified on a Raves `LineEdit`: "abcdef" → `{Ctrl}a` →
+  `Z` leaves "Z". (Not WSH's `^a` either; uiautomation uses the braced form.) Single named keys
+  are separate and case-insensitive — `hv key win escape` goes out as a real scan-code VK.
 - A `[Errno 49] Can't assign requested address` from any hv call is TRANSIENT — just retry.
 - Qud's window FREEZES when unfocused (Unity doesn't repaint) — `hv activate` + ~2s before a
   shot, or you'll diff a stale frame. The mod/bridge still runs unfocused; only pixels freeze.
