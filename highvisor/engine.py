@@ -289,6 +289,9 @@ class Engine:
         if op == P.OP_RESTART:
             return self._restart_app(b, req.get("app", ""))
 
+        if op == P.OP_GRANT_INPUT:
+            return b.request_input_grant()
+
         if op == P.OP_ABORT:
             return self.guard.abort("op")
 

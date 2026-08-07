@@ -335,6 +335,20 @@ def _cmd_trace(a):
                     print("      failed step: %s" % st.get("step"))
 
 
+def _cmd_grant_input(a):
+    """Raise the system Accessibility prompt for the DAEMON process, and say which identity
+    macOS is actually asking about — it is the interpreter, not Highvisor.app (see the
+    backend docstring; the two TCC grants resolve differently)."""
+    res = _call({"op": P.OP_GRANT_INPUT})
+    _print_json(res)
+    if res.get("process"):
+        print("\nmacOS keys ACCESSIBILITY to this binary:\n  %s" % res["process"])
+        print("Approve the dialog, or tick that entry under\n"
+              "  System Settings > Privacy & Security > Accessibility\n"
+              "then re-run `hv install-daemon` to confirm both grants.")
+    raise SystemExit(0 if res.get("trusted") else 1)
+
+
 def _cmd_abort(a):
     """Panic: release focus/mouse NOW; refuse control ops for 30s."""
     _print_json(_call({"op": P.OP_ABORT}))
@@ -1000,6 +1014,9 @@ def build_parser():
     s.add_argument("limit", nargs="?", type=int, default=20)
     s.add_argument("--json", action="store_true")
     s.set_defaults(fn=_cmd_trace)
+
+    sub.add_parser("grant-input", help="raise the Accessibility prompt for the daemon "
+                   "(input needs a DIFFERENT grant than capture)").set_defaults(fn=_cmd_grant_input)
 
     sub.add_parser("abort", help="PANIC: release focus/mouse now; refuse control ops for 30s").set_defaults(fn=_cmd_abort)
 

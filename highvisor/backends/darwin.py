@@ -28,7 +28,7 @@ from typing import List, Optional
 import Quartz
 from AppKit import NSBitmapImageRep, NSRunningApplication, NSWorkspace
 from ApplicationServices import (
-    AXIsProcessTrusted, AXUIElementCopyActionNames,
+    AXIsProcessTrusted, AXIsProcessTrustedWithOptions, AXUIElementCopyActionNames,
     AXUIElementCopyAttributeValue, AXUIElementCreateApplication,
     AXUIElementPerformAction, AXUIElementSetAttributeValue, AXValueCreate,
     AXValueGetValue)
@@ -68,6 +68,25 @@ KEYCODE = {
 }
 
 
+def _running_image() -> str:
+    """The executable image this process is actually running as — NOT sys.executable. The
+    framework python re-execs into Python.app, so the two differ, and only this one is what
+    TCC checks for Accessibility."""
+    import ctypes
+    import ctypes.util
+    try:
+        libc = ctypes.CDLL(ctypes.util.find_library("c"))
+        size = ctypes.c_uint32(4096)
+        buf = ctypes.create_string_buffer(size.value)
+        if libc._NSGetExecutablePath(buf, ctypes.byref(size)) == 0:
+            import os
+            return os.path.realpath(buf.value.decode())
+    except Exception:
+        pass
+    import sys
+    return sys.executable
+
+
 class MacBackend(PlatformBackend):
     name = "macos"
 
@@ -80,6 +99,36 @@ class MacBackend(PlatformBackend):
                 "Accessibility permission is not granted to this process. Grant it in "
                 "System Settings > Privacy & Security > Accessibility (add the terminal / "
                 "python running highvisor), then retry.")
+
+    def request_input_grant(self) -> dict:
+        """Ask macOS to show the Accessibility prompt for THIS process, and report who it is.
+
+        Needed because the two TCC grants resolve to DIFFERENT identities, which is not
+        obvious and cost an evening:
+
+          * Screen Recording resolves via the RESPONSIBLE process — the launchd job, i.e.
+            Highvisor.app. Granting the bundle works.
+          * Accessibility is keyed to the calling process's own signed identity. The
+            framework build's `bin/python3.9` re-execs into `Resources/Python.app`, so the
+            daemon really is running as `com.apple.python3` no matter what launched it, and
+            a grant on Highvisor.app has no effect on input at all.
+
+        So the honest thing is to let the SYSTEM name the identity it wants, by prompting.
+        The dialog also creates the correct entry in the Accessibility list, which otherwise
+        may not be there to tick.
+
+        Narrower than what highvisor had before today, for what it is worth: the grant used
+        to come from Terminal, which covers every command anyone runs there.
+        """
+        import os
+        opts = {"AXTrustedCheckOptionPrompt": True}
+        trusted = bool(AXIsProcessTrustedWithOptions(opts))
+        return {"ok": True, "trusted": trusted,
+                "process": os.path.realpath("/proc/self/exe") if os.path.exists("/proc/self/exe")
+                           else _running_image(),
+                "detail": ("already trusted" if trusted else
+                           "a system dialog was raised — approve it, or tick the entry it "
+                           "added under Privacy & Security > Accessibility")}
 
     # -------------------------------------------------------- window enumeration
     def _windows(self):

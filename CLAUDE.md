@@ -45,7 +45,17 @@ absence is the nastier one: `CGEventPost` does **not** fail without it, so every
 keypress returned `ok: true` and went nowhere. That cost an hour of suspecting the app while
 Raves' title menu ignored everything and screenshots worked perfectly. Those ops now check
 `AXIsProcessTrusted()` first and fail loudly. **If input is being ignored, check the grant
-before the app.** **You cannot check that by PID or uptime** — `os.execv` replaces the
+before the app.**
+
+**The two grants resolve to DIFFERENT identities — this is the part that wastes an evening.**
+Screen Recording resolves via the RESPONSIBLE process, so granting `Highvisor.app` works.
+Accessibility is keyed to the CALLING process's own signed identity — and the framework
+python's `bin/python3.9` re-execs into `Resources/Python.app`, so the daemon really runs as
+`com.apple.python3` no matter what launched it. Granting Highvisor.app does **nothing** for
+input. Run **`hv grant-input`**: it raises the system prompt from the daemon process, so macOS
+names and lists the identity it actually wants (it shows up as "Python"). Narrower than what
+highvisor relied on before — that grant came from Terminal, which covers everything anyone
+runs there. **You cannot check that by PID or uptime** — `os.execv` replaces the
 process image in place, so both are PRESERVED across a re-exec. A daemon showing hours of uptime
 may well be running code you saved a minute ago. To tell, grep the daemon log for
 `source changed: … — re-exec`, or call an op and look for behaviour only the new code has. (Cost
