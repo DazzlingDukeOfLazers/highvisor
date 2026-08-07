@@ -161,9 +161,14 @@ the standard 1920×1080 slots; re-measure if the layout changes.
   no node it returns the cost to every reachable state in one call.
 - `python3 tools/selftest_plan.py` — stdlib only, no daemon, no apps. Proves every target is
   reachable from every state we might be found in. Run it with any transition edit.
-- The 20 legacy `goto[app]` recipes are GONE (2026-08-06) — the graph covers every node that
-  had one. The fallback code stays, so adding a recipe for an unmodelled node still works,
-  but `selftest_plan.py` fails if one reappears for a node the graph can already reach.
+- The legacy `goto[app]` recipes are GONE — **all of them, in both apps** (the last, raves
+  `blueprint_browser`, converted 2026-08-07). The fallback code stays, so adding a recipe for
+  an unmodelled node still works, but `selftest_plan.py` fails if one reappears for a node the
+  graph can already reach. Two recurring reasons a node resisted conversion, both worth
+  recognising: it had **no detector** (the Map Editor's menu bar is a legacy RedShadow dialog —
+  the mod reports the open dropdown as `tab` now), or its route started at a node **that app
+  could not reach** (raves had no edge to `modding_toolkit`, so an edge out of it was
+  unreachable from everywhere).
 - `click_text` POLLS the OCR to a deadline: Qud does not repaint unfocused, so a single
   snapshot read the previous screen and "Continue is not on screen" meant "I am looking at
   a stale frame". Never load a save by clicking a row — `{"load_save": {"row": n}}` goes

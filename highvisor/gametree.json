@@ -586,7 +586,7 @@
               {
                 "id": "blueprint_browser",
                 "label": "Blueprint Browser",
-                "note": "LEFT AS A LEGACY RECIPE deliberately. Its route starts at `modding_toolkit`, and RAVES has no transition to that node — only Qud does — so an edge from there would be unreachable from every state, which selftest_plan rejects (correctly). Convert it once a raves title -> modding_toolkit edge exists and has been driven; Raves' title does carry a Modding Toolkit link, so that edge is writable, just unverified as of 2026-08-07.",
+                "note": "Converted 2026-08-07, the LAST legacy recipe in the tree. It waited on a raves title -> modding_toolkit edge, which did not exist because only Qud had one — an edge out of an unreachable node is unreachable from everywhere, and selftest_plan rejects that, correctly. Both new edges click by LABEL. Two things the old recipe encoded without saying so: Raves' Modding Toolkit link is a mouse-only gui_input among the title's bottom-left LINK_ITEMS, so it needs no activating `space` (every other raves title edge does); and a toolkit row's gui_input selects AND activates, so it needs no Enter — the recipe's four `down`s plus Enter silently depended on Blueprint Browser staying the fifth row. Esc from here goes to the TITLE, not back to the toolkit (MainMenu._close_overlay), matching Qud.",
                 "done": {
                   "qud": 0.9,
                   "raves": 0.9
@@ -600,40 +600,6 @@
                   "raves": [
                     {
                       "scene": "blueprint_browser"
-                    }
-                  ]
-                },
-                "goto": {
-                  "raves": [
-                    {
-                      "goto": "modding_toolkit"
-                    },
-                    {
-                      "key": "down",
-                      "window": "Raves of Qud",
-                      "note": "x4 to Blueprint Browser"
-                    },
-                    {
-                      "key": "down",
-                      "window": "Raves of Qud"
-                    },
-                    {
-                      "key": "down",
-                      "window": "Raves of Qud"
-                    },
-                    {
-                      "key": "down",
-                      "window": "Raves of Qud"
-                    },
-                    {
-                      "key": "enter",
-                      "window": "Raves of Qud"
-                    },
-                    {
-                      "assert": {
-                        "scene": "blueprint_browser"
-                      },
-                      "timeout": 12
                     }
                   ]
                 }
@@ -2479,6 +2445,79 @@
       },
       "timeout": 12,
       "note": "new_game is the chargen CONTAINER; detection reports the deepest match (game_mode), and assert passes a node that is on the current path, so landing on the first card satisfies this."
+    },
+    {
+      "app": "raves",
+      "from": "title",
+      "to": "modding_toolkit",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "click_text": "Modding Toolkit",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "modding_toolkit"
+      },
+      "timeout": 12,
+      "note": "Raves' Modding Toolkit link is NOT part of the keyboard-first title menu — it is one of the bottom-left LINK_ITEMS, and MainMenu wires it as a mouse-only gui_input that opens the overlay on the click itself. So this edge has no `key space`, unlike every other raves title edge, where a click only moves the selection."
+    },
+    {
+      "app": "raves",
+      "from": "modding_toolkit",
+      "to": "blueprint_browser",
+      "steps": [
+        {
+          "click_text": "Blueprint Browser",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "blueprint_browser"
+      },
+      "timeout": 15,
+      "note": "A toolkit row's own gui_input does `_select(idx)` AND `_activate()`, so the click IS the activation — no Enter. Clicked by LABEL rather than the old recipe's four `down`s plus Enter, which silently depended on Blueprint Browser being the fifth row."
+    },
+    {
+      "app": "raves",
+      "from": "modding_toolkit",
+      "to": "title",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "Escape",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "node": "title"
+      },
+      "timeout": 12,
+      "note": "Esc leaves to the TITLE, not back to the toolkit: MainMenu._close_overlay sets the scene to title, and the toolkit's own tools do the same (measured against Qud, whose Mod Manager also exits to the title). Raves takes synthetic keys, unlike Qud's modern menus. The climb makes _drive_route attach `not_within`, so an Esc that did nothing fails here instead of passing on the screen it was meant to leave."
+    },
+    {
+      "app": "raves",
+      "from": "blueprint_browser",
+      "to": "title",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "Escape",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "node": "title"
+      },
+      "timeout": 12,
+      "note": "Esc leaves to the TITLE, not back to the toolkit: MainMenu._close_overlay sets the scene to title, and the toolkit's own tools do the same (measured against Qud, whose Mod Manager also exits to the title). Raves takes synthetic keys, unlike Qud's modern menus. The climb makes _drive_route attach `not_within`, so an Esc that did nothing fails here instead of passing on the screen it was meant to leave."
     },
     {
       "app": "qud",
