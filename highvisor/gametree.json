@@ -405,7 +405,7 @@
                   {
                     "id": "me_menu_file",
                     "label": "File menu",
-                    "note": "New map (Ctrl+N) · Load map... (Ctrl+O) · Test (Ctrl+T) · Save (Ctrl+S) · Save As... | Reload Blueprints | Exit. Captured; MapEditorView backs these with NewMap/LoadMap/RunTest+BuildTestZone/Save/SaveAs/_ReloadBlueprints/Exit. Open at [46,16]; Exit at [64,260], confirm Yes at [925,555]. Detectable since 2026-08-07: the mod's UI sampler reads each MenuBarButton's Menu.IsVisible (DialogBase) on the main thread and reports the open dropdown in the state file's `tab` slot. The menu bar is a legacy RedShadow dialog, so neither UIManager._currentWindow nor _ActiveGameView moves when it opens — that is why these five kept goto recipes after every other toolkit screen became an edge. NOT YET CLOSABLE BY EDGE: leaving a dropdown is unmodelled. `key escape` looks right on paper (DialogBase.Update cancels the top dialog on Escape) and an escape->click edge was written and driven — it reported success while arriving NOWHERE. Two faults, both worth knowing: the escape did not close the menu inside the verify window, and the verify could not tell, because `assert node=X` passes when X is an ANCESTOR of the detected node (engine._assert_holds) — so 'verify map_editor' is satisfied by the still-open me_menu_file. The click then landed on the bar with a menu down, which cancels it and opens nothing. Escaping needs measuring on its own before it is an edge.",
+                    "note": "New map (Ctrl+N) · Load map... (Ctrl+O) · Test (Ctrl+T) · Save (Ctrl+S) · Save As... | Reload Blueprints | Exit. Captured; MapEditorView backs these with NewMap/LoadMap/RunTest+BuildTestZone/Save/SaveAs/_ReloadBlueprints/Exit. Open at [46,16]; Exit at [64,260], confirm Yes at [925,555]. Detectable since 2026-08-07: the mod's UI sampler reads each MenuBarButton's Menu.IsVisible (DialogBase) on the main thread and reports the open dropdown in the state file's `tab` slot. The menu bar is a legacy RedShadow dialog, so neither UIManager._currentWindow nor _ActiveGameView moves when it opens — that is why these five kept goto recipes after every other toolkit screen became an edge. LEAVING one is an edge too, but not by key: Escape does NOT reach the dialog (measured 2026-08-07 — an HID-tapped Escape left tab='File' across four polls, the same class as Qud's modern menus ignoring OS-synthesized keys), and the only click that would close it lands on the canvas and paints. The mod cancels the visible Menu first-party instead (`mapedit do=menuclose`), the way `uiback` handles the modern menus. Its verify carries `exact` because the whole point is that no menu is over the editor; an earlier attempt without it passed on the state it was supposed to leave and reported a drive that moved nothing.",
                     "done": {
                       "qud": 0.95,
                       "raves": 0.8
@@ -425,7 +425,7 @@
                   {
                     "id": "me_menu_edit",
                     "label": "Edit menu",
-                    "note": "Select All (Ctrl+A) · Undo (Ctrl+Z) · Redo (Ctrl+Y). Captured. MapEditorView: SelectAll/Undo/Redo over UndoStack+RedoStack, with ReverseAction as the primitive. Detectable since 2026-08-07: the mod's UI sampler reads each MenuBarButton's Menu.IsVisible (DialogBase) on the main thread and reports the open dropdown in the state file's `tab` slot. The menu bar is a legacy RedShadow dialog, so neither UIManager._currentWindow nor _ActiveGameView moves when it opens — that is why these five kept goto recipes after every other toolkit screen became an edge. NOT YET CLOSABLE BY EDGE: leaving a dropdown is unmodelled. `key escape` looks right on paper (DialogBase.Update cancels the top dialog on Escape) and an escape->click edge was written and driven — it reported success while arriving NOWHERE. Two faults, both worth knowing: the escape did not close the menu inside the verify window, and the verify could not tell, because `assert node=X` passes when X is an ANCESTOR of the detected node (engine._assert_holds) — so 'verify map_editor' is satisfied by the still-open me_menu_file. The click then landed on the bar with a menu down, which cancels it and opens nothing. Escaping needs measuring on its own before it is an edge.",
+                    "note": "Select All (Ctrl+A) · Undo (Ctrl+Z) · Redo (Ctrl+Y). Captured. MapEditorView: SelectAll/Undo/Redo over UndoStack+RedoStack, with ReverseAction as the primitive. Detectable since 2026-08-07: the mod's UI sampler reads each MenuBarButton's Menu.IsVisible (DialogBase) on the main thread and reports the open dropdown in the state file's `tab` slot. The menu bar is a legacy RedShadow dialog, so neither UIManager._currentWindow nor _ActiveGameView moves when it opens — that is why these five kept goto recipes after every other toolkit screen became an edge. LEAVING one is an edge too, but not by key: Escape does NOT reach the dialog (measured 2026-08-07 — an HID-tapped Escape left tab='File' across four polls, the same class as Qud's modern menus ignoring OS-synthesized keys), and the only click that would close it lands on the canvas and paints. The mod cancels the visible Menu first-party instead (`mapedit do=menuclose`), the way `uiback` handles the modern menus. Its verify carries `exact` because the whole point is that no menu is over the editor; an earlier attempt without it passed on the state it was supposed to leave and reported a drive that moved nothing.",
                     "done": {
                       "qud": 0.95,
                       "raves": 0.8
@@ -445,7 +445,7 @@
                   {
                     "id": "me_menu_transform",
                     "label": "Transform menu",
-                    "note": "Flip Horizontal · Flip Vertical (no hotkeys). Captured. MapEditorView: FlipHorizontal/FlipVertical — they act on SelectedRegion when one is set. Detectable since 2026-08-07: the mod's UI sampler reads each MenuBarButton's Menu.IsVisible (DialogBase) on the main thread and reports the open dropdown in the state file's `tab` slot. The menu bar is a legacy RedShadow dialog, so neither UIManager._currentWindow nor _ActiveGameView moves when it opens — that is why these five kept goto recipes after every other toolkit screen became an edge. NOT YET CLOSABLE BY EDGE: leaving a dropdown is unmodelled. `key escape` looks right on paper (DialogBase.Update cancels the top dialog on Escape) and an escape->click edge was written and driven — it reported success while arriving NOWHERE. Two faults, both worth knowing: the escape did not close the menu inside the verify window, and the verify could not tell, because `assert node=X` passes when X is an ANCESTOR of the detected node (engine._assert_holds) — so 'verify map_editor' is satisfied by the still-open me_menu_file. The click then landed on the bar with a menu down, which cancels it and opens nothing. Escaping needs measuring on its own before it is an edge.",
+                    "note": "Flip Horizontal · Flip Vertical (no hotkeys). Captured. MapEditorView: FlipHorizontal/FlipVertical — they act on SelectedRegion when one is set. Detectable since 2026-08-07: the mod's UI sampler reads each MenuBarButton's Menu.IsVisible (DialogBase) on the main thread and reports the open dropdown in the state file's `tab` slot. The menu bar is a legacy RedShadow dialog, so neither UIManager._currentWindow nor _ActiveGameView moves when it opens — that is why these five kept goto recipes after every other toolkit screen became an edge. LEAVING one is an edge too, but not by key: Escape does NOT reach the dialog (measured 2026-08-07 — an HID-tapped Escape left tab='File' across four polls, the same class as Qud's modern menus ignoring OS-synthesized keys), and the only click that would close it lands on the canvas and paints. The mod cancels the visible Menu first-party instead (`mapedit do=menuclose`), the way `uiback` handles the modern menus. Its verify carries `exact` because the whole point is that no menu is over the editor; an earlier attempt without it passed on the state it was supposed to leave and reported a drive that moved nothing.",
                     "done": {
                       "qud": 0.95,
                       "raves": 0.8
@@ -465,7 +465,7 @@
                   {
                     "id": "me_menu_view",
                     "label": "View menu",
-                    "note": "Toggle NorthSheva Overlay (Ctrl+F1) — the ONLY item. It overlays the NorthSheva artwork as a tracing guide (MapEditorView.ToggleOverlay); that same sprite, NorthShevaTransparent, is the BackdropWindow asset found during the toolkit backdrop hunt. Detectable since 2026-08-07: the mod's UI sampler reads each MenuBarButton's Menu.IsVisible (DialogBase) on the main thread and reports the open dropdown in the state file's `tab` slot. The menu bar is a legacy RedShadow dialog, so neither UIManager._currentWindow nor _ActiveGameView moves when it opens — that is why these five kept goto recipes after every other toolkit screen became an edge. NOT YET CLOSABLE BY EDGE: leaving a dropdown is unmodelled. `key escape` looks right on paper (DialogBase.Update cancels the top dialog on Escape) and an escape->click edge was written and driven — it reported success while arriving NOWHERE. Two faults, both worth knowing: the escape did not close the menu inside the verify window, and the verify could not tell, because `assert node=X` passes when X is an ANCESTOR of the detected node (engine._assert_holds) — so 'verify map_editor' is satisfied by the still-open me_menu_file. The click then landed on the bar with a menu down, which cancels it and opens nothing. Escaping needs measuring on its own before it is an edge.",
+                    "note": "Toggle NorthSheva Overlay (Ctrl+F1) — the ONLY item. It overlays the NorthSheva artwork as a tracing guide (MapEditorView.ToggleOverlay); that same sprite, NorthShevaTransparent, is the BackdropWindow asset found during the toolkit backdrop hunt. Detectable since 2026-08-07: the mod's UI sampler reads each MenuBarButton's Menu.IsVisible (DialogBase) on the main thread and reports the open dropdown in the state file's `tab` slot. The menu bar is a legacy RedShadow dialog, so neither UIManager._currentWindow nor _ActiveGameView moves when it opens — that is why these five kept goto recipes after every other toolkit screen became an edge. LEAVING one is an edge too, but not by key: Escape does NOT reach the dialog (measured 2026-08-07 — an HID-tapped Escape left tab='File' across four polls, the same class as Qud's modern menus ignoring OS-synthesized keys), and the only click that would close it lands on the canvas and paints. The mod cancels the visible Menu first-party instead (`mapedit do=menuclose`), the way `uiback` handles the modern menus. Its verify carries `exact` because the whole point is that no menu is over the editor; an earlier attempt without it passed on the state it was supposed to leave and reported a drive that moved nothing.",
                     "done": {
                       "qud": 0.95,
                       "raves": 0.8
@@ -485,7 +485,7 @@
                   {
                     "id": "me_menu_recent",
                     "label": "Recent menu",
-                    "note": "Recently-opened maps (MapEditorView RecentMenu/AddRecentFile/UpdateRecent/RecentClick, persisted via WriteModSettings). EMPTY on a fresh install — verified: opening it drew no panel, which is the expected zero-state, not a failure. Detectable since 2026-08-07: the mod's UI sampler reads each MenuBarButton's Menu.IsVisible (DialogBase) on the main thread and reports the open dropdown in the state file's `tab` slot. The menu bar is a legacy RedShadow dialog, so neither UIManager._currentWindow nor _ActiveGameView moves when it opens — that is why these five kept goto recipes after every other toolkit screen became an edge. NOT YET CLOSABLE BY EDGE: leaving a dropdown is unmodelled. `key escape` looks right on paper (DialogBase.Update cancels the top dialog on Escape) and an escape->click edge was written and driven — it reported success while arriving NOWHERE. Two faults, both worth knowing: the escape did not close the menu inside the verify window, and the verify could not tell, because `assert node=X` passes when X is an ANCESTOR of the detected node (engine._assert_holds) — so 'verify map_editor' is satisfied by the still-open me_menu_file. The click then landed on the bar with a menu down, which cancels it and opens nothing. Escaping needs measuring on its own before it is an edge.",
+                    "note": "Recently-opened maps (MapEditorView RecentMenu/AddRecentFile/UpdateRecent/RecentClick, persisted via WriteModSettings). EMPTY on a fresh install — verified: opening it drew no panel, which is the expected zero-state, not a failure. Detectable since 2026-08-07: the mod's UI sampler reads each MenuBarButton's Menu.IsVisible (DialogBase) on the main thread and reports the open dropdown in the state file's `tab` slot. The menu bar is a legacy RedShadow dialog, so neither UIManager._currentWindow nor _ActiveGameView moves when it opens — that is why these five kept goto recipes after every other toolkit screen became an edge. LEAVING one is an edge too, but not by key: Escape does NOT reach the dialog (measured 2026-08-07 — an HID-tapped Escape left tab='File' across four polls, the same class as Qud's modern menus ignoring OS-synthesized keys), and the only click that would close it lands on the canvas and paints. The mod cancels the visible Menu first-party instead (`mapedit do=menuclose`), the way `uiback` handles the modern menus. Its verify carries `exact` because the whole point is that no menu is over the editor; an earlier attempt without it passed on the state it was supposed to leave and reported a drive that moved nothing.",
                     "done": {
                       "qud": 0.9,
                       "raves": 0.8
@@ -587,7 +587,7 @@
               {
                 "id": "blueprint_browser",
                 "label": "Blueprint Browser",
-                "note": "LEFT AS A LEGACY RECIPE deliberately. Its route starts at `modding_toolkit`, and RAVES has no transition to that node — only Qud does — so an edge from there would be unreachable from every state, which selftest_plan rejects (correctly). Convert it once a raves title -> modding_toolkit edge exists and has been driven; Raves' title does carry a Modding Toolkit link, so that edge is writable, just unverified as of 2026-08-07. filterable collapsible tree of the full ObjectBlueprints hierarchy (Object, SultanMuralController expandable) — the natural UI mirror of the Object Checker enumeration. Back [3709,2068] returns to TITLE. RAVES: BlueprintBrowserScreen.gd — reads blueprints.json (BlueprintExporter walks GameObjectFactory.Factory.Blueprints, so a modded install shows its own; 5247 rows, and its 9 roots + expander set match Qud's screen exactly). PIXEL-DIFFED 2026-08-06: 99.77% content match, no divergent region. Layout MEASURED off Qud, not nudged — filter box x18..305 y12..38, row glyph tops 62/86/110 (pitch 24), expander x8..17, cube icon x27..43 (17x18, drawn as an isometric outline — a text glyph measured 9px against Qud's 17), text x48, Back glyph x1832..1884 y1026..1042; all now exact. The status line and opening row highlight are user-mode-only (Qud has neither). REMAINING (the whole residual): Qud's list font is ElliotSans, condensed — ~6.5px/char vs Atkinson's 8.4 at a matched cap height, so names run ~29% wide. The screen loads ElliotSans from title/chrome/ when present (correct on the Mac) and falls back otherwise; NO mod exporter for it exists yet — that is the next unit of work for this leaf, and it is shared with every other modern-UI screen. FONTS EXTRACTED (2026-08-07) -- the long-standing blocker is gone. Unity's Font asset keeps the ORIGINAL file in m_FontData, so Caves of Qud ships the real vector TTFs verbatim inside sharedassets0.assets; tools/capture/fonts.py carves them structurally (parse the sfnt table directory at each candidate offset and require every record to be self-consistent, plus a size ceiling -- without which a chance 'OTTO' inside texture data validates as a 120 MB font). 18 fonts are embedded; 4 matter: Elliot Sans Regular/Medium/Bold and LIBERATION SANS, which is what Qud's modding-tool dialogs actually use (Unity's stock UI face, not Qud's console mono). They go player-install -> player-support-dir like the tile art and are NEVER committed. THE LIST FACE IS ELLIOT SANS *MEDIUM* AT 13 px, and width alone cannot establish that: width-per-cap puts Qud at 13.56, between Regular's 13.39 and Medium's 13.89, inside the noise. Ink DENSITY separates them -- same string at a matched 9 px cap gives total ink 74805 (Regular) / 99652 (Medium) / 123041 (Bold) against Qud's own 95458. I picked Regular off the width ratio first and the density check corrected it; use density to pick a WEIGHT and width-per-cap to pick a SIZE. A 2 px baseline offset the real face exposed is fixed too, so row baselines now match to the pixel. METHOD NOTE worth carrying: whole-screen content_match moved only 99.75 -> 99.79 because a 1920x1080 screen is dominated by matching black and the metric is nearly blind to a text column; scored on the name column, glyph agreement went 15.3% -> 27.2%. Score per REGION when judging a single element. The residual is rasteriser difference (Unity TMP atlas vs Godot FreeType at a 9 px cap), not layout.",
+                "note": "Converted 2026-08-07, the LAST legacy recipe in the tree. It waited on a raves title -> modding_toolkit edge, which did not exist because only Qud had one — an edge out of an unreachable node is unreachable from everywhere, and selftest_plan rejects that, correctly. Both new edges click by LABEL. Two things the old recipe encoded without saying so: Raves' Modding Toolkit link is a mouse-only gui_input among the title's bottom-left LINK_ITEMS, so it needs no activating `space` (every other raves title edge does); and a toolkit row's gui_input selects AND activates, so it needs no Enter — the recipe's four `down`s plus Enter silently depended on Blueprint Browser staying the fifth row. Esc from here goes to the TITLE, not back to the toolkit (MainMenu._close_overlay), matching Qud. filterable collapsible tree of the full ObjectBlueprints hierarchy (Object, SultanMuralController expandable) — the natural UI mirror of the Object Checker enumeration. Back [3709,2068] returns to TITLE. RAVES: BlueprintBrowserScreen.gd — reads blueprints.json (BlueprintExporter walks GameObjectFactory.Factory.Blueprints, so a modded install shows its own; 5247 rows, and its 9 roots + expander set match Qud's screen exactly). PIXEL-DIFFED 2026-08-06: 99.77% content match, no divergent region. Layout MEASURED off Qud, not nudged — filter box x18..305 y12..38, row glyph tops 62/86/110 (pitch 24), expander x8..17, cube icon x27..43 (17x18, drawn as an isometric outline — a text glyph measured 9px against Qud's 17), text x48, Back glyph x1832..1884 y1026..1042; all now exact. The status line and opening row highlight are user-mode-only (Qud has neither). REMAINING (the whole residual): Qud's list font is ElliotSans, condensed — ~6.5px/char vs Atkinson's 8.4 at a matched cap height, so names run ~29% wide. The screen loads ElliotSans from title/chrome/ when present (correct on the Mac) and falls back otherwise; NO mod exporter for it exists yet — that is the next unit of work for this leaf, and it is shared with every other modern-UI screen. FONTS EXTRACTED (2026-08-07) -- the long-standing blocker is gone. Unity's Font asset keeps the ORIGINAL file in m_FontData, so Caves of Qud ships the real vector TTFs verbatim inside sharedassets0.assets; tools/capture/fonts.py carves them structurally (parse the sfnt table directory at each candidate offset and require every record to be self-consistent, plus a size ceiling -- without which a chance 'OTTO' inside texture data validates as a 120 MB font). 18 fonts are embedded; 4 matter: Elliot Sans Regular/Medium/Bold and LIBERATION SANS, which is what Qud's modding-tool dialogs actually use (Unity's stock UI face, not Qud's console mono). They go player-install -> player-support-dir like the tile art and are NEVER committed. THE LIST FACE IS ELLIOT SANS *MEDIUM* AT 13 px, and width alone cannot establish that: width-per-cap puts Qud at 13.56, between Regular's 13.39 and Medium's 13.89, inside the noise. Ink DENSITY separates them -- same string at a matched 9 px cap gives total ink 74805 (Regular) / 99652 (Medium) / 123041 (Bold) against Qud's own 95458. I picked Regular off the width ratio first and the density check corrected it; use density to pick a WEIGHT and width-per-cap to pick a SIZE. A 2 px baseline offset the real face exposed is fixed too, so row baselines now match to the pixel. METHOD NOTE worth carrying: whole-screen content_match moved only 99.75 -> 99.79 because a 1920x1080 screen is dominated by matching black and the metric is nearly blind to a text column; scored on the name column, glyph agreement went 15.3% -> 27.2%. Score per REGION when judging a single element. The residual is rasteriser difference (Unity TMP atlas vs Godot FreeType at a 9 px cap), not layout.",
                 "done": {
                   "qud": 0.9,
                   "raves": 0.95
@@ -601,40 +601,6 @@
                   "raves": [
                     {
                       "scene": "blueprint_browser"
-                    }
-                  ]
-                },
-                "goto": {
-                  "raves": [
-                    {
-                      "goto": "modding_toolkit"
-                    },
-                    {
-                      "key": "down",
-                      "window": "Raves of Qud",
-                      "note": "x4 to Blueprint Browser"
-                    },
-                    {
-                      "key": "down",
-                      "window": "Raves of Qud"
-                    },
-                    {
-                      "key": "down",
-                      "window": "Raves of Qud"
-                    },
-                    {
-                      "key": "down",
-                      "window": "Raves of Qud"
-                    },
-                    {
-                      "key": "enter",
-                      "window": "Raves of Qud"
-                    },
-                    {
-                      "assert": {
-                        "scene": "blueprint_browser"
-                      },
-                      "timeout": 12
                     }
                   ]
                 }
@@ -2482,6 +2448,79 @@
       "note": "new_game is the chargen CONTAINER; detection reports the deepest match (game_mode), and assert passes a node that is on the current path, so landing on the first card satisfies this."
     },
     {
+      "app": "raves",
+      "from": "title",
+      "to": "modding_toolkit",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "click_text": "Modding Toolkit",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "modding_toolkit"
+      },
+      "timeout": 12,
+      "note": "Raves' Modding Toolkit link is NOT part of the keyboard-first title menu — it is one of the bottom-left LINK_ITEMS, and MainMenu wires it as a mouse-only gui_input that opens the overlay on the click itself. So this edge has no `key space`, unlike every other raves title edge, where a click only moves the selection."
+    },
+    {
+      "app": "raves",
+      "from": "modding_toolkit",
+      "to": "blueprint_browser",
+      "steps": [
+        {
+          "click_text": "Blueprint Browser",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "blueprint_browser"
+      },
+      "timeout": 15,
+      "note": "A toolkit row's own gui_input does `_select(idx)` AND `_activate()`, so the click IS the activation — no Enter. Clicked by LABEL rather than the old recipe's four `down`s plus Enter, which silently depended on Blueprint Browser being the fifth row."
+    },
+    {
+      "app": "raves",
+      "from": "modding_toolkit",
+      "to": "title",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "Escape",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "node": "title"
+      },
+      "timeout": 12,
+      "note": "Esc leaves to the TITLE, not back to the toolkit: MainMenu._close_overlay sets the scene to title, and the toolkit's own tools do the same (measured against Qud, whose Mod Manager also exits to the title). Raves takes synthetic keys, unlike Qud's modern menus. The climb makes _drive_route attach `not_within`, so an Esc that did nothing fails here instead of passing on the screen it was meant to leave."
+    },
+    {
+      "app": "raves",
+      "from": "blueprint_browser",
+      "to": "title",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "Escape",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "node": "title"
+      },
+      "timeout": 12,
+      "note": "Esc leaves to the TITLE, not back to the toolkit: MainMenu._close_overlay sets the scene to title, and the toolkit's own tools do the same (measured against Qud, whose Mod Manager also exits to the title). Raves takes synthetic keys, unlike Qud's modern menus. The climb makes _drive_route attach `not_within`, so an Esc that did nothing fails here instead of passing on the screen it was meant to leave."
+    },
+    {
       "app": "qud",
       "from": "title",
       "to": "modding_toolkit",
@@ -2625,6 +2664,31 @@
       },
       "timeout": 12,
       "note": "Converted 2026-08-07. `from` is the EDITOR ONLY, not `within map_editor`, and that is a MEASURED constraint rather than a stylistic one. MenuBarButton.onMouseEnter looks like it makes menu->menu one hop (it cancels the open dropdown and opens its own), so the first cut used `within` — and driving File->Edit closed File and opened NOTHING. The click's mouse-DOWN lands on the menu BAR, which is outside the just-opened dropdown's rect, and Menu.Update cancels any top menu clicked outside itself. From a closed bar the same click is harmless (the button opens the menu on mouse-UP, after that check). So a dropdown must be ESCAPED before the next one opens: File -> map_editor -> Edit, which the escape edge gives for cost 1. The planner found this by re-planning; pinning `from` means it no longer has to spend a failed click to learn it."
+    },
+    {
+      "app": "qud",
+      "from": [
+        "me_menu_file",
+        "me_menu_edit",
+        "me_menu_transform",
+        "me_menu_view",
+        "me_menu_recent"
+      ],
+      "to": "map_editor",
+      "steps": [
+        {
+          "bridge": "mapedit",
+          "args": {
+            "do": "menuclose"
+          }
+        }
+      ],
+      "verify": {
+        "node": "map_editor",
+        "exact": true
+      },
+      "timeout": 10,
+      "note": "Leaves a dropdown the only way that works. Escape does NOT reach the dialog (measured 2026-08-07: `hv key --focus CavesOfQud escape`, HID tap, left tab='File' across four polls — the same class as Qud's modern menus ignoring OS-synthesized keys), and the only click that would close it lands on the editor canvas and paints. So the mod cancels the visible Menu first-party, exactly as `uiback` does for the modern menus. `exact` on the verify because the point of this edge is that NO menu is over the editor — without it the assert would pass on the very state we are trying to leave, which is how the first attempt at this edge reported success while moving nothing."
     },
     {
       "app": "qud",

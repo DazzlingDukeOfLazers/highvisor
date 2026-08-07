@@ -971,6 +971,8 @@ class Engine:
         --timeout 20`` blocks until Qud reports in-game (exit 0) or dumps the actual
         state (exit 1). Conditions (all supplied must hold):
           app + node:     the app's current node == node, or node is on its path
+          exact:          with `node`, drop that path tolerance — the node must be EXACT
+          not_within:     fail if the current node is this node or any descendant of it
           scene:          the app's self-reported scene equals this
           popup:          true = any popup up (state-file ``popup`` key), or a popup type
           present:        window presence equals this bool
@@ -978,9 +980,11 @@ class Engine:
         ``ok`` = the op ran; ``passed`` = the assertion's verdict."""
         import time
         app = req.get("app")
-        want = {k: req[k] for k in ("node", "scene", "popup", "present", "ocr_contains")
-                if k in req and req[k] is not None}
-        if not app or not want:
+        want = {k: req[k] for k in ("node", "scene", "popup", "present", "ocr_contains",
+                                    "not_within") if k in req and req[k] is not None}
+        if req.get("exact"):
+            want["exact"] = True   # a MODIFIER on `node`, not a condition of its own
+        if not app or not [k for k in want if k != "exact"]:
             return {"ok": False, "error": "assert needs app and at least one condition"}
         timeout = float(req.get("timeout", 10.0))
         interval = max(0.2, float(req.get("interval", 0.8)))
@@ -1005,7 +1009,25 @@ class Engine:
                 return False
         if "node" in want:
             node = want["node"]
-            if st.get("node") != node and node not in (st.get("path") or []):
+            # The path tolerance is DIRECTIONAL, and it has to be. Detection reports the
+            # DEEPEST match, so an edge aiming at a container legitimately lands on a child:
+            # raves title->new_game arrives on the first chargen card (game_mode), and
+            # demanding the exact node there would fail a drive that worked.
+            #
+            # Going the other way the same tolerance is poison. `assert node=map_editor`
+            # is satisfied by me_menu_file — the very state an escape edge is supposed to
+            # LEAVE — so that edge's verify could not fail, and `hv goto` reported success
+            # having moved nothing (measured 2026-08-07; the edge was dropped rather than
+            # shipped). `exact` and `not_within` are the two ways to say "and it actually
+            # moved"; _drive_route sets not_within by itself for any edge that climbs.
+            if want.get("exact"):
+                if st.get("node") != node:
+                    return False
+            elif st.get("node") != node and node not in (st.get("path") or []):
+                return False
+        if "not_within" in want:
+            inside = want["not_within"]
+            if st.get("node") == inside or inside in (st.get("path") or []):
                 return False
         if "scene" in want:
             if (st.get("signals", {}).get("scene") or "") != want["scene"]:
@@ -1125,7 +1147,7 @@ class Engine:
                     break
         return done
 
-    def _drive_route(self, b, app, tree, route, steps, _depth):
+    def _drive_route(self, b, app, tree, route, steps, _depth, start=None):
         """Run a planned route, edge by edge, verifying every arrival.
 
         The per-edge verify is not belt-and-braces — it is what makes re-planning safe.
@@ -1133,7 +1155,14 @@ class Engine:
         that landed on nothing errors nowhere), and a route that continues from a state it
         merely assumes fails several steps later somewhere unrelated. Checking at every
         edge means a failure names the transition that actually broke.
+
+        ``start`` is the state the route was planned from, so each edge knows where it set
+        off — which is what lets a CLIMBING edge (one whose target contains its origin)
+        demand that it actually left. Without that, its verify is vacuous; see
+        ``_assert_holds``. The chain is the planner's own: after edge N we are at its ``to``.
         """
+        from . import plan
+        prev = start
         for edge in route:
             self.bus.publish("gamego", app=app, node=edge.get("to"),
                              step={"transition": edge.get("id"), "cost": edge.get("cost")})
@@ -1146,6 +1175,12 @@ class Engine:
             a = dict(edge.get("verify") or {"node": edge.get("to")})
             a.setdefault("app", app)
             a["timeout"] = edge.get("timeout", 15)
+            # An edge that CLIMBS — target contains origin — cannot be verified by the node
+            # check alone, because staying put satisfies it. Say so, unless the author
+            # already pinned it with `exact` or their own `not_within`.
+            if ("node" in a and prev and not a.get("exact") and "not_within" not in a
+                    and prev != a["node"] and prev in plan.subtree_ids(tree, a["node"])):
+                a["not_within"] = prev
             ar = self._assert_state(b, a)
             steps.append({"step": {"verify": a}, "ok": bool(ar.get("passed")),
                           "edge": edge.get("id"), "actual": ar.get("actual")})
@@ -1153,6 +1188,7 @@ class Engine:
                 return {"ok": False, "error": "%s did not arrive: wanted %s, got %s"
                         % (edge.get("id"), edge.get("verify"),
                            (ar.get("actual") or {}).get("label"))}
+            prev = edge.get("to")
         return {"ok": True}
 
     # ------------------------------------------------------------- registered checks
@@ -1337,7 +1373,7 @@ class Engine:
         if rt.get("ok"):
             route_label = plan.summarize(rt)
             self.bus.publish("gamego", app=app, node=node_id, step={"plan": route_label})
-            r = self._drive_route(b, app, tree, rt["route"], steps, _depth)
+            r = self._drive_route(b, app, tree, rt["route"], steps, _depth, start=start)
             if r.get("ok"):
                 _finish(True)
                 return {"ok": True, "app": app, "node": node_id, "steps": steps,

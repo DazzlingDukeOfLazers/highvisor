@@ -161,9 +161,14 @@ the standard 1920×1080 slots; re-measure if the layout changes.
   no node it returns the cost to every reachable state in one call.
 - `python3 tools/selftest_plan.py` — stdlib only, no daemon, no apps. Proves every target is
   reachable from every state we might be found in. Run it with any transition edit.
-- The 20 legacy `goto[app]` recipes are GONE (2026-08-06) — the graph covers every node that
-  had one. The fallback code stays, so adding a recipe for an unmodelled node still works,
-  but `selftest_plan.py` fails if one reappears for a node the graph can already reach.
+- The legacy `goto[app]` recipes are GONE — **all of them, in both apps** (the last, raves
+  `blueprint_browser`, converted 2026-08-07). The fallback code stays, so adding a recipe for
+  an unmodelled node still works, but `selftest_plan.py` fails if one reappears for a node the
+  graph can already reach. Two recurring reasons a node resisted conversion, both worth
+  recognising: it had **no detector** (the Map Editor's menu bar is a legacy RedShadow dialog —
+  the mod reports the open dropdown as `tab` now), or its route started at a node **that app
+  could not reach** (raves had no edge to `modding_toolkit`, so an edge out of it was
+  unreachable from everywhere).
 - `click_text` POLLS the OCR to a deadline: Qud does not repaint unfocused, so a single
   snapshot read the previous screen and "Continue is not on screen" meant "I am looking at
   a stale frame". Never load a save by clicking a row — `{"load_save": {"row": n}}` goes
@@ -177,6 +182,17 @@ popup (exit 0) or dumps the actual state (exit 1). Conditions: `--node`, `--scen
 [kind]`, `--present yes|no`, `--ocr-contains`. Use it to pin state before AND after a driven
 action instead of screenshot-guess loops:
 `hv goto qud in_game && hv assert --app qud --node in_game && <the actual test>`.
+
+**`--node` tolerates landing DEEPER, and that tolerance is DIRECTIONAL.** Detection reports
+the deepest match, so an edge aiming at a container legitimately lands on a child
+(`title -> new_game` arrives on `game_mode`) — demanding the exact node would fail a drive
+that worked. Going the other way the same tolerance is poison: `assert node=map_editor` is
+satisfied by `me_menu_file`, the very state an escape edge exists to LEAVE, so that edge's
+verify could not fail and `hv goto` reported success having moved nothing. Two ways to say
+"and it actually moved": **`exact`** (the node, not a descendant) and **`not_within: X`**
+(fail if we are at X or inside it). `_drive_route` attaches `not_within` by itself to any
+edge whose target CONTAINS its origin, so climbing edges are honest without being authored
+that way. Guarded by `tools/selftest_evaluate.py`.
 
 ## Gotchas
 
