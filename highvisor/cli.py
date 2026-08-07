@@ -117,7 +117,7 @@ def _cmd_drag(a):
     _print_json(_call({"op": P.OP_DRAG, "target": a.target,
                        "x1": a.x1, "y1": a.y1, "x2": a.x2, "y2": a.y2,
                        "button": "right" if a.right else "left",
-                       "steps": a.steps, "modifiers": a.mod}))
+                       "steps": a.steps, "modifiers": a.mod, "hold": a.hold}))
 
 
 def _cmd_activate(a):
@@ -686,6 +686,10 @@ def build_parser():
     s.add_argument("--steps", type=int, default=12, help="intermediate moves (default 12)")
     s.add_argument("--mod", default=None, metavar="ctrl+alt+shift",
                    help="modifiers held for the whole gesture")
+    s.add_argument("--hold", type=float, default=0.08,
+                   help="seconds to hold the button before moving (default 0.08). "
+                        "MEASURED: longer is WORSE — 0.5s stops Qud registering the "
+                        "gesture as a drag at all. Lower it, do not raise it blindly.")
     s.set_defaults(fn=_cmd_drag)
 
     s = sub.add_parser("activate")

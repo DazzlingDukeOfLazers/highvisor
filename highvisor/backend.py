@@ -128,7 +128,7 @@ class PlatformBackend:
 
     def drag(self, target: str, x1: int, y1: int, x2: int, y2: int,
              button: str = "left", steps: int = 12,
-             modifiers: Optional[str] = None) -> ActionResult:
+             modifiers: Optional[str] = None, hold: float = 0.08) -> ActionResult:
         """Press at (x1,y1), move through intermediate points, release at (x2,y2),
         window-relative. Distinct from two clicks: selection rectangles are built
         from the moves BETWEEN press and release."""

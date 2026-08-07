@@ -171,6 +171,8 @@ class Engine:
         if op == P.OP_DRAG:
             kw = {"button": req.get("button", "left"),
                   "steps": int(req.get("steps", 12))}
+            if req.get("hold") is not None:
+                kw["hold"] = float(req["hold"])
             if req.get("modifiers"):
                 kw["modifiers"] = str(req["modifiers"])
             return b.drag(req["target"], int(req.get("x1", 0)), int(req.get("y1", 0)),

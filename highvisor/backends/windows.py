@@ -337,7 +337,7 @@ class WindowsBackend(PlatformBackend):
 
     def drag(self, target: str, x1: int, y1: int, x2: int, y2: int,
              button: str = "left", steps: int = 12,
-             modifiers: Optional[str] = None) -> ActionResult:
+             modifiers: Optional[str] = None, hold: float = 0.08) -> ActionResult:
         """Press at (x1,y1), move in steps, release at (x2,y2) — window-relative.
 
         A drag is not a click pair: apps that track a selection rectangle need the
@@ -373,7 +373,13 @@ class WindowsBackend(PlatformBackend):
             _move(gx1, gy1)
             time.sleep(0.08)
             user32.mouse_event(dn, 0, 0, 0, 0)
-            time.sleep(0.08)
+            # HOLD before moving, in seconds. MEASURED (Qud Map Editor, 2026-08-06):
+            # LONGER IS WORSE. At the 0.08 default a Ctrl+drag paints; at 0.5 or 1.2
+            # the identical gesture paints NOTHING — a long press before movement
+            # stops registering as a drag at all (it reads as press-and-hold). So do
+            # not raise this hoping to make a stubborn drag land; it is exposed to be
+            # LOWERED, or raised only for an app measured to want it.
+            time.sleep(max(0.0, float(hold)))
             n = max(2, int(steps))
             for i in range(1, n + 1):
                 _move(gx1 + (gx2 - gx1) * i // n, gy1 + (gy2 - gy1) * i // n)
