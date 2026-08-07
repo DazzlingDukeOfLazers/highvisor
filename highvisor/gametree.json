@@ -592,10 +592,10 @@
           {
             "id": "modding_toolkit",
             "label": "Modding Toolkit (secondary-links menu)",
-            "note": "Walked live on Lumpy (Win11 4K, Qud 1.0.5, 2026-08-06); captures in the session scratchpad. Coordinates are the STANDARD 1920x1080 slot values (Qud runs 1920x1080 in the portrait column; the Godot exe carries HIGHDPIAWARE so Raves is 1:1 too). QUIRKS: this legacy console menu ignores scancode arrow keys (title menu needs them) — drive it by hover-clicking rows; Enter selects, Space does not; the first click after a focus change is eaten by activation, so recipes double-click. SCENES: the bridge mod heartbeat reports first-party names for every toolkit screen (UIManager._currentWindow + SingletonWindowBase probes) — detect entries below use them; ocr_any stays as the Mac fallback. RAVES (measured 94.1% content congruence, 2026-08-06 round 2): SourceCodePro console styling at Qud's metrics, functional items — Mod Manager routes to ModsScreen (scene mods, Esc->title like Qud), Mod Wiki Website + Open Save Folder shell-open like Qud; remaining gap: the toolkit's own dimmed background art (needs a mod-side export like TitleExporter), the top plant ornament, and the six deep-tool screens (cosmetic rows).",
+            "note": "Walked live on Lumpy (Win11 4K, Qud 1.0.5, 2026-08-06); captures in the session scratchpad. Coordinates are the STANDARD 1920x1080 slot values (Qud runs 1920x1080 in the portrait column; the Godot exe carries HIGHDPIAWARE so Raves is 1:1 too). QUIRKS: this legacy console menu ignores scancode arrow keys (title menu needs them) — drive it by hover-clicking rows; Enter selects, Space does not; the first click after a focus change is eaten by activation, so recipes double-click. SCENES: the bridge mod heartbeat reports first-party names for every toolkit screen (UIManager._currentWindow + SingletonWindowBase probes) — detect entries below use them; ocr_any stays as the Mac fallback. RAVES (measured 98.15% content congruence at 1920x1080, 2026-08-06 round 3): Qud's OWN backdrop art (the mod's ExportMenuBackgrounds found it as a full-screen RawImage, texture 'bears' — NOT MainMenu.backgrounds[] nor BackdropWindowManager, both of which are inactive when this screen shows), dimmed by a MEASURED 0.765 veil; SourceCodePro console styling at Qud's metrics; functional items — Mod Manager -> ModsScreen, Blueprint Browser -> its own screen, Mod Wiki Website + Open Save Folder shell-open. Remaining: the top plant ornament and the five deep-tool screens (cosmetic rows).",
             "done": {
               "qud": 0.9,
-              "raves": 0.65
+              "raves": 0.85
             },
             "detect": {
               "raves": [
@@ -774,29 +774,54 @@
               {
                 "id": "blueprint_browser",
                 "label": "Blueprint Browser",
-                "note": "filterable collapsible tree of the full ObjectBlueprints hierarchy (Object, SultanMuralController expandable) — the natural UI mirror of the Object Checker enumeration. Back [3709,2068] returns to TITLE.",
+                "note": "filterable collapsible tree of the full ObjectBlueprints hierarchy (Object, SultanMuralController expandable) — the natural UI mirror of the Object Checker enumeration. Back [3709,2068] returns to TITLE. RAVES: BlueprintBrowserScreen.gd shipped — reads blueprints.json (BlueprintExporter walks GameObjectFactory.Factory.Blueprints, so a modded install shows its own; 5247 blueprints, and its 9 roots + expander set match Qud's screen exactly), collapsible tree, filter box (typing-guarded), Back/Esc, scene report. done.raves 0.6 — structure and data verified; not yet pixel-diffed against Qud's own row metrics/icon glyph.",
                 "done": {
                   "qud": 0.9,
-                  "raves": 0.0
+                  "raves": 0.6
                 },
                 "detect": {
                   "qud": [
                     {
                       "scene": "BrowseBlueprintsView"
                     }
+                  ],
+                  "raves": [
+                    {
+                      "scene": "blueprint_browser"
+                    }
                   ]
                 },
                 "goto": {
-                  "qud": [
+                  "raves": [
                     {
                       "goto": "modding_toolkit"
                     },
                     {
-                      "click_hover": [
-                        862,
-                        541
-                      ],
-                      "window": "CavesOfQud"
+                      "key": "down",
+                      "window": "Raves of Qud",
+                      "note": "x4 to Blueprint Browser"
+                    },
+                    {
+                      "key": "down",
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "key": "down",
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "key": "down",
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "key": "enter",
+                      "window": "Raves of Qud"
+                    },
+                    {
+                      "assert": {
+                        "scene": "blueprint_browser"
+                      },
+                      "timeout": 12
                     }
                   ]
                 }
