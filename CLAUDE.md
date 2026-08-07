@@ -63,6 +63,18 @@ back to OCR/port signals when stale. **When detection is wrong, teach the app to
 scene** (add a `UiState.set_scene` call / extend the mod heartbeat) rather than piling on OCR
 substrings.
 
+**Reports are PER-PROCESS.** A shared path has one writer per running instance: three live Raves
+had `raves_state.json` cycling `in_game → status_tinkering → title` every 2s, so every read was a
+coin flip — that, not a reporter bug, is why the tree "lied" and `hv goto raves in_game` needed
+retries (with two windows up, `_find_win` can hand a recipe a different window than the one being
+read). Raves now stamps `pid` and also writes `raves_state.<pid>.json`; the engine reads the
+sidecar for the pid owning the window it is evaluating and REFUSES a shared file stamped with a
+foreign pid — None (fall back to OCR/port) beats a confident wrong answer. Unstamped reports
+(`qud_state.json`) read as before. `hv state` prints `!! N INSTANCES` and `hv goto` refuses to
+drive while duplicates exist; `hv restart <app>` is the cure. Guarded by
+`python3 tools/selftest_state_read.py` (stdlib only, no daemon, no apps — run it with any change
+to the reader).
+
 ## gametree `goto` recipes (hv goto / cockpit click-to-state)
 
 A node's `goto[app]` is a step list: `{"goto": node}` (chain), `{"launch": name,

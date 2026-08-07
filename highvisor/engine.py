@@ -339,6 +339,14 @@ class Engine:
                 return t
         return None
 
+    def _all_wins(self, wins, label):
+        """EVERY window matching ``label`` — how duplicate instances become visible."""
+        m = (label or "").lower()
+        if not m:
+            return []
+        return [t for t in wins
+                if m in (t.title or "").lower() or m in (t.class_name or "").lower()]
+
     def _stack_above(self, b, top_label, bottom_label, gap=8):
         """Move ``top`` into the anchor's column (matched x + width), directly above it."""
         if not top_label or not bottom_label:
@@ -779,10 +787,15 @@ class Engine:
         states = {}
         for app, cfg in gametree.apps(tree).items():
             win = self._find_win(wins, cfg.get("window"))
+            # DUPLICATE INSTANCES are reported, never silently averaged over. _find_win
+            # takes the first match, so with two windows up we may drive one and read the
+            # other; the pid below at least ties the scene report to the window we picked.
+            dupes = len(self._all_wins(wins, cfg.get("window")))
+            wpid = win.pid if win is not None else None
             signals = {"present": win is not None, "port_open": None,
                        "game_live": None, "ocr_text": None,
-                       "scene": self._read_scene(cfg.get("state_file")),
-                       "tab": self._read_tab(cfg.get("state_file"))}
+                       "scene": self._read_scene(cfg.get("state_file"), wpid),
+                       "tab": self._read_tab(cfg.get("state_file"), wpid)}
             port = cfg.get("port")
             if port:
                 try:
@@ -813,8 +826,9 @@ class Engine:
             st["signals"] = {"present": signals["present"], "port_open": signals["port_open"],
                              "game_live": signals["game_live"],
                              "scene": signals["scene"], "tab": signals["tab"],
+                             "pid": wpid, "instances": dupes,
                              "ocr_used": signals["ocr_text"] is not None}
-            st["extra"] = self._read_state_extra(cfg.get("state_file"))
+            st["extra"] = self._read_state_extra(cfg.get("state_file"), wpid)
             states[app] = st
         return {"ok": True, "ocr": bool(ocr), "states": states}
 
@@ -824,35 +838,58 @@ class Engine:
     # last write must not pin the tree to a stale screen.
     STATE_FILE_TTL = 6.0
 
-    def _read_state_file(self, path):
-        """Parsed JSON dict of a fresh state file, else None."""
+    def _read_state_file(self, path, pid=None):
+        """Parsed JSON dict of a fresh state file, else None.
+
+        `pid` is the process that OWNS the window we are evaluating. It matters because
+        the shared path has one writer per running instance: three live Raves processes
+        had raves_state.json cycling in_game -> status_tinkering -> title every two
+        seconds, so a single read was a coin flip and `hv state` confidently reported a
+        screen the window in front of us was not on. Given a pid we read that process's
+        own sidecar (raves_state.<pid>.json) and are immune to duplicates.
+
+        The shared file is still the fallback, but only when it does not CONTRADICT the
+        pid: a report stamped with somebody else's pid is a foreign window's, and None
+        (detection falls back to OCR/port) beats a confident wrong answer. Reports with
+        no pid key -- the Qud mod's qud_state.json -- are read exactly as before.
+        """
         import json as _json
         import os as _os
         import time as _time
         if not path:
             return None
-        p = _os.path.expanduser(path)
-        try:
-            if _time.time() - _os.path.getmtime(p) > self.STATE_FILE_TTL:
-                return None
-            with open(p, "r", encoding="utf-8") as fh:
-                d = _json.load(fh)
-            return d if isinstance(d, dict) else None
-        except (OSError, ValueError):
-            return None
+        base = _os.path.expanduser(path)
+        cands = [base]
+        if pid:
+            stem, ext = _os.path.splitext(base)
+            cands.insert(0, "%s.%d%s" % (stem, int(pid), ext))
+        for p in cands:
+            try:
+                if _time.time() - _os.path.getmtime(p) > self.STATE_FILE_TTL:
+                    continue
+                with open(p, "r", encoding="utf-8") as fh:
+                    d = _json.load(fh)
+            except (OSError, ValueError):
+                continue
+            if not isinstance(d, dict):
+                continue
+            if pid and d.get("pid") and int(d["pid"]) != int(pid):
+                continue     # another instance's report — refuse rather than guess
+            return d
+        return None
 
-    def _read_scene(self, path):
-        d = self._read_state_file(path)
+    def _read_scene(self, path, pid=None):
+        d = self._read_state_file(path, pid)
         return d.get("scene") if d else None
 
-    def _read_tab(self, path):
+    def _read_tab(self, path, pid=None):
         """The active SUB-SCREEN within the reported scene (Qud's status-screen tab)."""
-        d = self._read_state_file(path)
+        d = self._read_state_file(path, pid)
         return d.get("tab") if d else None
 
-    def _read_state_extra(self, path):
+    def _read_state_extra(self, path, pid=None):
         """The full fresh report minus the scene key (mode, popup, zone, …) for the UI."""
-        d = self._read_state_file(path)
+        d = self._read_state_file(path, pid)
         if not d:
             return None
         return {k: v for k, v in d.items() if k != "scene"}
@@ -1011,6 +1048,16 @@ class Engine:
         # correctly reports records as title>menu_box>records, but being on the Records
         # SCREEN is not being on the title screen, and skipping the recipe strands us.
         st = self._gamestate(b).get("states", {}).get(app) or {}
+        # REFUSE to drive duplicates. With two windows up, _find_win picks one and the
+        # clicks go to whichever the OS fronts — so a recipe can drive window A, read
+        # window B's state, and "fail" on a step that actually worked. That is what made
+        # `hv goto raves in_game` need retries. Fail fast with the remedy instead: killing
+        # instances from under the caller is not ours to decide (Raves' launcher owns Qud).
+        _inst = (st.get("signals") or {}).get("instances") or 0
+        if _inst > 1 and _depth == 0:
+            return {"ok": False, "error": "%d instances of %s are running — driving one "
+                    "while reading another is undefined. Run `hv restart %s` first."
+                    % (_inst, app, app), "instances": _inst}
         entry = _slim_state(st)
         if st.get("node") == node_id:
             # The trivial success. Worth tracing precisely BECAUSE it runs no steps:

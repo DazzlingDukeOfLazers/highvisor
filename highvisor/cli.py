@@ -179,6 +179,11 @@ def _cmd_state(a):
         if extra.get("mode"):
             bits.append("mode=%s" % extra["mode"])
         bits.append("via=%s" % st.get("via"))
+        # A leaked second instance is the one condition that makes every OTHER field
+        # here untrustworthy (we may drive one window and read another), so it is shouted
+        # rather than tucked into --json.
+        if (sig.get("instances") or 0) > 1:
+            bits.append("!! %d INSTANCES — `hv restart %s`" % (sig["instances"], app))
         print("  ".join(str(b) for b in bits))
 
 
