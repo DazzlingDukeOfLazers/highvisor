@@ -182,6 +182,11 @@ action instead of screenshot-guess loops:
 
 - `hv move` verifies by READBACK (CG window frame) — raw AX error codes lie for Godot's
   borderless window (kAXErrorFailure from sets that landed, and vice versa).
+- **A click's `detail` echoes the button you ASKED for, not the events sent** — it is built from
+  the request (`"%s click @ …" % button`), so `hv click --middle` prints `"middle click"` even
+  when the running daemon is old enough to map it to left. It is not evidence the daemon has
+  your backend change. Verify with a BEHAVIOUR only the new code produces (for `--middle`: does
+  Raves' Map Editor context menu actually open?), never with the echoed field.
 - **`hv text` does not work on Godot** — it types into an editable element found through the
   accessibility layer, and Godot publishes none, so a Raves `LineEdit` fails with `no editable
   element found in target`. Type with **`hv key <target> <string>`** instead: an unnamed
