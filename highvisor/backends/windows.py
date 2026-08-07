@@ -273,22 +273,54 @@ class WindowsBackend(PlatformBackend):
         return buf.value
 
     def list_targets(self) -> List[Target]:
+        """Enumerate top-level windows through WIN32, never UIA.
+
+        UIA reads (BoundingRectangle / Name / ClassName / ProcessId / IsOffscreen) are
+        cross-process COM calls into the target's UI thread. When that thread is not
+        pumping — Qud during world generation, or sitting on a modal — they BLOCK, and a
+        blocking COM call does not raise, so the per-item try/except around them bought
+        nothing: one stalled app wedged the whole daemon and every later op timed out.
+        Observed three times in one session on Lumpy; each needed a daemon restart.
+
+        The Win32 calls below read from the window manager rather than from the app, so a
+        hung process yields a stale rect instead of hanging us. `hv move` already verifies
+        against GetWindowRect, so listing now agrees with what move reports.
+
+        UIA is still the right tool for `inspect` (it is the only thing that knows about
+        elements) — it just has no business in the listing path.
+        """
         fg = user32.GetForegroundWindow()
         out = []
-        for w in self._toplevels():
+        buf = ctypes.create_unicode_buffer(256)
+
+        @ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+        def _each(hwnd, _lparam):
             try:
-                r = w.BoundingRectangle
-                hwnd = w.NativeWindowHandle
-                title = self._win32_title(hwnd) or w.Name or ""
-                if not title and (r.width() <= 0 or r.height() <= 0):
-                    continue
+                if not user32.IsWindowVisible(hwnd):
+                    return True
+                rect = wintypes.RECT()
+                if not user32.GetWindowRect(hwnd, ctypes.byref(rect)):
+                    return True
+                w_, h_ = rect.right - rect.left, rect.bottom - rect.top
+                title = self._win32_title(hwnd) or ""
+                # UIA's top-level view used to hide the OS's swarm of 1x1 untitled helper
+                # windows for us; EnumWindows does not, so drop them here. A real untitled
+                # window (some Godot/Unity surfaces) is still kept on size alone.
+                if not title and (w_ < 50 or h_ < 50):
+                    return True
+                user32.GetClassNameW(hwnd, buf, 256)
+                pid = wintypes.DWORD()
+                user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
                 out.append(Target(
-                    id="hwnd:0x%X" % hwnd, kind="window", pid=w.ProcessId,
-                    title=title, class_name=w.ClassName or "",
-                    x=r.left, y=r.top, w=r.width(), h=r.height(),
-                    focused=(hwnd == fg), visible=not w.IsOffscreen))
+                    id="hwnd:0x%X" % hwnd, kind="window", pid=int(pid.value),
+                    title=title, class_name=buf.value or "",
+                    x=rect.left, y=rect.top, w=w_, h=h_,
+                    focused=(hwnd == fg), visible=True))
             except Exception:
-                continue
+                pass
+            return True
+
+        user32.EnumWindows(_each, 0)
         return out
 
     def launch(self, spec: str, args=None) -> ActionResult:
