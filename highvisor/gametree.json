@@ -2207,7 +2207,18 @@
           "activate": "Raves of Qud"
         },
         {
-          "key": "k",
+          "key": "f2",
+          "window": "Raves of Qud",
+          "focus": true
+        },
+        {
+          "sleep": 0.8
+        },
+        {
+          "click": [
+            275,
+            136
+          ],
           "window": "Raves of Qud"
         }
       ],
@@ -2215,8 +2226,8 @@
         "scene": "status_skills",
         "app": "raves"
       },
-      "timeout": 8,
-      "note": "Qud's Commands.xml default binding for this screen."
+      "timeout": 15,
+      "note": "Raves opens the status overlay with F2 and you pick a TAB — it does not implement Qud's per-screen letter bindings (e/k/x/n/j/q), which is what this edge used to send, so it reported every step OK and never arrived. Tab x MEASURED off the live strip at 1920x1080; y=136 is the strip's text row (the messagelog edge already used it). Qud's Commands.xml default binding for this screen."
     },
     {
       "app": "raves",
@@ -2227,7 +2238,18 @@
           "activate": "Raves of Qud"
         },
         {
-          "key": "x",
+          "key": "f2",
+          "window": "Raves of Qud",
+          "focus": true
+        },
+        {
+          "sleep": 0.8
+        },
+        {
+          "click": [
+            490,
+            136
+          ],
           "window": "Raves of Qud"
         }
       ],
@@ -2235,8 +2257,8 @@
         "scene": "status_attributes",
         "app": "raves"
       },
-      "timeout": 8,
-      "note": "Qud's Commands.xml default binding for this screen."
+      "timeout": 15,
+      "note": "Raves opens the status overlay with F2 and you pick a TAB — it does not implement Qud's per-screen letter bindings (e/k/x/n/j/q), which is what this edge used to send, so it reported every step OK and never arrived. Tab x MEASURED off the live strip at 1920x1080; y=136 is the strip's text row (the messagelog edge already used it). Qud's Commands.xml default binding for this screen."
     },
     {
       "app": "raves",
@@ -2247,7 +2269,18 @@
           "activate": "Raves of Qud"
         },
         {
-          "key": "e",
+          "key": "f2",
+          "window": "Raves of Qud",
+          "focus": true
+        },
+        {
+          "sleep": 0.8
+        },
+        {
+          "click": [
+            726,
+            136
+          ],
           "window": "Raves of Qud"
         }
       ],
@@ -2255,8 +2288,8 @@
         "scene": "status_equipment",
         "app": "raves"
       },
-      "timeout": 8,
-      "note": "Qud's Commands.xml default binding for this screen."
+      "timeout": 15,
+      "note": "Raves opens the status overlay with F2 and you pick a TAB — it does not implement Qud's per-screen letter bindings (e/k/x/n/j/q), which is what this edge used to send, so it reported every step OK and never arrived. Tab x MEASURED off the live strip at 1920x1080; y=136 is the strip's text row (the messagelog edge already used it). Qud's Commands.xml default binding for this screen."
     },
     {
       "app": "raves",
@@ -2267,7 +2300,18 @@
           "activate": "Raves of Qud"
         },
         {
-          "key": "n",
+          "key": "f2",
+          "window": "Raves of Qud",
+          "focus": true
+        },
+        {
+          "sleep": 0.8
+        },
+        {
+          "click": [
+            908,
+            136
+          ],
           "window": "Raves of Qud"
         }
       ],
@@ -2275,8 +2319,8 @@
         "scene": "status_tinkering",
         "app": "raves"
       },
-      "timeout": 8,
-      "note": "Qud's Commands.xml default binding for this screen."
+      "timeout": 15,
+      "note": "Raves opens the status overlay with F2 and you pick a TAB — it does not implement Qud's per-screen letter bindings (e/k/x/n/j/q), which is what this edge used to send, so it reported every step OK and never arrived. Tab x MEASURED off the live strip at 1920x1080; y=136 is the strip's text row (the messagelog edge already used it). Qud's Commands.xml default binding for this screen."
     },
     {
       "app": "raves",
@@ -2287,7 +2331,18 @@
           "activate": "Raves of Qud"
         },
         {
-          "key": "j",
+          "key": "f2",
+          "window": "Raves of Qud",
+          "focus": true
+        },
+        {
+          "sleep": 0.8
+        },
+        {
+          "click": [
+            1080,
+            136
+          ],
           "window": "Raves of Qud"
         }
       ],
@@ -2295,8 +2350,8 @@
         "scene": "status_journal",
         "app": "raves"
       },
-      "timeout": 8,
-      "note": "Qud's Commands.xml default binding for this screen."
+      "timeout": 15,
+      "note": "Raves opens the status overlay with F2 and you pick a TAB — it does not implement Qud's per-screen letter bindings (e/k/x/n/j/q), which is what this edge used to send, so it reported every step OK and never arrived. Tab x MEASURED off the live strip at 1920x1080; y=136 is the strip's text row (the messagelog edge already used it). Qud's Commands.xml default binding for this screen."
     },
     {
       "app": "raves",
@@ -2307,7 +2362,18 @@
           "activate": "Raves of Qud"
         },
         {
-          "key": "q",
+          "key": "f2",
+          "window": "Raves of Qud",
+          "focus": true
+        },
+        {
+          "sleep": 0.8
+        },
+        {
+          "click": [
+            1236,
+            136
+          ],
           "window": "Raves of Qud"
         }
       ],
@@ -2315,8 +2381,8 @@
         "scene": "status_quests",
         "app": "raves"
       },
-      "timeout": 8,
-      "note": "Qud's Commands.xml default binding for this screen."
+      "timeout": 15,
+      "note": "Raves opens the status overlay with F2 and you pick a TAB — it does not implement Qud's per-screen letter bindings (e/k/x/n/j/q), which is what this edge used to send, so it reported every step OK and never arrived. Tab x MEASURED off the live strip at 1920x1080; y=136 is the strip's text row (the messagelog edge already used it). Qud's Commands.xml default binding for this screen."
     },
     {
       "app": "raves",
@@ -2327,7 +2393,18 @@
           "activate": "Raves of Qud"
         },
         {
-          "key": "ctrl+f",
+          "key": "f2",
+          "window": "Raves of Qud",
+          "focus": true
+        },
+        {
+          "sleep": 0.8
+        },
+        {
+          "click": [
+            1408,
+            136
+          ],
           "window": "Raves of Qud"
         }
       ],
@@ -2335,8 +2412,8 @@
         "scene": "status_reputation",
         "app": "raves"
       },
-      "timeout": 8,
-      "note": "Qud's Commands.xml default binding for this screen."
+      "timeout": 15,
+      "note": "Raves opens the status overlay with F2 and you pick a TAB — it does not implement Qud's per-screen letter bindings (e/k/x/n/j/q), which is what this edge used to send, so it reported every step OK and never arrived. Tab x MEASURED off the live strip at 1920x1080; y=136 is the strip's text row (the messagelog edge already used it). Qud's Commands.xml default binding for this screen."
     },
     {
       "app": "raves",
@@ -2348,14 +2425,15 @@
         },
         {
           "key": "f2",
-          "window": "Raves of Qud"
+          "window": "Raves of Qud",
+          "focus": true
         },
         {
-          "sleep": 0.6
+          "sleep": 0.8
         },
         {
           "click": [
-            1615,
+            1619,
             136
           ],
           "window": "Raves of Qud"
@@ -2365,7 +2443,8 @@
         "scene": "status_messagelog",
         "app": "raves"
       },
-      "timeout": 8
+      "timeout": 15,
+      "note": "Raves opens the status overlay with F2 and you pick a TAB — it does not implement Qud's per-screen letter bindings (e/k/x/n/j/q), which is what this edge used to send, so it reported every step OK and never arrived. Tab x MEASURED off the live strip at 1920x1080; y=136 is the strip's text row (the messagelog edge already used it). "
     },
     {
       "app": "raves",
