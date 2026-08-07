@@ -714,10 +714,10 @@
               {
                 "id": "map_editor",
                 "label": "Map Editor",
-                "note": "Qud's map editor: an 80x25 cell canvas with a blueprint palette. WALKED LIVE at 1920x1080 on Lumpy (Qud 1.0.5, 2026-08-06) — every menu opened and captured; the command surface below is cross-checked against Overlay.MapEditor.MapEditorView by reflection, so it includes verbs that have no menu entry. LAYOUT: menu bar y=16 (File x46, Edit x112, Transform x203, View x293, Recent x369), title 'Map Editor' centred x959; canvas x50..1470 y208..872 (80x25 => cell ~17.7x26.6) with a green cell cursor; palette panel x1524..1920 — filter field 'Enter text...' at y4..30, a '[ ] In Use' toggle at y46 (right edge), the blueprint list with per-row tile icons, and readouts at the bottom: 'Mouse Position: X, Y' + 'Brush: <name>' (y695) and 'Selected Cell: X, Y|none' (y716); control hints bottom-left y1029/y1045. EXIT: File > Exit > confirm Yes returns to the TOOLKIT menu, and it leaves the legacy view string stuck at 'MapEditor' — trust `scene` (window-priority), not `view`.",
+                "note": "Qud's map editor: an 80x25 cell canvas with a blueprint palette. WALKED LIVE at 1920x1080 on Lumpy (Qud 1.0.5, 2026-08-06) — every menu opened and captured; the command surface below is cross-checked against Overlay.MapEditor.MapEditorView by reflection, so it includes verbs that have no menu entry. LAYOUT: menu bar y=16 (File x46, Edit x112, Transform x203, View x293, Recent x369), title 'Map Editor' centred x959; canvas x50..1470 y208..872 (80x25 => cell ~17.7x26.6) with a green cell cursor; palette panel x1524..1920 — filter field 'Enter text...' at y4..30, a '[ ] In Use' toggle at y46 (right edge), the blueprint list with per-row tile icons, and readouts at the bottom: 'Mouse Position: X, Y' + 'Brush: <name>' (y695) and 'Selected Cell: X, Y|none' (y716); control hints bottom-left y1029/y1045. EXIT: File > Exit > confirm Yes returns to the TOOLKIT menu, and it leaves the legacy view string stuck at 'MapEditor' — trust `scene` (window-priority), not `view`. RAVES: MapEditorScreen.gd shipped — 95.16% content congruence at 1920x1080 on the first build, geometry MEASURED off the reference (menu text at x29/95/160/275/342, title x913, canvas 50,208 1420x664 = 80x25, palette pitch 24, readouts y688/y710, hints y1023/y1039). Working: the five menus with their verbatim items + hotkey column (Recent draws no panel when empty, matching Qud), the dotted 80x25 canvas with hover cursor, Shift+drag region select, Ctrl+click paint, Alt+click sample, Ctrl+Z undo, flips, Select All, the NorthSheva overlay toggle, the live palette from blueprints.json with filter + In Use, and all three readouts. NOT DONE: no .rpm file I/O (New/Load/Save/Save As and Test are inert), painted cells draw a placeholder swatch rather than the blueprint tile, and no per-object context menu yet. done.raves 0.6 reflects chrome+interaction complete, persistence and tile art absent.",
                 "done": {
                   "qud": 0.95,
-                  "raves": 0.0
+                  "raves": 0.6
                 },
                 "detect": {
                   "qud": [
@@ -747,7 +747,7 @@
                     "note": "New map (Ctrl+N) · Load map... (Ctrl+O) · Test (Ctrl+T) · Save (Ctrl+S) · Save As... | Reload Blueprints | Exit. Captured; MapEditorView backs these with NewMap/LoadMap/RunTest+BuildTestZone/Save/SaveAs/_ReloadBlueprints/Exit. Open at [46,16]; Exit at [64,260], confirm Yes at [925,555].",
                     "done": {
                       "qud": 0.95,
-                      "raves": 0.0
+                      "raves": 0.8
                     },
                     "detect": {},
                     "goto": {
@@ -771,7 +771,7 @@
                     "note": "Select All (Ctrl+A) · Undo (Ctrl+Z) · Redo (Ctrl+Y). Captured. MapEditorView: SelectAll/Undo/Redo over UndoStack+RedoStack, with ReverseAction as the primitive.",
                     "done": {
                       "qud": 0.95,
-                      "raves": 0.0
+                      "raves": 0.8
                     },
                     "detect": {},
                     "goto": {
@@ -795,7 +795,7 @@
                     "note": "Flip Horizontal · Flip Vertical (no hotkeys). Captured. MapEditorView: FlipHorizontal/FlipVertical — they act on SelectedRegion when one is set.",
                     "done": {
                       "qud": 0.95,
-                      "raves": 0.0
+                      "raves": 0.8
                     },
                     "detect": {},
                     "goto": {
@@ -819,7 +819,7 @@
                     "note": "Toggle NorthSheva Overlay (Ctrl+F1) — the ONLY item. It overlays the NorthSheva artwork as a tracing guide (MapEditorView.ToggleOverlay); that same sprite, NorthShevaTransparent, is the BackdropWindow asset found during the toolkit backdrop hunt.",
                     "done": {
                       "qud": 0.95,
-                      "raves": 0.0
+                      "raves": 0.8
                     },
                     "detect": {},
                     "goto": {
@@ -843,7 +843,7 @@
                     "note": "Recently-opened maps (MapEditorView RecentMenu/AddRecentFile/UpdateRecent/RecentClick, persisted via WriteModSettings). EMPTY on a fresh install — verified: opening it drew no panel, which is the expected zero-state, not a failure.",
                     "done": {
                       "qud": 0.9,
-                      "raves": 0.0
+                      "raves": 0.8
                     },
                     "detect": {},
                     "goto": {
@@ -867,7 +867,7 @@
                     "note": "x50..1470 y208..872; green cell cursor follows the mouse; left-click sets Selected Cell (readout updates), drag sets SelectedRegion (MapEditorView _dragStart/_dragDelta/isDragging, RenderSelectionFrame).",
                     "done": {
                       "qud": 0.9,
-                      "raves": 0.0
+                      "raves": 0.7
                     },
                     "detect": {}
                   },
@@ -877,7 +877,7 @@
                     "note": "Right panel: a text filter ('Enter text...', MapEditorView UpdateFilter/_DataFilter) over the full blueprint list with per-row tile icons, plus an 'In Use' checkbox (SetFilterUsed/_FilterUsed) limiting the list to blueprints already placed. Clicking a row sets the brush — VERIFIED: clicking row 'Across1' made the readout show 'Brush: Across1' (SetBrush/SetSelectedBlueprint/GetBrushText).",
                     "done": {
                       "qud": 0.9,
-                      "raves": 0.0
+                      "raves": 0.7
                     },
                     "detect": {}
                   },
@@ -887,7 +887,7 @@
                     "note": "'Mouse Position: X, Y' + 'Brush: <name>' at y695, 'Selected Cell: X, Y' (or 'none') at y716 — MapEditorView UpdateHoverXY/UpdateSelectedXY/GetBrushText. These are the cheapest live assertions for a driven map-editor test.",
                     "done": {
                       "qud": 0.95,
-                      "raves": 0.0
+                      "raves": 0.7
                     },
                     "detect": {}
                   },
@@ -897,7 +897,7 @@
                     "note": "DECODED FROM IL + VERIFIED LIVE (2026-08-06). The on-screen hint 'Ctrl+Click-Paint from palette' is MISLEADING: painting is not a click. MapEditorView.OnClick performs NO modifier check at all — it raycasts a cell and calls OnCommand (selection only). All three drag verbs live in OnDragMove, each gated on a modifier read with Input.GetKey: SHIFT (LeftShift/RightShift) -> region select (sets isDragging/_dragStart, Rect min/max, RenderSelectionFrame); CTRL (LeftControl/RightControl) -> PAINT (raycast -> MapFileRegion.GetOrCreateCellAt -> MapFileCell.Objects.Add -> UndoStack.Push -> RenderMap); NO MODIFIER -> camera pan (LetterboxCamera.SetPositionImmediately). A click never moves the pointer, so it can never reach a drag handler — which is exactly why every Ctrl+Click attempt silently did nothing while the brush readout looked correct. DRIVING IT SYNTHETICALLY IS ONLY PARTLY SOLVED, and the honest numbers matter: Ctrl+drag DOES paint — objects appear on the canvas and the count climbs across runs — but it is INTERMITTENT, not reliable. Identical gestures at the same coordinates sometimes place an object (+57 px, one sprite) and sometimes place nothing. An earlier claim here that paint simply 'works' was too confident; it lands often enough to prove the verb, not often enough to script against yet. HOLD DURATION MEASURED: `hv drag --hold` sets the pause between press and first move. Longer is WORSE — at 0.5s and 1.2s a Ctrl+drag painted NOTHING in any trial, while the 0.08 default paints some of the time. A long press before movement stops registering as a drag at all. The default is therefore 0.08 and the flag exists to be lowered, not raised. MENU HOTKEYS from Update(), all Ctrl+<key>: Z undo, Y redo, N new, O open, S save, T test, A select-all, plus Ctrl+F1 overlay. UNDOCUMENTED FIND — Ctrl+C is handled in Update() and does Map/SelectedRegion -> MapFileRegion.GetRegion -> Clone -> SetBrush, i.e. it copies the SELECTED REGION into the brush as a multi-cell stamp. It appears in no menu and no hint text. RESOLUTION: rather than keep tuning injected input, the mod drives these verbs directly — MapEditorDriver.Paint/Select/Context (bridge `mapedit`). Reliable where synthetic input was intermittent or impossible, and it is the same precedent as EmbarkDriver.",
                     "done": {
                       "qud": 0.85,
-                      "raves": 0.0
+                      "raves": 0.7
                     },
                     "detect": {}
                   },
