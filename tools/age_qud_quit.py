@@ -162,6 +162,16 @@ def main():
                "after_scene": after.get("scene"),
                "after_live": after.get("live"),
                "after_view": after.get("view"),
+               # THE FIELDS THAT SPLIT THE STRAND IN HALF (mod build 2026-08-07).
+               # Qud keeps two view names: cur_view is the LOGICAL one XRLCore's menu loop
+               # sets and tests, view is what GameManager.UpdateView last APPLIED. At a
+               # strand, cur_view=MainMenu means the menu loop ran and UpdateView did not;
+               # cur_view=Stage means control never got back to the loop. running/player
+               # split the collapsed `live` flag, so "the game ended" can be told from
+               # "The.Player went null while RunGame is still looping".
+               "after_cur_view": after.get("cur_view"),
+               "after_running": after.get("running"),
+               "after_player": after.get("player"),
                "after_window": after.get("window"),
                "missed": missed or None,
                "mod_log": log_since(off) or None}
@@ -179,9 +189,16 @@ def main():
             # PHOTOGRAPH the failure. The state file says which screen Qud THINKS it is on;
             # only the window says which one it is DRAWING, and the whole point of this edge's
             # history is that those two have disagreed.
+            # ACTIVATE before the shot. Qud does not repaint unfocused, so a capture taken
+            # as-is can be the last frame drawn before the game ended -- which is exactly the
+            # ambiguity that made the first strand photograph unreadable (a rendered stage
+            # that might have been a stale frame). Focus it, let it draw, then capture.
             shot = os.path.join(os.path.dirname(OUT), "age_fail_c%d.png" % cycle)
+            hv("activate", "CavesOfQud", timeout=30)
+            time.sleep(2.5)
             hv("shot", "CavesOfQud", shot, timeout=60)
-            print("   shot| " + shot)
+            print("   shot| %s  (activated first, so this is a LIVE frame)" % shot)
+            print("   state| " + json.dumps(qud_state()))
             print("Re-run to confirm the number repeats — if it does not, the count is not the "
                   "variable and the minutes/zone loads are worth a second look.")
             return 1
