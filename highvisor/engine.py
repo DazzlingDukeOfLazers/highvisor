@@ -610,6 +610,171 @@ class Engine:
         except OSError as e:
             return {"ok": False, "error": "qud bridge: %s" % e}
 
+    def _qud_command_chain(self, command, answers, timeout=25.0):
+        """Run a Qud command and answer the modals it raises AS THEY ARRIVE.
+
+        This replaces a blind `send, sleep 1.2, answer, sleep 1.2, answer` chain, and the
+        difference is not cosmetic. Both writes in the blind version succeeded whatever the
+        game did -- a TCP write to the mod cannot fail just because no popup was up -- so
+        every step reported ok and the only thing that could ever fail was the edge's verify,
+        45 seconds later, with no record of which prompt went unanswered. Three wrong
+        diagnoses came out of that gap ("stale save", "Raves contention", "process age");
+        what it actually hid is below.
+
+        **Qud's quit chain is not a fixed length.** Decompiled from the shipped assembly
+        (XRL.Core.XRLCore, case "CmdQuit"): after "Are you sure you want to quit?" -> Yes and
+        "Do you want to save first?", a THIRD prompt appears unless
+        `Options.DisablePermadeath || CheckpointingSystem.IsCheckpointingEnabled()` -- and
+        checkpointing is on only for **Wander/Roleplay** saves. On a **Classic** save Qud
+        raises `Popup.AskString(… Type 'ABANDON' to confirm)`, a TEXT-INPUT modal. Two blind
+        answers have nothing for it, so it sits there with the turn thread parked inside it,
+        the state file reads In-Game forever, and -- the part that made this look like
+        process ageing -- every later `goto in_game` is a NO-OP, because the tree still calls
+        that state in_game, so "retrying on a fresh load" never reloaded anything.
+
+        We answer that prompt by REFUSING it. Typing ABANDON is the quit-without-saving path
+        for a permadeath character: it sets a DeathReason and ends the run. A harness must not
+        destroy a character to satisfy a state transition, so the input modal is CANCELLED and
+        the edge fails with what happened. The planner's `"*" -> title` restart edge is the
+        non-destructive way out, and it will be re-planned onto automatically.
+
+        Matching is by CONTENT, never by the popup's id. The mod re-publishes the live popup
+        on every client connect, and highvisor's own state poller connects about twice a
+        second, so one prompt arrives over and over with a fresh id each time -- answering per
+        id sends the second answer to the first prompt (measured: it answered "Are you sure
+        you want to quit?" twice in 0.31s).
+        """
+        import json as _json
+        import socket as _socket
+        import struct as _struct
+        import time as _time
+        from .apps import PROFILES
+        port = PROFILES.get("qud", {}).get("port", 48710)
+
+        def _send(sock, obj):
+            p = _json.dumps(obj).encode("utf-8")
+            sock.sendall(_struct.pack(">I", len(p)) + p)
+
+        def _sig(f):
+            return ((f.get("message") or "")
+                    + "|" + ",".join(b.get("command", "") for b in f.get("buttons") or []))
+
+        pending = list(answers or [])
+        answered = []
+        try:
+            with _socket.create_connection(("127.0.0.1", port), timeout=5) as s:
+                # The mod re-broadcasts the live popup to a joining client, so a short drain
+                # here says whether a modal was ALREADY up. That is not our prompt and must
+                # not eat an answer -- record it as seen and let the edge's preflight own it.
+                buf = b""
+                seen = set()
+                deadline = _time.time() + 0.6
+                while _time.time() < deadline:
+                    s.settimeout(max(0.05, deadline - _time.time()))
+                    try:
+                        chunk = s.recv(65536)
+                    except (_socket.timeout, OSError):
+                        break
+                    if not chunk:
+                        break
+                    buf += chunk
+                    while len(buf) >= 4:
+                        n = _struct.unpack(">I", buf[:4])[0]
+                        if len(buf) < 4 + n:
+                            break
+                        body, buf = buf[4:4 + n], buf[4 + n:]
+                        try:
+                            f = _json.loads(body.decode("utf-8", "replace"))
+                        except ValueError:
+                            continue
+                        if f.get("type") == "popup" and f.get("active"):
+                            seen.add(_sig(f))
+
+                _send(s, {"type": "command", "name": "command", "command": command})
+                if not pending:
+                    return {"ok": True, "command": command, "answered": []}
+
+                # Keep reading until every answer has found its prompt, then a beat longer to
+                # catch a prompt we did NOT expect -- which is the whole point.
+                deadline = _time.time() + float(timeout)
+                grace = None
+                while _time.time() < deadline:
+                    s.settimeout(0.3)
+                    try:
+                        chunk = s.recv(65536)
+                    except _socket.timeout:
+                        if grace is not None and _time.time() > grace:
+                            return {"ok": True, "command": command, "answered": answered}
+                        continue
+                    except OSError as e:
+                        return {"ok": False, "error": "qud bridge: %s" % e}
+                    if not chunk:
+                        break
+                    buf += chunk
+                    while len(buf) >= 4:
+                        n = _struct.unpack(">I", buf[:4])[0]
+                        if len(buf) < 4 + n:
+                            break
+                        body, buf = buf[4:4 + n], buf[4 + n:]
+                        try:
+                            f = _json.loads(body.decode("utf-8", "replace"))
+                        except ValueError:
+                            continue
+                        if f.get("type") != "popup" or not f.get("active"):
+                            continue
+                        sig = _sig(f)
+                        if sig in seen:
+                            continue          # a re-announce of one we already handled
+                        seen.add(sig)
+                        msg = (f.get("message") or "").strip()
+                        if f.get("kind") == "input":
+                            # The ABANDON prompt (or any other typed confirmation). Cancel it
+                            # so the game is left live and intact, and say why we stopped.
+                            _send(s, {"type": "command", "name": "popup",
+                                      "action": "button", "btn": "Cancel"})
+                            return {"ok": False, "answered": answered,
+                                    "error": "%s raised a TEXT-INPUT confirmation this edge "
+                                             "must not answer: %r. Qud asks that only when the "
+                                             "save has no checkpointing (a Classic character), "
+                                             "and typing it quits WITHOUT SAVING, ending a "
+                                             "permadeath run. Cancelled it; the game is still "
+                                             "live. Use a Wander/Roleplay save, or reach the "
+                                             "title by restarting."
+                                             % (command, msg[:90])}
+                        if not pending:
+                            _send(s, {"type": "command", "name": "popup",
+                                      "action": "button", "btn": "Cancel"})
+                            return {"ok": False, "answered": answered,
+                                    "error": "%s raised an unexpected extra prompt %r after "
+                                             "%d answer(s); cancelled it rather than guessing"
+                                             % (command, msg[:90], len(answered))}
+                        btn = pending.pop(0)
+                        have = [b.get("command", "") for b in f.get("buttons") or []]
+                        if btn not in have:
+                            _send(s, {"type": "command", "name": "popup",
+                                      "action": "button", "btn": "Cancel"})
+                            return {"ok": False, "answered": answered,
+                                    "error": "%s: prompt %r offers %s, not %r -- cancelled "
+                                             "rather than pressing the wrong button"
+                                             % (command, msg[:60], have, btn)}
+                        _send(s, {"type": "command", "name": "popup",
+                                  "action": "button", "btn": btn})
+                        answered.append({"prompt": msg[:60], "btn": btn})
+                        if not pending:
+                            # Everything we planned for is answered. Watch a little longer:
+                            # a further prompt now is the Classic-save case above.
+                            grace = _time.time() + 3.0
+
+                if pending:
+                    return {"ok": False, "answered": answered,
+                            "error": "%s: no popup appeared to answer %r (waited %.0fs). The "
+                                     "command reached the mod, so the turn thread never got "
+                                     "to it -- a modal already up, or no live game."
+                                     % (command, pending[0], timeout)}
+                return {"ok": True, "command": command, "answered": answered}
+        except OSError as e:
+            return {"ok": False, "error": "qud bridge: %s" % e}
+
     def _qud_bridge(self, name, focus=True, args=None):
         """Send a bare {"type":"command","name":...} frame to the Qud mod bridge
         (listener is up from the main menu on — ModSensitiveCacheInit). First-party
@@ -1657,25 +1822,22 @@ class Engine:
                 # flow the game's own UI owns -- Qud's modern screens ignore synthesized keys.
                 # Unconditional here, because a transition already knows which state it is
                 # leaving; the `dismiss` form below is for when that has to be re-checked.
-                r = self._qud_command(step["command"])
+                #
+                # The answers are delivered ON ARRIVAL over a held bridge connection, not on a
+                # 1.2s timer. The timer version could not fail -- a socket write succeeds
+                # whether or not a modal is up -- so an unanswered prompt surfaced only as the
+                # verify timing out 45s later, which is how a Classic save's third, TEXT-INPUT
+                # confirm got mistaken three times for the process ageing. See
+                # `_qud_command_chain`.
+                answers = step.get("answers") or []
+                r = self._qud_command_chain(step["command"], answers,
+                                            timeout=float(step.get("answer_timeout", 25)))
                 if not r.get("ok"):
                     return {"ok": False,
                             "error": "command %s: %s" % (step["command"], r.get("error"))}
-                answers = step.get("answers") or []
-                for btn in answers:
-                    # BLIND, deliberately, and this was tried the other way. Gating each answer on
-                    # a reported popup looked like the obvious upgrade — the mod publishes the
-                    # active modal — but the CmdQuit confirms are not among the kinds it reports,
-                    # so the gate never opened and it broke a path that worked. An answer with
-                    # nothing to answer is a no-op, so sending on a timer is safe; what is NOT
-                    # safe is assuming the app has settled by the time the edge verifies, which is
-                    # handled by the dismiss step after this one.
-                    time.sleep(1.2)
-                    rr = self._qud_popup_answer(btn)
-                    if not rr.get("ok"):
-                        return {"ok": False, "error": "answer %r: %s" % (btn, rr.get("error"))}
                 return {"ok": True,
-                        "detail": "%s + %d answer(s)" % (step["command"], len(answers))}
+                        "detail": "%s + %d answer(s)" % (step["command"],
+                                                         len(r.get("answered") or []))}
 
             if "load_save" in step:
                 # Load a save through the mod's own `loadsave {id}` bridge command: exact ID,
@@ -1773,14 +1935,13 @@ class Engine:
         if win is None:
             return {"ok": False, "error": "dismiss: no window for %s" % app}
         if cond.get("command"):
-            r = self._qud_command(cond["command"])
+            # Same observed-arrival delivery as the `command` step above -- a dismiss that
+            # answers a chain must be able to report an unanswered prompt, not just that its
+            # writes left the machine. With no `answers` this is a plain command send.
+            r = self._qud_command_chain(cond["command"], cond.get("answers") or [],
+                                        timeout=float(cond.get("answer_timeout", 25)))
             if not r.get("ok"):
                 return {"ok": False, "error": "dismiss command: %s" % r.get("error")}
-            for btn in (cond.get("answers") or []):
-                time.sleep(1.2)
-                rr = self._qud_popup_answer(btn)
-                if not rr.get("ok"):
-                    return {"ok": False, "error": "dismiss answer: %s" % rr.get("error")}
         elif cond.get("bridge"):
             # first-party dismissal -- no OCR, no coords, no focus steal
             r = self._qud_bridge(cond["bridge"])

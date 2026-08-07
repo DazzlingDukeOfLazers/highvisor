@@ -1419,7 +1419,8 @@
           "answers": [
             "Yes",
             "No"
-          ]
+          ],
+          "note": "Answered ON ARRIVAL, not on a timer: the old blind version slept 1.2s between sends, and a socket write to the mod succeeds whether or not a modal is up, so the step could not fail and the real fault surfaced 45s later as the verify. See engine._qud_command_chain."
         },
         {
           "dismiss": {
@@ -1433,7 +1434,7 @@
         "scene": "MainMenu"
       },
       "timeout": 45,
-      "note": "LEAVE A LIVE GAME, first-party throughout: CmdQuit goes through Qud's own command path and the confirms are answered BY BUTTON via the mod, so nothing here depends on synthesized keys -- which Qud's modern UI ignores outright. Yes to 'are you sure you want to quit', then NO to 'do you want to save first': Yes would overwrite the fixture save with whatever state the harness drove the character into, destroying the reference every parity capture is measured against."
+      "note": "LEAVE A LIVE GAME, first-party throughout: CmdQuit goes through Qud's own command path and the confirms are answered BY BUTTON via the mod, so nothing here depends on synthesized keys -- which Qud's modern UI ignores outright. Yes to 'are you sure you want to quit', then NO to 'do you want to save first': Yes would overwrite the fixture save with whatever state the harness drove the character into, destroying the reference every parity capture is measured against. (Qud DISCARDS that second answer -- decompiled XRLCore assigns DialogResult.No and then ignores the prompt's return -- but answer it correctly anyway; the prompt is real and must be cleared.)\n\nTHE CHAIN IS ONLY TWO PROMPTS LONG FOR A CHECKPOINTING SAVE. Measured 2026-08-07 against the shipped assembly and live: CmdQuit raises a THIRD confirm unless Options.DisablePermadeath or CheckpointingSystem.IsCheckpointingEnabled(), and checkpointing is on only for GameMode Wander/Roleplay. On a CLASSIC save Qud raises Popup.AskString('… Type ABANDON to confirm'), a text-input modal. This edge REFUSES to type it -- that is the quit-without-saving path for a permadeath character -- so the engine cancels it and fails with that reason, leaving the game live and the character intact. Reaching the title from a Classic game means restarting.\n\nThat third prompt is the whole of the 'the quit edge breaks on a long-lived process' bug. It never was process age: a bare load/quit loop on the Wander fixture ran 40/40 clean in 9.2 minutes. The session that failed had a Classic character loaded, so the chain hung on the ABANDON prompt every time -- and because the tree still calls that state in_game, every 'retry on a fresh load' planned zero steps and re-tested the same stuck game. Answers are now delivered when the prompt ARRIVES, over a held bridge connection, so an unanswered prompt fails HERE with its text instead of surfacing as the verify timing out 45s later."
     },
     {
       "app": "qud",
