@@ -1510,6 +1510,13 @@ class Engine:
                             "error": "command %s: %s" % (step["command"], r.get("error"))}
                 answers = step.get("answers") or []
                 for btn in answers:
+                    # BLIND, deliberately, and this was tried the other way. Gating each answer on
+                    # a reported popup looked like the obvious upgrade — the mod publishes the
+                    # active modal — but the CmdQuit confirms are not among the kinds it reports,
+                    # so the gate never opened and it broke a path that worked. An answer with
+                    # nothing to answer is a no-op, so sending on a timer is safe; what is NOT
+                    # safe is assuming the app has settled by the time the edge verifies, which is
+                    # handled by the dismiss step after this one.
                     time.sleep(1.2)
                     rr = self._qud_popup_answer(btn)
                     if not rr.get("ok"):

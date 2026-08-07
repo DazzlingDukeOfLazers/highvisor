@@ -1059,12 +1059,19 @@
             "Yes",
             "No"
           ]
+        },
+        {
+          "dismiss": {
+            "scene": "PopupMessage",
+            "bridge": "uiback"
+          },
+          "note": "SETTLE. Answering the quit confirms over the bridge can leave a PopupMessage reported for a while after the game has actually ended — and PopupMessage is one of the scenes in_game's detector claims, so the edge verified 'still In-Game' and failed while Qud was already on its way to the menu (it read MainMenu ~40s later, unaided). Driving popups over the bridge is what leaves them, so the edge that drives them clears them. Conditional, so it is a no-op when nothing is up — an unconditional uiback at the MainMenu would hit the menu's own Cancel."
         }
       ],
       "verify": {
         "scene": "MainMenu"
       },
-      "timeout": 25,
+      "timeout": 45,
       "note": "LEAVE A LIVE GAME, first-party throughout: CmdQuit goes through Qud's own command path and the confirms are answered BY BUTTON via the mod, so nothing here depends on synthesized keys -- which Qud's modern UI ignores outright. Yes to 'are you sure you want to quit', then NO to 'do you want to save first': Yes would overwrite the fixture save with whatever state the harness drove the character into, destroying the reference every parity capture is measured against."
     },
     {
@@ -1442,14 +1449,22 @@
       "to": "title",
       "steps": [
         {
-          "bridge": "uiback"
+          "activate": "CavesOfQud"
+        },
+        {
+          "click_text": "Back",
+          "window": "CavesOfQud",
+          "offset": [
+            0,
+            -40
+          ],
+          "note": "CLICK, not uiback. ModernHighScores ignores the mod's first-party back command — measured twice (2026-08-06 from the daemon and from a raw socket, so it is the screen, not the transport), and again in the 2026-08-07 FULL run where it stranded Qud on Records and took options/mods down with it. Qud's modern screens DO take synthesized clicks. The hit area is ~40px ABOVE the '[Esc] Back' caption, which is what `offset` is for."
         }
       ],
       "verify": {
         "scene": "MainMenu"
       },
       "timeout": 12,
-      "cost": 12,
       "note": "MEASURED FLAKY, priced accordingly. uiback reaches the active window's own OnCancel/Exit, which covers the other modern menus -- but ModernHighScores did NOT budge when this was measured directly (2026-08-06, both from the daemon and from a raw socket, so it is the screen and not the transport). The edge stays because it sometimes works and it verifies its own arrival; the explicit cost keeps the planner from routing THROUGH Records, and a failure re-plans onto restart instead of stranding on a screen with no exit."
     },
     {
@@ -1599,12 +1614,18 @@
         {
           "click_text": "Continue",
           "window": "Raves of Qud"
+        },
+        {
+          "key": "space",
+          "window": "Raves of Qud",
+          "note": "ACTIVATE. Raves' title menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted the item and stopped there — the recipe then failed its own assert while sitting on the title. Only the in_game edge carried this, which is why that one worked and every other title edge did not. An older note claimed a hover-click self-activates here; that stopped being true when the menus went 1:1 keyboard-first, and nothing re-drove them until this FULL run."
         }
       ],
       "verify": {
         "scene": "loadgame"
       },
-      "timeout": 12
+      "timeout": 12,
+      "note": "CONDITIONAL SCREEN — this edge legitimately fails sometimes. Raves' Continue opens the Load Game picker only when there is a choice to make; otherwise it goes STRAIGHT in-game and `loadgame` never exists to arrive at. Measured 2026-08-07 with four saves on disk and it still went straight in, so the condition is not simply 'more than one save'. The verify says 'got In-Game' rather than passing on the wrong screen, which is the right failure: treat it as 'the picker did not appear', not as a broken recipe. `hv loadsave <name>` is the way to reach a SPECIFIC save regardless."
     },
     {
       "app": "raves",
@@ -1635,6 +1656,11 @@
         {
           "click_text": "Records",
           "window": "Raves of Qud"
+        },
+        {
+          "key": "space",
+          "window": "Raves of Qud",
+          "note": "ACTIVATE. Raves' title menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted the item and stopped there — the recipe then failed its own assert while sitting on the title. Only the in_game edge carried this, which is why that one worked and every other title edge did not. An older note claimed a hover-click self-activates here; that stopped being true when the menus went 1:1 keyboard-first, and nothing re-drove them until this FULL run."
         }
       ],
       "verify": {
@@ -1671,6 +1697,11 @@
         {
           "click_text": "Options",
           "window": "Raves of Qud"
+        },
+        {
+          "key": "space",
+          "window": "Raves of Qud",
+          "note": "ACTIVATE. Raves' title menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted the item and stopped there — the recipe then failed its own assert while sitting on the title. Only the in_game edge carried this, which is why that one worked and every other title edge did not. An older note claimed a hover-click self-activates here; that stopped being true when the menus went 1:1 keyboard-first, and nothing re-drove them until this FULL run."
         }
       ],
       "verify": {
@@ -1707,6 +1738,11 @@
         {
           "click_text": "Mods",
           "window": "Raves of Qud"
+        },
+        {
+          "key": "space",
+          "window": "Raves of Qud",
+          "note": "ACTIVATE. Raves' title menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted the item and stopped there — the recipe then failed its own assert while sitting on the title. Only the in_game edge carried this, which is why that one worked and every other title edge did not. An older note claimed a hover-click self-activates here; that stopped being true when the menus went 1:1 keyboard-first, and nothing re-drove them until this FULL run."
         }
       ],
       "verify": {
@@ -1761,6 +1797,11 @@
         {
           "click_text": "New Game",
           "window": "Raves of Qud"
+        },
+        {
+          "key": "space",
+          "window": "Raves of Qud",
+          "note": "ACTIVATE. Raves' title menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted the item and stopped there — the recipe then failed its own assert while sitting on the title. Only the in_game edge carried this, which is why that one worked and every other title edge did not. An older note claimed a hover-click self-activates here; that stopped being true when the menus went 1:1 keyboard-first, and nothing re-drove them until this FULL run."
         }
       ],
       "verify": {
@@ -2037,6 +2078,11 @@
         {
           "click_text": "New Game",
           "window": "Raves of Qud"
+        },
+        {
+          "key": "space",
+          "window": "Raves of Qud",
+          "note": "ACTIVATE. Raves' title menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted the item and stopped there — the recipe then failed its own assert while sitting on the title. Only the in_game edge carried this, which is why that one worked and every other title edge did not. An older note claimed a hover-click self-activates here; that stopped being true when the menus went 1:1 keyboard-first, and nothing re-drove them until this FULL run."
         }
       ],
       "verify": {
