@@ -23,13 +23,18 @@ fix compounds. Concretely:
 | blind top-row Continue clicks | `hv loadsave <name>` (row computed from DISK metadata — `hv saves` lists them, no game launch) |
 
 The daemon **self-restarts** (2026-08-03): a source watcher re-execs it when any highvisor `.py`
-changes (edit → it picks itself up in ~2s), and `hv install-daemon` adds a launchd KeepAlive agent
-for crash restart. **You cannot check that by PID or uptime** — `os.execv` replaces the
+changes (edit → it picks itself up in ~2s), and the launchd KeepAlive agent is INSTALLED (2026-08-06,
+`com.highvisor.daemon`) so a crash respawns it — verified by `kill -9`: new pid, port
+listening ~5s later. Its plist pins the interpreter to `.venv/bin/python`, so rebuilding
+the venv at a different path means re-running `hv install-daemon`. Logs:
+`~/Library/Logs/highvisor.log`. **You cannot check that by PID or uptime** — `os.execv` replaces the
 process image in place, so both are PRESERVED across a re-exec. A daemon showing hours of uptime
 may well be running code you saved a minute ago. To tell, grep the daemon log for
 `source changed: … — re-exec`, or call an op and look for behaviour only the new code has. (Cost
 of learning this the other way: a wrong "the watcher is broken" conclusion, and a pointless manual
-daemon restart.) If `nc -z 127.0.0.1 48720` fails AND the agent isn't installed, ask Daniel.
+daemon restart.) If `nc -z 127.0.0.1 48720` fails now, the AGENT is down, not just the process —
+`launchctl print gui/$(id -u)/com.highvisor.daemon` first, and check the log before
+restarting anything by hand.
 `webui/` static files still only need a browser reload.
 
 ## THE TIMESHARE GUARD — this machine is shared
