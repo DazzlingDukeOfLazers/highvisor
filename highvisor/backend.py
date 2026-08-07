@@ -160,6 +160,19 @@ class PlatformBackend:
         when explicitly requested, so it never reaches a backend that lacks the arg."""
         raise NotImplementedError
 
+    def scroll(self, target: str, x: int, y: int, dy: int = 1, dx: int = 0,
+               mods: str = "") -> ActionResult:
+        """Wheel event at a window point. ``dy`` is in LINES, positive = up/away;
+        ``mods`` is a comma list (ctrl,cmd,shift,alt) applied as event FLAGS, never as
+        held keys — a held modifier is the stuck-modifier bug waiting to happen.
+
+        Separate from ``click`` because a wheel is not a button: it carries no position
+        of its own and lands wherever the OS cursor is, so an implementation must warp
+        first. Added for Raves' Ctrl+wheel state-graph panel, which no other op could
+        reach — and a gesture that can only be tested by hand is a gesture that stops
+        being tested."""
+        return ActionResult.fail("scroll not implemented on this backend")
+
     def inspect(self, target: str, depth: int = 3) -> Element:
         raise NotImplementedError
 

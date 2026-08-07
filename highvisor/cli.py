@@ -237,6 +237,14 @@ def _cmd_plan(a):
     raise SystemExit(0)
 
 
+def _cmd_scroll(a):
+    """Wheel event at a window point, e.g. `hv scroll raves 960 540 --dy 1 --mods ctrl`."""
+    res = _call({"op": P.OP_SCROLL, "target": a.target, "x": a.x, "y": a.y,
+                 "dy": a.dy, "dx": a.dx, "mods": a.mods or ""})
+    _print_json(res)
+    raise SystemExit(0 if res.get("ok") else 1)
+
+
 def _cmd_wish(a):
     """Run a Caves of Qud wish through the Raves mod bridge (godmode, item:..., xp:...)."""
     res = _call({"op": P.OP_QUDWISH, "wish": " ".join(a.text)})
@@ -864,6 +872,15 @@ def build_parser():
                    help="plan from this state instead of the detected one (a node id, "
                         "'off' or 'unknown')")
     s.set_defaults(fn=_cmd_plan)
+
+    s = sub.add_parser("scroll", help="wheel event at a window point (dy in LINES, + = up), e.g. hv scroll raves 960 540 --dy 1 --mods ctrl")
+    s.add_argument("target")
+    s.add_argument("x", type=int)
+    s.add_argument("y", type=int)
+    s.add_argument("--dy", type=int, default=1, help="lines; positive = wheel up/away")
+    s.add_argument("--dx", type=int, default=0, help="lines; horizontal")
+    s.add_argument("--mods", default="", help="comma list applied as event FLAGS: ctrl,cmd,shift,alt")
+    s.set_defaults(fn=_cmd_scroll)
 
     s = sub.add_parser("wish", help="run a Caves of Qud wish via the Raves bridge, e.g. hv wish godmode")
     s.add_argument("text", nargs="+", help="the wish text (godmode | item:<Blueprint> | xp:<n> | ...)")

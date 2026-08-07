@@ -389,17 +389,7 @@ class MacBackend(PlatformBackend):
         # Modifier-clicks (Cmd+Right-click = Raves' element-feedback gesture): set the flag on the
         # MOUSE events themselves. Flags-only is enough for Godot -- it reads event.meta_pressed off
         # the click -- and avoids the stuck-modifier class of bug entirely (nothing is ever held).
-        flags = 0
-        for m in (mods or "").split(","):
-            m = m.strip().lower()
-            if m in ("cmd", "meta", "command"):
-                flags |= Quartz.kCGEventFlagMaskCommand
-            elif m in ("ctrl", "control"):
-                flags |= Quartz.kCGEventFlagMaskControl
-            elif m == "shift":
-                flags |= Quartz.kCGEventFlagMaskShift
-            elif m in ("alt", "opt", "option"):
-                flags |= Quartz.kCGEventFlagMaskAlternate
+        flags = self._mod_flags(mods)
         # a stuck HID modifier (see _clear_stuck_mods) rides on mouse events too -- a plain
         # left click would arrive as Cmd+click. Clear anything we didn't ask for.
         self._clear_stuck_mods(keep=flags)
@@ -416,6 +406,109 @@ class MacBackend(PlatformBackend):
                             detail="%s%s%s click @ global (%d,%d)"
                                    % ("hover+" if hover else "", "double " if double else "",
                                       button, gx, gy))
+
+    def scroll(self, target: str, x: int, y: int, dy: int = 1, dx: int = 0,
+               mods: str = "") -> ActionResult:
+        """Post a scroll-wheel event at a window point, optionally modifier-flagged.
+
+        Written for a gesture no other op could reach: Raves' state-graph panel opens on
+        **Ctrl+wheel**, and there was no way to drive a wheel at all, let alone a modified one.
+        Working around that with a keyboard shortcut would have tested a different code path
+        than the one the viewer uses.
+
+        Same shape as `click`: warp the real cursor first (the wheel goes to whatever is under
+        it, and Unity/Godot read the actual position), HID source and HID tap, and the modifier
+        as a FLAG on the event rather than a held key — nothing to get stuck.
+
+        `dy` is in LINES, positive = wheel-up/away. macOS reports line units as the coarse,
+        universally-understood unit; pixel units would need a device profile to mean anything.
+        """
+        w = self._resolve(target)
+        if w is None:
+            return ActionResult.fail("scroll needs a window target")
+        wx, wy, ww, wh = self._bounds(w)
+        gx, gy = wx + int(x), wy + int(y)
+        self.activate(target)
+        time.sleep(0.06)
+        src = Quartz.CGEventSourceCreate(Quartz.kCGEventSourceStateHIDSystemState)
+        pt = Quartz.CGPointMake(gx, gy)
+        Quartz.CGWarpMouseCursorPosition(pt)
+        Quartz.CGEventPost(Quartz.kCGHIDEventTap,
+            Quartz.CGEventCreateMouseEvent(src, Quartz.kCGEventMouseMoved, pt,
+                                           Quartz.kCGMouseButtonLeft))
+        time.sleep(0.05)
+        flags = self._mod_flags(mods)
+        self._clear_stuck_mods(keep=0)
+        # MEASURED: flags alone are NOT enough for a modified WHEEL. Setting
+        # kCGEventFlagMaskControl on the scroll event and posting it gets the wheel through to
+        # Godot with ctrl_pressed FALSE — Raves' Ctrl+wheel panel never opened, while a plain
+        # wheel zoomed the camera every time. (The flags-only trick documented on `click` is a
+        # different path and stays as it is; do not "unify" them without re-measuring.)
+        #
+        # So for scroll we hold the REAL modifier around the event, which produces genuine
+        # hardware modifier state. That is the stuck-modifier bug class the repo lost a day to,
+        # so the release is in a `finally` and a belt-and-braces clear follows it: a modifier
+        # orphaned DOWN makes every later synthetic key arrive modified and silently no-op,
+        # surviving app restarts, and it is close to undiagnosable from the app side.
+        held = self._mod_keycodes(mods)
+        try:
+            for kc in held:
+                Quartz.CGEventPost(Quartz.kCGHIDEventTap,
+                                   Quartz.CGEventCreateKeyboardEvent(src, kc, True))
+            if held:
+                time.sleep(0.04)
+            ev = Quartz.CGEventCreateScrollWheelEvent(src, Quartz.kCGScrollEventUnitLine,
+                                                      2, int(dy), int(dx))
+            if flags:
+                Quartz.CGEventSetFlags(ev, flags)
+            # The wheel event carries no position of its own — it lands wherever the cursor is,
+            # which is why the warp above is not optional.
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+            time.sleep(0.05)
+        finally:
+            for kc in reversed(held):
+                Quartz.CGEventPost(Quartz.kCGHIDEventTap,
+                                   Quartz.CGEventCreateKeyboardEvent(src, kc, False))
+            if held:
+                time.sleep(0.03)
+                self._clear_stuck_mods(keep=0)
+        return ActionResult(ok=True, tier=4,
+                            detail="scroll dy=%d dx=%d%s @ global (%d,%d)"
+                                   % (int(dy), int(dx),
+                                      (" mods=%s" % mods) if mods else "", gx, gy))
+
+    # Virtual keycodes for the LEFT-hand modifier keys, for the cases where a flag on the
+    # event is not enough and the key has to actually be held.
+    _MOD_KEYCODE = {"cmd": 0x37, "meta": 0x37, "command": 0x37,
+                    "ctrl": 0x3B, "control": 0x3B,
+                    "shift": 0x38,
+                    "alt": 0x3A, "opt": 0x3A, "option": 0x3A}
+
+    @classmethod
+    def _mod_keycodes(cls, mods: str) -> list:
+        out = []
+        for m in (mods or "").split(","):
+            kc = cls._MOD_KEYCODE.get(m.strip().lower())
+            if kc is not None and kc not in out:
+                out.append(kc)
+        return out
+
+    @staticmethod
+    def _mod_flags(mods: str) -> int:
+        """Modifier names -> CGEventFlags. Shared by click and scroll so one spelling of
+        'cmd'/'meta'/'command' works everywhere."""
+        flags = 0
+        for m in (mods or "").split(","):
+            m = m.strip().lower()
+            if m in ("cmd", "meta", "command"):
+                flags |= Quartz.kCGEventFlagMaskCommand
+            elif m in ("ctrl", "control"):
+                flags |= Quartz.kCGEventFlagMaskControl
+            elif m == "shift":
+                flags |= Quartz.kCGEventFlagMaskShift
+            elif m in ("alt", "opt", "option"):
+                flags |= Quartz.kCGEventFlagMaskAlternate
+        return flags
 
     def mouse_move(self, target: str, x: int, y: int) -> ActionResult:
         """Warp + post a real mouseMoved at a window point — NO buttons. Activates

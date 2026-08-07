@@ -174,7 +174,7 @@ class Engine:
         # whether the action landed (RPC-level failures come back as exceptions).
         # Focus/mouse-stealing ops go through the TIMESHARE GUARD (audio countdown,
         # focus+mouse save/restore, abort channels, 20s cap — see guard.py).
-        if op in (P.OP_ACTIVATE, P.OP_TEXT, P.OP_KEY, P.OP_CLICK, P.OP_MOUSE):
+        if op in (P.OP_ACTIVATE, P.OP_TEXT, P.OP_KEY, P.OP_CLICK, P.OP_MOUSE, P.OP_SCROLL):
             _gerr = self.guard.begin()
             if _gerr:
                 return {"ok": False, "error": _gerr}
@@ -197,6 +197,14 @@ class Engine:
                 kw["mods"] = str(req["mods"])
             return b.click(req["target"], int(req.get("x", 0)), int(req.get("y", 0)),
                            **kw).to_dict()
+
+        if op == P.OP_SCROLL:
+            # A WHEEL event, optionally modifier-flagged. Distinct from click because a wheel
+            # carries no position: it lands under the OS cursor, so the backend warps first.
+            # Guarded like every other input op — it moves the mouse and takes focus.
+            return b.scroll(req["target"], int(req.get("x", 0)), int(req.get("y", 0)),
+                            dy=int(req.get("dy", 1)), dx=int(req.get("dx", 0)),
+                            mods=str(req.get("mods", ""))).to_dict()
 
         if op == P.OP_MOUSE:
             # pure hover: warp + a real mouseMoved so engines that read
