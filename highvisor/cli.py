@@ -301,6 +301,18 @@ def _cmd_loadsave(a):
     raise SystemExit(0 if res.get("ok") else 1)
 
 
+def _cmd_quit(a):
+    """Stop an app and LEAVE it stopped — the gap between `launch` and `restart`.
+
+    Wanted whenever a test needs one app alone: these two mirror each other's modals over
+    the bridge, so "does this still fail with only Qud up?" is a real question, and before
+    this the only way to ask it was hand-driving the app's own quit menu.
+    """
+    res = _call({"op": P.OP_QUIT, "app": a.app, "force": bool(a.force)}, timeout=40.0)
+    _print_json(res)
+    raise SystemExit(0 if res.get("ok") else 1)
+
+
 def _cmd_restart(a):
     """Clean restart: kill EVERY instance (duplicates too), launch solo, wait for the window."""
     res = _call({"op": P.OP_RESTART, "app": a.app}, timeout=120.0)
@@ -1054,6 +1066,13 @@ def build_parser():
 
     s = sub.add_parser("back", help="close/back out of Qud's current modern menu (first-party uiback)")
     s.set_defaults(fn=lambda a: _print_json(_call({"op": P.OP_QUDBACK})))
+    s = sub.add_parser("quit", help="stop an app and leave it stopped (TERM; --force for KILL)")
+    s.add_argument("app", help="qud | raves")
+    s.add_argument("--force", action="store_true",
+                   help="SIGKILL instead of a graceful TERM — skips the app's own shutdown, "
+                        "so it can lose state the app writes on the way out")
+    s.set_defaults(fn=_cmd_quit)
+
     s = sub.add_parser("restart", help="clean restart: kill ALL instances, launch solo, wait for the window")
     s.add_argument("app", help="qud | raves")
     s.set_defaults(fn=_cmd_restart)

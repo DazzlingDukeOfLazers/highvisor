@@ -309,6 +309,9 @@ class Engine:
         if op == P.OP_TRACE:
             return self._read_trace(req.get("limit", 20))
 
+        if op == P.OP_QUIT:
+            return self._quit_app(b, req.get("app"), force=bool(req.get("force")))
+
         if op == P.OP_RESTART:
             return self._restart_app(b, req.get("app", ""))
 
@@ -708,6 +711,62 @@ class Engine:
         return {"ok": True, "saves": out}
 
     # ------------------------------------------------------- clean restart
+    def _quit_app(self, b, app, force=False):
+        """Stop EVERY instance of an app and leave it stopped.
+
+        The gap this fills: highvisor could launch and restart, but not simply STOP — so
+        "run this with only the other app up" had no expression here, and the only way to
+        get it was hand-driving the app's own quit menu, which is what the prime rule
+        exists to prevent. It came up chasing a quit-path failure that two apps mirroring
+        each other's modals could plausibly explain: testing that means running one alone.
+
+        TERM first, KILL only on `force` or after the grace period. A -9 skips the app's own
+        shutdown, and both of these apps write state on the way out (Raves' UiState report,
+        Qud's save) — losing that would make the next run's state file a lie, which is a
+        worse failure than a slow quit. `restart_app` still uses -9 because it relaunches
+        immediately and does not care what the dying instance was holding.
+
+        Verified by the WINDOW going away, not by the signal being sent: pkill reports
+        success for a process that ignores TERM.
+        """
+        import subprocess as _sp
+        import time as _t
+        from .apps import PROFILES
+        prof = PROFILES.get(app) or {}
+        proc, win = prof.get("proc"), prof.get("window", "")
+        if not proc:
+            return {"ok": False, "error": "no proc profile for app %r" % app}
+
+        def up():
+            return [t for t in b.list_targets()
+                    if win and win in (t.to_dict().get("title") or "")]
+
+        before = len(up())
+        if not before:
+            return {"ok": True, "app": app, "was_running": False, "detail": "not running"}
+
+        import os as _os
+        windows = _os.name == "nt"
+        if windows:
+            _sp.run(["taskkill"] + (["/F"] if force else []) + ["/IM", proc + ".exe"],
+                    capture_output=True)
+        else:
+            _sp.run(["pkill", "-9" if force else "-TERM", "-f", proc], capture_output=True)
+
+        deadline = _t.time() + (5 if force else 12)
+        while _t.time() < deadline:
+            if not up():
+                return {"ok": True, "app": app, "was_running": True, "instances": before,
+                        "forced": bool(force)}
+            _t.sleep(0.5)
+
+        if force:
+            return {"ok": False, "app": app,
+                    "error": "%s still has a window after a forced kill" % app}
+        # graceful quit ignored or blocked (a modal can hold it) — say so, and say the remedy
+        return {"ok": False, "app": app, "instances": before,
+                "error": "%s did not exit within 12s of TERM — retry with --force" % app}
+
     def _restart_app(self, b, app):
         """Kill EVERY instance of the app (duplicates included — the double-launch
         class), launch its solo launcher, wait for the window. The one true restart."""
