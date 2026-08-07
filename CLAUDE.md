@@ -198,6 +198,11 @@ action instead of screenshot-guess loops:
 - A dismiss step FAILS the recipe if the affordance is missing or the scene doesn't
   change — silent "dismissed" was how a stray Cancel reached the main menu (where
   Cancel == quit confirm). Fire ONE cancel and verify; never a fallback shotgun.
+- **Modifier CLICKS and WHEELS need the modifier really HELD; a flag on the event is not
+  enough.** Measured twice: Ctrl+wheel never opened Raves' panel, and Ctrl+click never fired
+  the cell inspector while unmodified clicks worked perfectly. An old comment here claimed
+  flags-only reached Godot — it does not, and believing it cost a FULL-run test case.
+  `_hold_mods`/`_release_mods` press the real keys, released in a `finally`.
 - A daemon re-exec mid key-combo orphans a modifier DOWN in the OS HID state: every later
   synthetic key/click arrives Cmd-modified and silently no-ops ("intermittent" app-side
   symptoms, survives app restarts). `_clear_stuck_mods` in darwin.py self-heals on every

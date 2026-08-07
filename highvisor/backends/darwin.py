@@ -415,6 +415,36 @@ class MacBackend(PlatformBackend):
         if not AXIsProcessTrusted():
             raise BackendError(self._AX_INPUT_NOTE)
 
+    def _hold_mods(self, src, mods: str):
+        """Press the real modifier keys and return the keycodes to release.
+
+        MEASURED TWICE, both times the hard way. Setting the flag on the event alone does NOT
+        reach Godot — not for a wheel (the Ctrl+wheel panel never opened) and not for a click
+        (a Ctrl+click on the playfield never fired the cell inspector, and Cmd+Right-click never
+        opened the feedback form, while unmodified clicks worked perfectly throughout). An
+        earlier comment here claimed flags-only was enough for Godot; it is not, and believing it
+        cost a live-test case in the FULL run.
+
+        Callers MUST release in a `finally` — an orphaned modifier makes every later synthetic
+        key arrive modified and silently no-op, survives app restarts, and is close to
+        undiagnosable from the app side.
+        """
+        held = self._mod_keycodes(mods)
+        for kc in held:
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap,
+                               Quartz.CGEventCreateKeyboardEvent(src, kc, True))
+        if held:
+            time.sleep(0.04)
+        return held
+
+    def _release_mods(self, src, held):
+        for kc in reversed(held or []):
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap,
+                               Quartz.CGEventCreateKeyboardEvent(src, kc, False))
+        if held:
+            time.sleep(0.03)
+            self._clear_stuck_mods(keep=0)
+
     def click(self, target: str, x: int, y: int, button: str = "left",
               double: bool = False, hover: bool = False, mods: str = "") -> ActionResult:
         w = self._resolve(target)
@@ -460,16 +490,20 @@ class MacBackend(PlatformBackend):
         flags = self._mod_flags(mods)
         # a stuck HID modifier (see _clear_stuck_mods) rides on mouse events too -- a plain
         # left click would arrive as Cmd+click. Clear anything we didn't ask for.
-        self._clear_stuck_mods(keep=flags)
-        for _ in range(2 if double else 1):
-            ed = Quartz.CGEventCreateMouseEvent(src, down, pt, b)
-            eu = Quartz.CGEventCreateMouseEvent(src, up, pt, b)
-            if flags:
-                Quartz.CGEventSetFlags(ed, flags)
-                Quartz.CGEventSetFlags(eu, flags)
-            Quartz.CGEventPost(Quartz.kCGHIDEventTap, ed)
-            Quartz.CGEventPost(Quartz.kCGHIDEventTap, eu)
-            time.sleep(0.02)
+        self._clear_stuck_mods(keep=0)
+        held = self._hold_mods(src, mods)
+        try:
+            for _ in range(2 if double else 1):
+                ed = Quartz.CGEventCreateMouseEvent(src, down, pt, b)
+                eu = Quartz.CGEventCreateMouseEvent(src, up, pt, b)
+                if flags:
+                    Quartz.CGEventSetFlags(ed, flags)
+                    Quartz.CGEventSetFlags(eu, flags)
+                Quartz.CGEventPost(Quartz.kCGHIDEventTap, ed)
+                Quartz.CGEventPost(Quartz.kCGHIDEventTap, eu)
+                time.sleep(0.02)
+        finally:
+            self._release_mods(src, held)
         return ActionResult(ok=True, tier=4,
                             detail="%s%s%s click @ global (%d,%d)"
                                    % ("hover+" if hover else "", "double " if double else "",
@@ -519,13 +553,8 @@ class MacBackend(PlatformBackend):
         # so the release is in a `finally` and a belt-and-braces clear follows it: a modifier
         # orphaned DOWN makes every later synthetic key arrive modified and silently no-op,
         # surviving app restarts, and it is close to undiagnosable from the app side.
-        held = self._mod_keycodes(mods)
+        held = self._hold_mods(src, mods)
         try:
-            for kc in held:
-                Quartz.CGEventPost(Quartz.kCGHIDEventTap,
-                                   Quartz.CGEventCreateKeyboardEvent(src, kc, True))
-            if held:
-                time.sleep(0.04)
             ev = Quartz.CGEventCreateScrollWheelEvent(src, Quartz.kCGScrollEventUnitLine,
                                                       2, int(dy), int(dx))
             if flags:
@@ -535,12 +564,7 @@ class MacBackend(PlatformBackend):
             Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
             time.sleep(0.05)
         finally:
-            for kc in reversed(held):
-                Quartz.CGEventPost(Quartz.kCGHIDEventTap,
-                                   Quartz.CGEventCreateKeyboardEvent(src, kc, False))
-            if held:
-                time.sleep(0.03)
-                self._clear_stuck_mods(keep=0)
+            self._release_mods(src, held)
         return ActionResult(ok=True, tier=4,
                             detail="scroll dy=%d dx=%d%s @ global (%d,%d)"
                                    % (int(dy), int(dx),
