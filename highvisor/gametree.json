@@ -903,10 +903,10 @@
                   },
                   {
                     "id": "me_context_menu",
-                    "label": "Cell/region context menu (right-click)",
-                    "note": "NOT YET CAPTURED — an honest gap. Right-click over an empty cell, and over one after a Ctrl+Click paint, both produced no panel in this pass, so its trigger is still unknown (needs a placed object confirmed present, or a dragged region). Its CONTENTS are known from MapEditorView regardless: DisplayContextInRegion, Flood, DeleteInRegion, ReplaceInRegion, SetOwnerInRegion/SetOwnerForContext, AddPropertyForContext, AddIntPropertyForContext, RemovePropertyForContext, SetPartForContext — i.e. the per-cell/region editing verbs that appear nowhere in the menu bar. Next step for this leaf.",
+                    "label": "Cell/region context menu (right-click a Selected-Contents ROW)",
+                    "note": "TRIGGER SOLVED by IL inspection (2026-08-06) — it is NOT a canvas right-click, which is why clicking the map never produced it. MapEditorSelectedObjectsRow.OnPointerClick decodes to: `if (eventData.button != InputButton.Right) return; MapEditorView.instance.DisplayContextInRegion(this.bp);` — i.e. RIGHT-CLICK ON A ROW of the selected-contents list, passing that row's blueprint. DisplayContextInRegion then calls Menu.show at Input.mousePosition; the menu itself is BUILT once in MapEditorView.OnEnter (DialogManager.createMenu + Menu.addItem/addSeparator). Those rows live in SelectedCellContentsView, populated by MapEditorView.UpdateSelectedContents from HasSelectedRegion/SelectedRegion via MapFileRegion.GetRegion — so a DRAGGED REGION CONTAINING OBJECTS is the precondition; an empty region correctly lists nothing. Hovering a row calls SetHoverBlueprint (OnPointerEnter/Exit), and each row carries bp/BlueprintName/Count/Owner/ReplaceButton. MENU CONTENTS (from MapEditorView): Flood, DeleteInRegion, ReplaceInRegion, SetOwnerInRegion/SetOwnerForContext, AddPropertyForContext, AddIntPropertyForContext, RemovePropertyForContext, SetPartForContext. STILL UNVERIFIED LIVE: the full gesture, because no object could be confirmed placed — Ctrl+Click paint (brush readout DOES set, e.g. 'Brush: Across1') did not visibly populate a cell under synthetic input, so every drag so far selected an empty region. Next step is to confirm painting works (or find why it doesn't), THEN drag a region over the painted cell and right-click its row. `hv drag` now exists for that step.",
                     "done": {
-                      "qud": 0.3,
+                      "qud": 0.7,
                       "raves": 0.0
                     },
                     "detect": {}

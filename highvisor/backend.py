@@ -126,6 +126,14 @@ class PlatformBackend:
         if given, is forwarded to the program's argv."""
         raise NotImplementedError
 
+    def drag(self, target: str, x1: int, y1: int, x2: int, y2: int,
+             button: str = "left", steps: int = 12,
+             modifiers: Optional[str] = None) -> ActionResult:
+        """Press at (x1,y1), move through intermediate points, release at (x2,y2),
+        window-relative. Distinct from two clicks: selection rectangles are built
+        from the moves BETWEEN press and release."""
+        raise NotImplementedError
+
     def screenshot(self, target: Optional[str], native: bool = False) -> bytes:
         """PNG bytes of ``target`` (a window ref) or the screen if target is
         None/"screen". Must work for an UNFOCUSED window. ``native`` requests a

@@ -113,6 +113,13 @@ def _cmd_click(a):
                        "hover": a.hover, "modifiers": a.mod}))
 
 
+def _cmd_drag(a):
+    _print_json(_call({"op": P.OP_DRAG, "target": a.target,
+                       "x1": a.x1, "y1": a.y1, "x2": a.x2, "y2": a.y2,
+                       "button": "right" if a.right else "left",
+                       "steps": a.steps, "modifiers": a.mod}))
+
+
 def _cmd_activate(a):
     _print_json(_call({"op": P.OP_ACTIVATE, "target": a.target}))
 
@@ -670,6 +677,16 @@ def build_parser():
                    help="modifiers HELD across the click (Qud's Map Editor: "
                         "ctrl=paint from palette, alt=sample to palette)")
     s.set_defaults(fn=_cmd_click)
+
+    s = sub.add_parser("drag", help="press, move, release (selection rectangles)")
+    s.add_argument("target")
+    for _a in ("x1", "y1", "x2", "y2"):
+        s.add_argument(_a, type=int)
+    s.add_argument("--right", action="store_true", help="drag with the right button")
+    s.add_argument("--steps", type=int, default=12, help="intermediate moves (default 12)")
+    s.add_argument("--mod", default=None, metavar="ctrl+alt+shift",
+                   help="modifiers held for the whole gesture")
+    s.set_defaults(fn=_cmd_drag)
 
     s = sub.add_parser("activate")
     s.add_argument("target")

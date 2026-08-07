@@ -335,6 +335,59 @@ class WindowsBackend(PlatformBackend):
                                    % ("+".join(mods) + " " if mods else "",
                                       "double " if double else "", button, gx, gy))
 
+    def drag(self, target: str, x1: int, y1: int, x2: int, y2: int,
+             button: str = "left", steps: int = 12,
+             modifiers: Optional[str] = None) -> ActionResult:
+        """Press at (x1,y1), move in steps, release at (x2,y2) — window-relative.
+
+        A drag is not a click pair: apps that track a selection rectangle need the
+        INTERMEDIATE moves (Qud's Map Editor builds SelectedRegion from OnBeginDrag/
+        OnDragMove, and only a dragged region populates its selected-contents list),
+        and Unity only sees moves that carry raw input, hence mouse_event rather than
+        SetCursorPos. Modifiers are held for the whole gesture and released in a
+        finally, same contract as click()."""
+        hwnd = self._resolve(target)
+        if hwnd is None:
+            return ActionResult.fail("drag needs a window target")
+        rect = wintypes.RECT()
+        user32.GetWindowRect(hwnd, ctypes.byref(rect))
+        gx1, gy1 = rect.left + int(x1), rect.top + int(y1)
+        gx2, gy2 = rect.left + int(x2), rect.top + int(y2)
+        self.activate(target)
+        time.sleep(0.06)
+        MOVE_ABS = 0x0001 | 0x8000
+        sw, sh = self.screen_size()
+
+        def _move(px, py):
+            user32.SetCursorPos(px, py)
+            user32.mouse_event(MOVE_ABS, int(px * 65535 / max(sw - 1, 1)),
+                               int(py * 65535 / max(sh - 1, 1)), 0, 0)
+
+        mods = [m.strip().lower() for m in (modifiers or "").split("+") if m.strip()]
+        vk_for = {"ctrl": 0x11, "control": 0x11, "alt": 0x12, "shift": 0x10}
+        held = [vk_for[m] for m in mods if m in vk_for]
+        dn, up = (0x0008, 0x0010) if button == "right" else (0x0002, 0x0004)
+        try:
+            for vk in held:
+                self._send_vk_scancode(vk, down=True, up=False)
+            _move(gx1, gy1)
+            time.sleep(0.08)
+            user32.mouse_event(dn, 0, 0, 0, 0)
+            time.sleep(0.08)
+            n = max(2, int(steps))
+            for i in range(1, n + 1):
+                _move(gx1 + (gx2 - gx1) * i // n, gy1 + (gy2 - gy1) * i // n)
+                time.sleep(0.03)
+            time.sleep(0.08)
+            user32.mouse_event(up, 0, 0, 0, 0)
+        finally:
+            for vk in reversed(held):
+                self._send_vk_scancode(vk, down=False, up=True)
+        return ActionResult(ok=True, tier=4,
+                            detail="%sdrag %s (%d,%d)->(%d,%d)"
+                                   % ("+".join(mods) + " " if mods else "",
+                                      button, gx1, gy1, gx2, gy2))
+
     def screenshot(self, target: Optional[str], native: bool = False) -> bytes:
         # `native` is a macOS/ScreenCaptureKit distinction; the Windows path is
         # already physical-pixel (DPI-aware), so it's accepted and ignored.

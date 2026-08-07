@@ -168,6 +168,14 @@ class Engine:
             return b.click(req["target"], int(req.get("x", 0)), int(req.get("y", 0)),
                            **kw).to_dict()
 
+        if op == P.OP_DRAG:
+            kw = {"button": req.get("button", "left"),
+                  "steps": int(req.get("steps", 12))}
+            if req.get("modifiers"):
+                kw["modifiers"] = str(req["modifiers"])
+            return b.drag(req["target"], int(req.get("x1", 0)), int(req.get("y1", 0)),
+                          int(req.get("x2", 0)), int(req.get("y2", 0)), **kw).to_dict()
+
         if op == P.OP_INSPECT:
             tree = b.inspect(req["target"], int(req.get("depth", 3)))
             return {"ok": True, "tree": tree.to_dict()}
