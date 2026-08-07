@@ -592,10 +592,10 @@
           {
             "id": "modding_toolkit",
             "label": "Modding Toolkit (secondary-links menu)",
-            "note": "Walked live on Lumpy (Win11 4K, Qud 1.0.5, 2026-08-06); captures in the session scratchpad. Coordinates are Lumpy 3840x2160 window px — HALVE for the standard 1920x1080 slots. QUIRKS: this legacy console menu ignores scancode arrow keys (title menu needs them) — drive it by hover-clicking rows; Enter selects, Space does not; the first click after a focus change is eaten by activation, so recipes double-click. SCENES: the bridge mod heartbeat reports first-party names for every toolkit screen (UIManager._currentWindow + SingletonWindowBase probes) — detect entries below use them; ocr_any stays as the Mac fallback. RAVES: ModdingToolkitScreen.gd baseline shipped (box/title/9 rows/caret+bar/footer, scene report, Esc-close) — done.raves 0.5; polish pending: row pitch/font scale, box width vs longest row, top ornament, dimmed bears background art. Raves dev-run on Lumpy is DPI-virtualized (allow_hidpi=false, ~1.8x): click physical = logical*1.8 + (~10,31); captures are DWM-upscaled (soft) — export a build for congruence-grade pixels.",
+            "note": "Walked live on Lumpy (Win11 4K, Qud 1.0.5, 2026-08-06); captures in the session scratchpad. Coordinates are the STANDARD 1920x1080 slot values (Qud runs 1920x1080 in the portrait column; the Godot exe carries HIGHDPIAWARE so Raves is 1:1 too). QUIRKS: this legacy console menu ignores scancode arrow keys (title menu needs them) — drive it by hover-clicking rows; Enter selects, Space does not; the first click after a focus change is eaten by activation, so recipes double-click. SCENES: the bridge mod heartbeat reports first-party names for every toolkit screen (UIManager._currentWindow + SingletonWindowBase probes) — detect entries below use them; ocr_any stays as the Mac fallback. RAVES (measured 94.1% content congruence, 2026-08-06 round 2): SourceCodePro console styling at Qud's metrics, functional items — Mod Manager routes to ModsScreen (scene mods, Esc->title like Qud), Mod Wiki Website + Open Save Folder shell-open like Qud; remaining gap: the toolkit's own dimmed background art (needs a mod-side export like TitleExporter), the top plant ornament, and the six deep-tool screens (cosmetic rows).",
             "done": {
               "qud": 0.9,
-              "raves": 0.5
+              "raves": 0.65
             },
             "detect": {
               "raves": [
@@ -628,16 +628,16 @@
                 },
                 {
                   "click_hover": [
-                    313,
-                    1805
+                    156,
+                    902
                   ],
                   "window": "CavesOfQud",
                   "note": "Modding Toolkit link, lower-left secondary list"
                 },
                 {
                   "click_hover": [
-                    313,
-                    1805
+                    156,
+                    902
                   ],
                   "window": "CavesOfQud",
                   "note": "repeat — first click may be eaten by activation; lands in empty space if already open"
@@ -673,8 +673,8 @@
                     },
                     {
                       "click_hover": [
-                        1724,
-                        875
+                        862,
+                        437
                       ],
                       "window": "CavesOfQud"
                     }
@@ -703,8 +703,8 @@
                     },
                     {
                       "click_hover": [
-                        1724,
-                        927
+                        862,
+                        463
                       ],
                       "window": "CavesOfQud"
                     }
@@ -733,8 +733,8 @@
                     },
                     {
                       "click_hover": [
-                        1724,
-                        979
+                        862,
+                        489
                       ],
                       "window": "CavesOfQud"
                     }
@@ -793,8 +793,8 @@
                     },
                     {
                       "click_hover": [
-                        1724,
-                        1083
+                        862,
+                        541
                       ],
                       "window": "CavesOfQud"
                     }
@@ -843,8 +843,8 @@
                     },
                     {
                       "click_hover": [
-                        1724,
-                        1238
+                        862,
+                        619
                       ],
                       "window": "CavesOfQud"
                     }
@@ -873,8 +873,8 @@
                     },
                     {
                       "click_hover": [
-                        1724,
-                        1292
+                        862,
+                        646
                       ],
                       "window": "CavesOfQud"
                     }
