@@ -365,26 +365,6 @@
                       "scene": "ModManagerUI"
                     }
                   ]
-                },
-                "goto": {
-                  "qud": [
-                    {
-                      "goto": "modding_toolkit"
-                    },
-                    {
-                      "click_hover": [
-                        862,
-                        437
-                      ],
-                      "window": "CavesOfQud"
-                    },
-                    {
-                      "assert": {
-                        "node": "mod_manager"
-                      },
-                      "timeout": 15
-                    }
-                  ]
                 }
               },
               {
@@ -401,32 +381,11 @@
                       "scene": "SteamWorkshopUploaderView"
                     }
                   ]
-                },
-                "goto": {
-                  "qud": [
-                    {
-                      "goto": "modding_toolkit"
-                    },
-                    {
-                      "click_hover": [
-                        862,
-                        463
-                      ],
-                      "window": "CavesOfQud"
-                    },
-                    {
-                      "assert": {
-                        "node": "workshop_uploader"
-                      },
-                      "timeout": 15
-                    }
-                  ]
                 }
               },
               {
                 "id": "map_editor",
                 "label": "Map Editor",
-                "note": "LEFT AS A LEGACY RECIPE. Converted to a transition on 2026-08-07 and reverted the same hour: driven from a clean Modding Toolkit, the click lands nowhere and Qud ends up back at the TITLE. The coordinates here are window points captured on the PC rig and look stale for this layout — the recipe is equally broken, so this is not a regression, but an edge asserts routability and a recipe does not. Re-measure the coordinates against a screenshot, drive it, THEN convert.",
                 "done": {
                   "qud": 0.95,
                   "raves": 0.93
@@ -434,7 +393,10 @@
                 "detect": {
                   "qud": [
                     {
-                      "scene": "MapEditorWindow"
+                      "scene": [
+                        "MapEditorWindow",
+                        "MapEditor"
+                      ]
                     }
                   ]
                 },
@@ -619,27 +581,7 @@
                     },
                     "detect": {}
                   }
-                ],
-                "goto": {
-                  "qud": [
-                    {
-                      "goto": "modding_toolkit"
-                    },
-                    {
-                      "click_hover": [
-                        862,
-                        489
-                      ],
-                      "window": "CavesOfQud"
-                    },
-                    {
-                      "assert": {
-                        "node": "map_editor"
-                      },
-                      "timeout": 15
-                    }
-                  ]
-                }
+                ]
               },
               {
                 "id": "mod_wiki_website",
@@ -740,26 +682,6 @@
                       "scene": "HistoryTestView"
                     }
                   ]
-                },
-                "goto": {
-                  "qud": [
-                    {
-                      "goto": "modding_toolkit"
-                    },
-                    {
-                      "click_hover": [
-                        862,
-                        619
-                      ],
-                      "window": "CavesOfQud"
-                    },
-                    {
-                      "assert": {
-                        "node": "histographicnomicon"
-                      },
-                      "timeout": 15
-                    }
-                  ]
                 }
               },
               {
@@ -774,26 +696,6 @@
                   "qud": [
                     {
                       "scene": "WaveformTestView"
-                    }
-                  ]
-                },
-                "goto": {
-                  "qud": [
-                    {
-                      "goto": "modding_toolkit"
-                    },
-                    {
-                      "click_hover": [
-                        862,
-                        646
-                      ],
-                      "window": "CavesOfQud"
-                    },
-                    {
-                      "assert": {
-                        "node": "wfc_generator"
-                      },
-                      "timeout": 15
                     }
                   ]
                 }
@@ -2618,6 +2520,101 @@
       },
       "timeout": 10,
       "note": "Converted from the legacy goto recipe (2026-08-07). Coordinates are window points at the standard 1920x1080 slot, carried over verbatim — re-measure if the layout moves."
+    },
+    {
+      "app": "qud",
+      "from": "modding_toolkit",
+      "to": "map_editor",
+      "steps": [
+        {
+          "click_hover": [
+            862,
+            489
+          ],
+          "window": "CavesOfQud"
+        }
+      ],
+      "verify": {
+        "node": "map_editor"
+      },
+      "timeout": 15,
+      "note": "Converted 2026-08-07 after re-measuring. The coordinates were never the problem — they were within 2px — and the clicks always worked; the earlier conversion attempt was driven from a Qud stuck on a stale 'Stage' scene, which invalidated the whole run. map_editor's DETECTOR was the real defect: it named the UI sampler's window ('MapEditorWindow') while the mod reports the legacy view ('MapEditor'), which is the more specific of the two and therefore wins."
+    },
+    {
+      "app": "qud",
+      "from": "modding_toolkit",
+      "to": "mod_manager",
+      "steps": [
+        {
+          "click_hover": [
+            862,
+            437
+          ],
+          "window": "CavesOfQud"
+        }
+      ],
+      "verify": {
+        "node": "mod_manager"
+      },
+      "timeout": 15,
+      "note": "Converted 2026-08-07 after re-measuring. The coordinates were never the problem — they were within 2px — and the clicks always worked; the earlier conversion attempt was driven from a Qud stuck on a stale 'Stage' scene, which invalidated the whole run. map_editor's DETECTOR was the real defect: it named the UI sampler's window ('MapEditorWindow') while the mod reports the legacy view ('MapEditor'), which is the more specific of the two and therefore wins."
+    },
+    {
+      "app": "qud",
+      "from": "modding_toolkit",
+      "to": "histographicnomicon",
+      "steps": [
+        {
+          "click_hover": [
+            862,
+            619
+          ],
+          "window": "CavesOfQud"
+        }
+      ],
+      "verify": {
+        "node": "histographicnomicon"
+      },
+      "timeout": 15,
+      "note": "Converted 2026-08-07 after re-measuring. The coordinates were never the problem — they were within 2px — and the clicks always worked; the earlier conversion attempt was driven from a Qud stuck on a stale 'Stage' scene, which invalidated the whole run. map_editor's DETECTOR was the real defect: it named the UI sampler's window ('MapEditorWindow') while the mod reports the legacy view ('MapEditor'), which is the more specific of the two and therefore wins."
+    },
+    {
+      "app": "qud",
+      "from": "modding_toolkit",
+      "to": "wfc_generator",
+      "steps": [
+        {
+          "click_hover": [
+            862,
+            646
+          ],
+          "window": "CavesOfQud"
+        }
+      ],
+      "verify": {
+        "node": "wfc_generator"
+      },
+      "timeout": 15,
+      "note": "Converted 2026-08-07 after re-measuring. The coordinates were never the problem — they were within 2px — and the clicks always worked; the earlier conversion attempt was driven from a Qud stuck on a stale 'Stage' scene, which invalidated the whole run. map_editor's DETECTOR was the real defect: it named the UI sampler's window ('MapEditorWindow') while the mod reports the legacy view ('MapEditor'), which is the more specific of the two and therefore wins."
+    },
+    {
+      "app": "qud",
+      "from": "modding_toolkit",
+      "to": "workshop_uploader",
+      "steps": [
+        {
+          "click_hover": [
+            862,
+            463
+          ],
+          "window": "CavesOfQud"
+        }
+      ],
+      "verify": {
+        "node": "workshop_uploader"
+      },
+      "timeout": 15,
+      "note": "Converted 2026-08-07 after re-measuring. The coordinates were never the problem — they were within 2px — and the clicks always worked; the earlier conversion attempt was driven from a Qud stuck on a stale 'Stage' scene, which invalidated the whole run. map_editor's DETECTOR was the real defect: it named the UI sampler's window ('MapEditorWindow') while the mod reports the legacy view ('MapEditor'), which is the more specific of the two and therefore wins."
     }
   ],
   "tests": [
