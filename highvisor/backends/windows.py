@@ -318,18 +318,24 @@ class WindowsBackend(PlatformBackend):
         vk_for = {"ctrl": 0x11, "control": 0x11, "alt": 0x12, "shift": 0x10}
         held = [vk_for[m] for m in mods if m in vk_for]
         try:
-            for vk in held:
-                self._send_vk_scancode(vk, down=True, up=False)
             if held:
-                time.sleep(0.04)
+                # The modifier must be delivered to a window that ALREADY has focus, and it
+                # must still be down when the app PROCESSES the click (message handling lags
+                # injection), or a message-tracking toolkit reports no modifier at all.
+                self._await_focus(hwnd)
+                for vk in held:
+                    self._send_modifier(vk, True)
+                time.sleep(0.06)
             dn, up = (0x0008, 0x0010) if button == "right" else (0x0002, 0x0004)
             for _ in range(2 if double else 1):
                 user32.mouse_event(dn, 0, 0, 0, 0)
                 user32.mouse_event(up, 0, 0, 0, 0)
                 time.sleep(0.02)
+            if held:
+                time.sleep(0.12)   # let the click be consumed before the modifier lifts
         finally:
             for vk in reversed(held):
-                self._send_vk_scancode(vk, down=False, up=True)
+                self._send_modifier(vk, False)
         return ActionResult(ok=True, tier=4,
                             detail="%s%s%s click @ (%d,%d)"
                                    % ("+".join(mods) + " " if mods else "",
@@ -368,6 +374,8 @@ class WindowsBackend(PlatformBackend):
         held = [vk_for[m] for m in mods if m in vk_for]
         dn, up = (0x0008, 0x0010) if button == "right" else (0x0002, 0x0004)
         try:
+            if held:
+                self._await_focus(hwnd)   # same rule as click(): focus first, then modifiers
             for vk in held:
                 self._send_vk_scancode(vk, down=True, up=False)
             _move(gx1, gy1)
@@ -388,7 +396,7 @@ class WindowsBackend(PlatformBackend):
             user32.mouse_event(up, 0, 0, 0, 0)
         finally:
             for vk in reversed(held):
-                self._send_vk_scancode(vk, down=False, up=True)
+                self._send_modifier(vk, False)
         return ActionResult(ok=True, tier=4,
                             detail="%sdrag %s (%d,%d)->(%d,%d)"
                                    % ("+".join(mods) + " " if mods else "",
@@ -570,6 +578,47 @@ class WindowsBackend(PlatformBackend):
                                     error="tier1(%s) tier2(%s)" % (tier1_err, e))
         return ActionResult(ok=False, tier=None,
                             error="tier1(%s); no child hwnd for tier2" % tier1_err)
+
+    def _await_focus(self, hwnd, timeout: float = 1.0) -> bool:
+        """Block until ``hwnd`` is actually the foreground window.
+
+        activate() returns as soon as it has ASKED Windows to raise the window; focus
+        lands a moment later. That gap matters for modifiers: a synthetic Ctrl goes to
+        whatever is focused RIGHT NOW, and an app that tracks modifier state from its own
+        WM_KEYDOWN messages (Godot) never sees a keystroke delivered before it had focus —
+        so InputEventMouseButton.ctrl_pressed stays false while the click itself still
+        lands. Unity hides this by polling global key state instead, which is why the same
+        gesture worked against Qud and silently failed against Raves."""
+        end = time.time() + timeout
+        while time.time() < end:
+            if user32.GetForegroundWindow() == hwnd:
+                return True
+            time.sleep(0.02)
+        return user32.GetForegroundWindow() == hwnd
+
+    def _send_modifier(self, vk: int, down: bool) -> None:
+        """Hold/release a modifier so BOTH toolkits see it.
+
+        MEASURED (2026-08-07): a scancode-only injection (KEYEVENTF_SCANCODE, which is what
+        Qud needs for Space/Escape) is invisible to Godot — Ctrl+click arrived with
+        ctrl_pressed false and Ctrl+A did nothing, while uiautomation's VK-based SendKeys
+        drove the same shortcut fine. Unity polls global key state and accepts either;
+        Godot tracks modifiers from the key messages it receives and wants the VK form.
+        Rather than pick a winner, emit BOTH: modifiers are level-triggered, so a doubled
+        press/release is harmless, and each toolkit sees the form it recognises."""
+        # uiautomation's PressKey/ReleaseKey is the delivery that DEMONSTRABLY reaches Godot
+        # (its SendKeys drove Ctrl+A when a raw keybd_event/scancode press did not), so use it
+        # for the VK half rather than rolling our own; the scancode half stays for Unity.
+        try:
+            if down:
+                auto.PressKey(vk)
+            else:
+                auto.ReleaseKey(vk)
+        except Exception:
+            KEYEVENTF_KEYUP = 0x0002
+            user32.keybd_event(vk, user32.MapVirtualKeyW(vk, 0),
+                               0 if down else KEYEVENTF_KEYUP, 0)
+        self._send_vk_scancode(vk, down=down, up=not down)               # scancode form (Unity)
 
     def _send_vk_scancode(self, vk: int, down: bool = True, up: bool = True) -> None:
         """Press and/or release one virtual key via SendInput WITH its hardware scan
