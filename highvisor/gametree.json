@@ -1938,27 +1938,21 @@
           "note": "let Continue enable (heartbeat poll) after a fresh launch"
         },
         {
-          "key": "down",
-          "window": "Raves of Qud",
-          "note": "select Continue by KEYBOARD. This was click_text, which needs OCR — and ocr() exists only in the darwin backend, so this edge could not run on Windows at all. Raves' title menu is keyboard-first (the edge's own note says so), and New Game -> Continue is one step down, so the keyboard form is both cross-platform AND closer to how the menu works."
+          "click": [
+            958,
+            578
+          ],
+          "window": "Raves of Qud"
         },
         {
-          "key": "space",
-          "window": "Raves of Qud",
-          "note": "ACTIVATE. Raves' main menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted Continue and stopped there."
-        },
-        {
-          "dismiss": {
-            "scene": "loadgame",
-            "key": "space"
-          },
-          "note": "CONDITIONAL: Continue opens the LOAD GAME picker when there is a choice to make and goes straight in-game when there is not, so this presses the picker's [Space] select only if we actually landed there."
+          "sleep": 1.5
         }
       ],
       "verify": {
         "node": "in_game"
       },
-      "timeout": 60
+      "timeout": 30,
+      "note": "Continue is CLICKED, not selected with arrow keys. The keyboard form assumed the selection starts on New Game and stepped down once — but Raves REMEMBERS the menu selection, so after any earlier navigation that single `down` lands somewhere else and `space` activates the wrong row (or nothing). Verified live: arrow keys do move the selection, so this was never a key-delivery problem; it was a relative move against an unknown starting point. A click is position-independent. Continue measured at (958,578) at 1920x1080. "
     },
     {
       "app": "raves",
