@@ -350,43 +350,11 @@
                 }
               ]
             },
-            "goto": {
-              "qud": [
-                {
-                  "goto": "title"
-                },
-                {
-                  "activate": "CavesOfQud"
-                },
-                {
-                  "click_hover": [
-                    156,
-                    902
-                  ],
-                  "window": "CavesOfQud",
-                  "note": "Modding Toolkit link, lower-left secondary list"
-                },
-                {
-                  "click_hover": [
-                    156,
-                    902
-                  ],
-                  "window": "CavesOfQud",
-                  "note": "repeat — first click may be eaten by activation; lands in empty space if already open"
-                },
-                {
-                  "assert": {
-                    "node": "modding_toolkit"
-                  },
-                  "timeout": 10
-                }
-              ]
-            },
             "children": [
               {
                 "id": "mod_manager",
                 "label": "Mod Manager",
-                "note": "opens the SAME Mods screen as title>menu_box>mods (two-pane list + tile preview, footer [Esc] Back / [v] Disable All); list empty until mods are installed. Esc exits to TITLE (verified), not the toolkit menu.",
+                "note": "LEFT AS A LEGACY RECIPE. Converted to a transition on 2026-08-07 and reverted the same hour: driven from a clean Modding Toolkit, the click lands nowhere and Qud ends up back at the TITLE. The coordinates here are window points captured on the PC rig and look stale for this layout — the recipe is equally broken, so this is not a regression, but an edge asserts routability and a recipe does not. Re-measure the coordinates against a screenshot, drive it, THEN convert.",
                 "done": {
                   "qud": 0.9,
                   "raves": 0.0
@@ -409,6 +377,12 @@
                         437
                       ],
                       "window": "CavesOfQud"
+                    },
+                    {
+                      "assert": {
+                        "node": "mod_manager"
+                      },
+                      "timeout": 15
                     }
                   ]
                 }
@@ -416,7 +390,7 @@
               {
                 "id": "workshop_uploader",
                 "label": "Workshop Uploader",
-                "note": "modern full-screen UI: < Back / browse mods folder / refresh, Mods-folder list, 'Select a mod to manage it'. Esc does NOT exit — click < Back at [217,74]; Back returns to TITLE, not the toolkit menu.",
+                "note": "LEFT AS A LEGACY RECIPE. Converted to a transition on 2026-08-07 and reverted the same hour: driven from a clean Modding Toolkit, the click lands nowhere and Qud ends up back at the TITLE. The coordinates here are window points captured on the PC rig and look stale for this layout — the recipe is equally broken, so this is not a regression, but an edge asserts routability and a recipe does not. Re-measure the coordinates against a screenshot, drive it, THEN convert.",
                 "done": {
                   "qud": 0.9,
                   "raves": 0.0
@@ -439,6 +413,12 @@
                         463
                       ],
                       "window": "CavesOfQud"
+                    },
+                    {
+                      "assert": {
+                        "node": "workshop_uploader"
+                      },
+                      "timeout": 15
                     }
                   ]
                 }
@@ -446,7 +426,7 @@
               {
                 "id": "map_editor",
                 "label": "Map Editor",
-                "note": "Qud's map editor: an 80x25 cell canvas with a blueprint palette. WALKED LIVE at 1920x1080 on Lumpy (Qud 1.0.5, 2026-08-06) — every menu opened and captured; the command surface below is cross-checked against Overlay.MapEditor.MapEditorView by reflection, so it includes verbs that have no menu entry. LAYOUT: menu bar y=16 (File x46, Edit x112, Transform x203, View x293, Recent x369), title 'Map Editor' centred x959; canvas x50..1470 y208..872 (80x25 => cell ~17.7x26.6) with a green cell cursor; palette panel x1524..1920 — filter field 'Enter text...' at y4..30, a '[ ] In Use' toggle at y46 (right edge), the blueprint list with per-row tile icons, and readouts at the bottom: 'Mouse Position: X, Y' + 'Brush: <name>' (y695) and 'Selected Cell: X, Y|none' (y716); control hints bottom-left y1029/y1045. EXIT: File > Exit > confirm Yes returns to the TOOLKIT menu, and it leaves the legacy view string stuck at 'MapEditor' — trust `scene` (window-priority), not `view`. RAVES: MapEditorScreen.gd shipped — 95.16% content congruence at 1920x1080 on the first build, geometry MEASURED off the reference (menu text at x29/95/160/275/342, title x913, canvas 50,208 1420x664 = 80x25, palette pitch 24, readouts y688/y710, hints y1023/y1039). Working: the five menus with their verbatim items + hotkey column (Recent draws no panel when empty, matching Qud), the dotted 80x25 canvas with hover cursor, Shift+drag region select, Ctrl+click paint, Alt+click sample, Ctrl+Z undo, flips, Select All, the NorthSheva overlay toggle, the live palette from blueprints.json with filter + In Use, and all three readouts. TILES: painted cells now render Qud's REAL tile art — QudTiles recolours the exported grayscale mask with the blueprint's TileColor/DetailColor (BlueprintExporter gained tilecolor+detail; 1529 blueprints carry both), falling back to the render glyph, and a missing mask is fetched once via the new `wanttile` bridge command (only ~245 of ~5.2k tiles ship exported, so screens ask for what they draw). NOT DONE: no .rpm file I/O (New/Load/Save/Save As/Test inert) and no per-object context menu. TILE/PAINT PATH NOW VERIFIED LIVE (2026-08-07): Ctrl+click paints and the cell renders the blueprint's art — the glyph fallback confirmed on screen for a tile-less blueprint. The blocker was a highvisor bug, since fixed: a KEYEVENTF_SCANCODE modifier press is invisible to Godot (Unity polls global key state and accepts it; Godot tracks modifiers from key MESSAGES and wants the VK form), so hv now emits BOTH forms. Two Raves bugs were found by driving it: palette rows had zero width (a Control with custom_minimum_size (0,h) in a non-expanding VBox is unclickable, so the brush never set) and modifiers now come off the EVENT rather than Input.is_key_pressed. TILE PIPELINE FULLY VERIFIED (2026-08-07): painting Clue_BloodyWatervine (tilecolor &w, detail r) drew a recognisable watervine SPRITE in brown/orange tones — 252 lit px across 6 colour groups, i.e. a real 2-colour mask recolour, not the glyph (~40px, one hue) or the flat swatch. The on-demand fetch works too: `wanttile creatures/sw_giant_clam.bmp` produced creatures_sw_giant_clam.bmp on disk in ~1s. FLATTENED TILE PATHS FIXED (2026-08-07): 345 of 4649 blueprint tile values arrive already flattened ('Assets_Content_Textures_Creatures_sw_farmer.bmp') and resolved to nothing. TileExportPump.Resolve now repairs them — drop the Assets_Content_Textures_ prefix, then split at the first underscore followed by a lower-case letter (Qud dirs are Capitalised, file names start lower-case). MEASURED canonical form: 'Creatures/sw_farmer.bmp' resolves while 'creatures/sw_farmer.bmp' (case) and 'Assets/Content/Textures/Creatures/sw_farmer.bmp' (prefix) both return null. The file is written under the ORIGINAL requested name so the client lookup still matches. Sampled 12 previously-dead paths: 11 now export; backslash separators are also repaired. The residual misses are NOT a path bug — those blueprints reference art absent from the shipped atlas (verified: the correct forward-slash form fails too), and the pump now LOGS 'could not resolve' instead of returning silently, which is what made this invisible before. RPM FILE I/O DONE and verified LOSSLESS: loaded Qud's own Barathrums_Study.rpm, saved it back, and compared parsed cell-by-cell against the pristine original — 2000 cells vs 2000, 1904 objects vs 1904, 0 missing / 0 extra / 0 differing. Cells hold object DICTS so Owner/Part/<intproperty> survive the trip; Qud writes ALL 2000 cells including 122 empty ones as <cell X Y></cell>, and matching that is what closed the last diff. New/Load/Save/Save As plus Ctrl+N/O/S are wired; the picker is a Godot FileDialog (a deliberate non-1:1 spot — a file chooser is chrome, not game UI). TEST (Ctrl+T) NOW BUILDS A ZONE, verified end to end (2026-08-07): Raves writes the on-screen map to a scratch .rpm, the bridge's new `mapedit do=test` hands the path to MapEditorDriver.Test, which loads it into Qud's LIVE MapEditorView via MapFile.LoadFile and invokes Qud's own MapEditorView.Test (-> RunTest -> async BuildTestZone, deliberately not reimplemented — Qud owns worldgen). PROOF: the heartbeat flipped from {scene:MapEditorWindow, live:false} to {scene:play, live:true, view:Stage} with 'Test invoked - Qud is building the zone' in Player.log. Requires Qud to be sitting in its Map Editor; that is Qud's constraint and the driver reports it plainly. GOTCHA WORTH KNOWING: a long-lived Qud can reach a state where GameManager.uiQueue STOPS DRAINING even while focused — every mod-driven action silently no-ops. The tell is heartbeat `ui_age` climbing without bound (seen at 83s -> 224s); the same command succeeded immediately against a freshly launched Qud. Check ui_age before diagnosing any mod command as broken. STILL OPEN: no per-object context menu, GLYPH FALLBACK FIXED: Qud's RenderString is EITHER a literal char OR a CP437 code as a DECIMAL STRING (Fulcrete '176' = light shade, Wall '219' = full block, '247' = approx among the most common) — drawing it verbatim printed the digits once per wall. Now resolved via ASCII 32..126 plus a CP437 table for 128..255, and drawn CENTRED in the cell in the console face. A reloaded Barathrums_Study is legible: shaded-block walls, furniture as π/¥/µ/ß, tile art where a mask exists.",
+                "note": "LEFT AS A LEGACY RECIPE. Converted to a transition on 2026-08-07 and reverted the same hour: driven from a clean Modding Toolkit, the click lands nowhere and Qud ends up back at the TITLE. The coordinates here are window points captured on the PC rig and look stale for this layout — the recipe is equally broken, so this is not a regression, but an edge asserts routability and a recipe does not. Re-measure the coordinates against a screenshot, drive it, THEN convert.",
                 "done": {
                   "qud": 0.95,
                   "raves": 0.93
@@ -455,20 +435,6 @@
                   "qud": [
                     {
                       "scene": "MapEditorWindow"
-                    }
-                  ]
-                },
-                "goto": {
-                  "qud": [
-                    {
-                      "goto": "modding_toolkit"
-                    },
-                    {
-                      "click_hover": [
-                        862,
-                        489
-                      ],
-                      "window": "CavesOfQud"
                     }
                   ]
                 },
@@ -653,7 +619,27 @@
                     },
                     "detect": {}
                   }
-                ]
+                ],
+                "goto": {
+                  "qud": [
+                    {
+                      "goto": "modding_toolkit"
+                    },
+                    {
+                      "click_hover": [
+                        862,
+                        489
+                      ],
+                      "window": "CavesOfQud"
+                    },
+                    {
+                      "assert": {
+                        "node": "map_editor"
+                      },
+                      "timeout": 15
+                    }
+                  ]
+                }
               },
               {
                 "id": "mod_wiki_website",
@@ -668,7 +654,7 @@
               {
                 "id": "blueprint_browser",
                 "label": "Blueprint Browser",
-                "note": "filterable collapsible tree of the full ObjectBlueprints hierarchy (Object, SultanMuralController expandable) — the natural UI mirror of the Object Checker enumeration. Back [3709,2068] returns to TITLE. RAVES: BlueprintBrowserScreen.gd — reads blueprints.json (BlueprintExporter walks GameObjectFactory.Factory.Blueprints, so a modded install shows its own; 5247 rows, and its 9 roots + expander set match Qud's screen exactly). PIXEL-DIFFED 2026-08-06: 99.77% content match, no divergent region. Layout MEASURED off Qud, not nudged — filter box x18..305 y12..38, row glyph tops 62/86/110 (pitch 24), expander x8..17, cube icon x27..43 (17x18, drawn as an isometric outline — a text glyph measured 9px against Qud's 17), text x48, Back glyph x1832..1884 y1026..1042; all now exact. The status line and opening row highlight are user-mode-only (Qud has neither). REMAINING (the whole residual): Qud's list font is ElliotSans, condensed — ~6.5px/char vs Atkinson's 8.4 at a matched cap height, so names run ~29% wide. The screen loads ElliotSans from title/chrome/ when present (correct on the Mac) and falls back otherwise; NO mod exporter for it exists yet — that is the next unit of work for this leaf, and it is shared with every other modern-UI screen.",
+                "note": "LEFT AS A LEGACY RECIPE deliberately. Its route starts at `modding_toolkit`, and RAVES has no transition to that node — only Qud does — so an edge from there would be unreachable from every state, which selftest_plan rejects (correctly). Convert it once a raves title -> modding_toolkit edge exists and has been driven; Raves' title does carry a Modding Toolkit link, so that edge is writable, just unverified as of 2026-08-07.",
                 "done": {
                   "qud": 0.9,
                   "raves": 0.9
@@ -743,7 +729,7 @@
               {
                 "id": "histographicnomicon",
                 "label": "Histographicnomicon",
-                "note": "history-generation debug tool: Generate / Test Failure Redirect / Test Variable, scrollable output canvas, Reload + Back. Back [3717,2097] returns to TITLE.",
+                "note": "LEFT AS A LEGACY RECIPE. Converted to a transition on 2026-08-07 and reverted the same hour: driven from a clean Modding Toolkit, the click lands nowhere and Qud ends up back at the TITLE. The coordinates here are window points captured on the PC rig and look stale for this layout — the recipe is equally broken, so this is not a regression, but an edge asserts routability and a recipe does not. Re-measure the coordinates against a screenshot, drive it, THEN convert.",
                 "done": {
                   "qud": 0.9,
                   "raves": 0.0
@@ -766,6 +752,12 @@
                         619
                       ],
                       "window": "CavesOfQud"
+                    },
+                    {
+                      "assert": {
+                        "node": "histographicnomicon"
+                      },
+                      "timeout": 15
                     }
                   ]
                 }
@@ -773,7 +765,7 @@
               {
                 "id": "wfc_generator",
                 "label": "Waveform Collapse Map Generator",
-                "note": "white preview canvas + parameter console (default 'pass:temple,n=3,width=78,height=23'), Generate / Generate Fast / Reseed To Static / TTest. Back [3706,2090] returns to TITLE.",
+                "note": "LEFT AS A LEGACY RECIPE. Converted to a transition on 2026-08-07 and reverted the same hour: driven from a clean Modding Toolkit, the click lands nowhere and Qud ends up back at the TITLE. The coordinates here are window points captured on the PC rig and look stale for this layout — the recipe is equally broken, so this is not a regression, but an edge asserts routability and a recipe does not. Re-measure the coordinates against a screenshot, drive it, THEN convert.",
                 "done": {
                   "qud": 0.9,
                   "raves": 0.0
@@ -796,6 +788,12 @@
                         646
                       ],
                       "window": "CavesOfQud"
+                    },
+                    {
+                      "assert": {
+                        "node": "wfc_generator"
+                      },
+                      "timeout": 15
                     }
                   ]
                 }
@@ -2589,6 +2587,37 @@
       },
       "timeout": 12,
       "note": "new_game is the chargen CONTAINER; detection reports the deepest match (game_mode), and assert passes a node that is on the current path, so landing on the first card satisfies this."
+    },
+    {
+      "app": "qud",
+      "from": "title",
+      "to": "modding_toolkit",
+      "steps": [
+        {
+          "activate": "CavesOfQud"
+        },
+        {
+          "click_hover": [
+            156,
+            902
+          ],
+          "window": "CavesOfQud",
+          "note": "Modding Toolkit link, lower-left secondary list"
+        },
+        {
+          "click_hover": [
+            156,
+            902
+          ],
+          "window": "CavesOfQud",
+          "note": "repeat — first click may be eaten by activation; lands in empty space if already open"
+        }
+      ],
+      "verify": {
+        "node": "modding_toolkit"
+      },
+      "timeout": 10,
+      "note": "Converted from the legacy goto recipe (2026-08-07). Coordinates are window points at the standard 1920x1080 slot, carried over verbatim — re-measure if the layout moves."
     }
   ],
   "tests": [
