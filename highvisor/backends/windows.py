@@ -36,6 +36,15 @@ SWP_NOACTIVATE, SWP_SHOWWINDOW = 0x0010, 0x0040
 HWND_TOP, HWND_TOPMOST, HWND_NOTOPMOST = 0, -1, -2
 SPI_SETFOREGROUNDLOCKTIMEOUT = 0x2001
 
+# mouse_event down/up pairs per button. Middle matters more than it looks: Qud's Map Editor
+# dispatches a "MiddleTile:x,y" command on it, and an app can hang real behaviour off a button
+# no amount of left/right clicking will reach.
+_BUTTON_EVENTS = {
+    "left": (0x0002, 0x0004),
+    "right": (0x0008, 0x0010),
+    "middle": (0x0020, 0x0040),
+}
+
 VK = {
     "RETURN": 0x0D, "ENTER": 0x0D, "TAB": 0x09, "ESC": 0x1B, "ESCAPE": 0x1B,
     "SPACE": 0x20, "BACKSPACE": 0x08, "BACK": 0x08, "DELETE": 0x2E, "DEL": 0x2E,
@@ -326,7 +335,7 @@ class WindowsBackend(PlatformBackend):
                 for vk in held:
                     self._send_modifier(vk, True)
                 time.sleep(0.06)
-            dn, up = (0x0008, 0x0010) if button == "right" else (0x0002, 0x0004)
+            dn, up = _BUTTON_EVENTS.get(button, _BUTTON_EVENTS["left"])
             for _ in range(2 if double else 1):
                 user32.mouse_event(dn, 0, 0, 0, 0)
                 user32.mouse_event(up, 0, 0, 0, 0)
@@ -372,7 +381,7 @@ class WindowsBackend(PlatformBackend):
         mods = [m.strip().lower() for m in (modifiers or "").split("+") if m.strip()]
         vk_for = {"ctrl": 0x11, "control": 0x11, "alt": 0x12, "shift": 0x10}
         held = [vk_for[m] for m in mods if m in vk_for]
-        dn, up = (0x0008, 0x0010) if button == "right" else (0x0002, 0x0004)
+        dn, up = _BUTTON_EVENTS.get(button, _BUTTON_EVENTS["left"])
         try:
             if held:
                 self._await_focus(hwnd)   # same rule as click(): focus first, then modifiers

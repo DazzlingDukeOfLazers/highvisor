@@ -9,7 +9,7 @@ other language could reimplement this in a few lines (that's the point).
     hv shot <target> [out.png] [--native]
     hv text <target> <string...>
     hv key <target> <keys> [--focus]
-    hv click <target> <x> <y> [--right] [--double]
+    hv click <target> <x> <y> [--right|--middle] [--double]
     hv activate <target>
     hv inspect <target> [depth]
     hv move <target> <zone | x y w h> [--topmost | --no-topmost]
@@ -107,16 +107,23 @@ def _cmd_key(a):
                        "focus": a.focus}))
 
 
+def _button(a):
+    """--right/--middle pick the button; left is the default."""
+    if getattr(a, "middle", False):
+        return "middle"
+    return "right" if a.right else "left"
+
+
 def _cmd_click(a):
     _print_json(_call({"op": P.OP_CLICK, "target": a.target, "x": a.x, "y": a.y,
-                       "button": "right" if a.right else "left", "double": a.double,
+                       "button": _button(a), "double": a.double,
                        "hover": a.hover, "modifiers": a.mod}))
 
 
 def _cmd_drag(a):
     _print_json(_call({"op": P.OP_DRAG, "target": a.target,
                        "x1": a.x1, "y1": a.y1, "x2": a.x2, "y2": a.y2,
-                       "button": "right" if a.right else "left",
+                       "button": _button(a),
                        "steps": a.steps, "modifiers": a.mod, "hold": a.hold}))
 
 
@@ -670,6 +677,8 @@ def build_parser():
     s.add_argument("x", type=int)
     s.add_argument("y", type=int)
     s.add_argument("--right", action="store_true", help="right-click")
+    s.add_argument("--middle", action="store_true",
+                   help="middle-click (Qud's Map Editor hangs commands off it)")
     s.add_argument("--double", action="store_true", help="double-click")
     s.add_argument("--hover", action="store_true",
                    help="post a real mouseMoved first (needed for Qud's legacy popups)")
@@ -683,6 +692,7 @@ def build_parser():
     for _a in ("x1", "y1", "x2", "y2"):
         s.add_argument(_a, type=int)
     s.add_argument("--right", action="store_true", help="drag with the right button")
+    s.add_argument("--middle", action="store_true", help="drag with the middle button")
     s.add_argument("--steps", type=int, default=12, help="intermediate moves (default 12)")
     s.add_argument("--mod", default=None, metavar="ctrl+alt+shift",
                    help="modifiers held for the whole gesture")
