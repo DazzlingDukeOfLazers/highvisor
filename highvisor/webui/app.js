@@ -481,6 +481,40 @@ async function qudGodmode() {
   }
 }
 
+// First-party Escape for Qud's modern menus (the mod's uiback bridge command) —
+// closes screens that ignore synthesized keys, including a STUCK status screen
+// whose nav context died (seen after a mutation-buy popup).
+async function qudBack() {
+  const btn = $("qud-back");
+  btn.disabled = true;
+  try {
+    const r = await rpc("qudback", {});
+    if (!r.ok) alert("uiback failed: " + (r.error || "?"));
+  } catch (e) {
+    alert("uiback failed: " + (e.message || e));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// Grant XP through the 'xp:<n>' wish (same bridge path as godmode). Levels the
+// player up so point-spend workflows (mutations/attributes) are testable on a
+// fresh save. The wish result lands in the game's own message log.
+async function qudXp() {
+  const btn = $("qud-xp");
+  const amt = parseInt($("xp-amount").value || "0", 10);
+  if (!(amt > 0)) { alert("enter an XP amount"); return; }
+  btn.disabled = true;
+  try {
+    const r = await rpc("qudwish", { wish: "xp:" + amt });
+    if (!r.ok) alert("xp wish failed: " + (r.error || "?"));
+  } catch (e) {
+    alert("xp wish failed: " + (e.message || e));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // Start the latest Raves build and arrange it. Launches via the `raves` launcher
 // (which itself spawns Caves of Qud borderless — see launch.json / QudLauncher),
 // waits for BOTH windows to appear (Qud's takes ~20s), then tiles at 1920×1080.
@@ -916,6 +950,11 @@ function bgnStep(k, d) {
 let gtTree = null;
 const gtCoarse = {};   // app -> last cheap poll result
 const gtFine = {};     // app -> last OCR poll result (+ .ts)
+// app -> {node: cost} from the planner. THE GATE for click-to-drive: a cell is clickable when
+// a route exists from where the app is NOW, which is a different (and more useful) question
+// than the one this used to ask.
+const gtCosts = {};
+let gtBusy = "";       // a drive or a check in flight; "" when idle
 
 function gtCurrent(app) {
   const f = gtFine[app];
@@ -936,7 +975,26 @@ async function pollGameState(ocr) {
     st.ts = now;
     if (ocr) gtFine[app] = st; else gtCoarse[app] = st;
   }
+  await gtLoadCosts();
   renderGameTree();
+}
+
+// One `plan_route` per app with NO node returns the cost to EVERY reachable state — so the
+// whole tree's clickability and every hover price come from two calls, not one per node per app.
+//
+// Refetched only when an app has actually CHANGED NODE. The costs are pure computation on the
+// daemon, but they are only wrong when the start state moves, and refetching on every poll made
+// the cockpit the chattiest thing on the socket — four extra ops per cycle, drowning the log
+// that exists to show what the harness is doing.
+const gtCostFrom = {};   // app -> the node the current cost map was computed from
+async function gtLoadCosts(force) {
+  for (const app of Object.keys((gtTree && gtTree.apps) || {})) {
+    const st = gtCurrent(app);
+    const at = st ? (st.off ? "off" : (st.node || "unknown")) : null;
+    if (!force && gtCostFrom[app] === at) continue;
+    const r = await rpc("plan_route", { app });
+    if (r.ok && r.costs) { gtCosts[app] = r.costs; gtCostFrom[app] = at; }
+  }
 }
 
 // Collapsed node ids persist across reloads; a node collapses to its row (children hidden).
@@ -961,10 +1019,50 @@ window.gtToggle = gtToggle;
 // Click an app's cell on a row whose node carries a goto recipe for that app → drive the app
 // there (the engine's gamego op runs the recipe; progress streams into the log).
 async function gtGo(app, nodeId) {
+  if (gtBusy) { gtSay(`already running ${gtBusy} — wait for it to finish`); return; }
+  const cost = (gtCosts[app] || {})[nodeId];
+  // The one thing worth knowing BEFORE the click: cost >= 100 means the only route runs through
+  // the "*" -> title RESTART edge, i.e. minutes and the app relaunched.
+  if (cost >= 100 && !confirm(`The only route for ${app} → ${nodeId} costs ${cost} — it goes via a RESTART (minutes, and the app is relaunched).\n\nGo ahead?`)) return;
+  gtBusy = `${app} → ${nodeId}`;
+  gtSay(`driving ${gtBusy} …`);
   const r = await rpc("gamego", { app, node: nodeId });
-  if (!r.ok) alert(`goto ${app} → ${nodeId} failed: ` + (r.error || "?"));
+  gtBusy = "";
+  if (r.ok) {
+    gtSay(`${app} → ${nodeId}: OK  (${r.route || ""})`);
+  } else {
+    // Name the step that broke, not just ok/fail — the trace is the useful part.
+    const bad = (r.steps || []).filter(s => !s.ok)[0];
+    gtSay(`${app} → ${nodeId}: FAILED — ${(bad && bad.error) || r.error || "?"}`, true);
+  }
+  await gtLoadCosts(true);
+  renderGameTree();
 }
 window.gtGo = gtGo;
+
+// Run a check REGISTERED IN THE TREE. `nodeId` is "" for the harness-wide ones. The command
+// text lives in gametree.json — this names WHICH check, never what to execute.
+async function gtTest(nodeId, testId) {
+  if (gtBusy) { gtSay(`already running ${gtBusy} — wait for it to finish`); return; }
+  gtBusy = `check ${testId}`;
+  gtSay(`running ${testId} …`);
+  const r = await rpc("run_test", { node: nodeId, test: testId });
+  gtBusy = "";
+  if (r.exit === undefined) { gtSay(`check ${testId}: ${r.error || "did not run"}`, true); return; }
+  // TAIL, not head: a check that fails says so at the end.
+  const tail = (r.tail || []).slice(-3).join(" / ");
+  gtSay(`check ${testId}: ${r.detail}${tail ? "  —  " + tail : ""}`, !r.ok);
+}
+window.gtTest = gtTest;
+
+// The status line under the tree header. Kept separate from the SSE log: this is the answer to
+// something you just clicked, and it should not scroll away under the daemon's own chatter.
+function gtSay(text, bad) {
+  const el = $("gt-status");
+  if (!el) return;
+  el.textContent = text;
+  el.className = "gt-status" + (bad ? " bad" : "");
+}
 
 function gtRow(node, depth, appIds, cur) {
   const pad = 6 + depth * 14;
@@ -982,16 +1080,23 @@ function gtRow(node, depth, appIds, cur) {
     const bar = done == null
       ? `<span class="gt-bar gt-bar-na"></span><span class="gt-num"></span>`
       : `<span class="gt-bar"><span class="gt-bar-fill" style="width:${Math.round(done * 100)}%"></span></span><span class="gt-num">${done.toFixed(1)}</span>`;
-    const canGo = !!(node.goto && node.goto[app]);
+    // REACHABILITY, not a stored recipe. This used to read `node.goto[app]`, and when the 20
+    // legacy recipes were deleted for the transition graph every cell silently stopped being
+    // clickable — the cockpit looked fine and did nothing.
+    const cost = (gtCosts[app] || {})[node.id];
+    const canGo = cost !== undefined;
     const cls = `gt-cell${isCur ? " cur" : ""}${onPath ? " onpath" : ""}${canGo ? " gt-go" : ""}`;
+    const label = escapeHtml(gtTree.apps[app].label || app);
     const attrs = canGo
-      ? ` onclick="gtGo('${app}','${escapeHtml(node.id)}')" title="click: drive ${escapeHtml(gtTree.apps[app].label || app)} to ${escapeHtml(node.label || node.id)}"`
-      : "";
+      ? ` onclick="gtGo('${app}','${escapeHtml(node.id)}')" title="drive ${label} to ${escapeHtml(node.label || node.id)} — cost ${cost}${cost >= 100 ? " (via RESTART)" : ""}"`
+      : ` title="${label} has no route to ${escapeHtml(node.label || node.id)} from here"`;
     cells += `<span class="${cls}"${attrs}>${bar}${isCur ? '<span class="gt-here">●</span>' : ""}</span>`;
   }
   const anyCur = appIds.some(a => cur[a] && cur[a].node === node.id);
   const hiddenCur = closed && appIds.some(a => cur[a] && Array.isArray(cur[a].path) && cur[a].path.includes(node.id) && cur[a].node !== node.id);
-  return `<div class="gt-row${anyCur ? " rowcur" : ""}">${twist}<span class="gt-label" style="padding-left:${pad}px" title="${escapeHtml(node.id)}">${escapeHtml(node.label || node.id)}${hiddenCur ? ' <span class="gt-here">●</span>' : ""}</span>${cells}</div>`;
+  const marks = (node.tests || []).map(t =>
+    `<span class="gt-test" onclick="gtTest('${escapeHtml(node.id)}','${escapeHtml(t.id)}')" title="run ${escapeHtml(t.tier || "")} check ${escapeHtml(t.id)}: ${escapeHtml(t.cmd || "")}">[T]</span>`).join("");
+  return `<div class="gt-row${anyCur ? " rowcur" : ""}">${twist}<span class="gt-label" style="padding-left:${pad}px" title="${escapeHtml(node.id)}">${escapeHtml(node.label || node.id)}${hiddenCur ? ' <span class="gt-here">●</span>' : ""}${marks}</span>${cells}</div>`;
 }
 
 function renderGameTree() {
@@ -1010,7 +1115,12 @@ function renderGameTree() {
     legend.push(`${lbl}: ${st ? (st.off ? "off" : (st.label || "…")) : "—"}${extra ? " · " + extra : ""}`);
   }
   const leg = $("gt-legend"); if (leg) leg.textContent = legend.join("   ·   ");
-  let html = '<div class="gt-row gt-head"><span class="gt-twist gt-twist-leaf"></span><span class="gt-label">screen</span>';
+  // Harness-wide checks test the SUPERVISOR, not a screen, so they sit above the tree rather
+  // than on some arbitrary node. Per-node checks appear as [T] on their own row.
+  const harness = (gtTree.tests || []).map(t =>
+    `<span class="gt-test" onclick="gtTest('','${escapeHtml(t.id)}')" title="run ${escapeHtml(t.tier || "")} check: ${escapeHtml(t.cmd || "")}">[T] ${escapeHtml(t.id)}</span>`).join(" ");
+  let html = harness ? `<div class="gt-row gt-checks"><span class="gt-twist gt-twist-leaf"></span><span class="gt-label">checks: ${harness}</span></div>` : "";
+  html += '<div class="gt-row gt-head"><span class="gt-twist gt-twist-leaf"></span><span class="gt-label">screen</span>';
   for (const app of appIds) html += `<span class="gt-cell gt-head-cell">${escapeHtml(gtTree.apps[app].label || app)}</span>`;
   html += "</div>";
   const rows = [];
@@ -1067,6 +1177,11 @@ async function init() {
     (b.onclick = () => userTestLayout(+b.dataset.w, +b.dataset.h)));
   $("raves-1to1").onclick = toggleRaves1to1;
   $("qud-godmode").onclick = qudGodmode;
+  $("qud-xp").onclick = qudXp;
+  $("qud-back").onclick = qudBack;
+  $("hv-abort").onclick = async () => {
+    try { await rpc("abort_control", {}); } catch (e) { alert("abort failed: " + (e.message || e)); }
+  };
   $("layoutsel").onchange = showLayoutDesc;
   $("clearlog").onclick = () => (logEl().innerHTML = "");
   $("gt-ocr").onclick = () => pollGameState(true);

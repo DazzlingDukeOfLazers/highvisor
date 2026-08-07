@@ -253,3 +253,18 @@ main {
 .log .ok { color: var(--ok); }
 .log .copy { margin-left: 6px; cursor: pointer; color: var(--accent);
   border: 1px solid var(--line); border-radius: 3px; padding: 0 5px; font-size: 11px; }
+
+/* Registered checks: [T] next to a node, or a row of them above the tree for the harness-wide
+   ones. Deliberately the same marker the Raves state-graph panel uses — one gesture, two
+   surfaces, so there is nothing to re-learn moving between them. */
+.gt-test { margin-left: 6px; color: var(--accent); cursor: pointer; font-size: 10px;
+           opacity: .75; }
+.gt-test:hover { opacity: 1; text-decoration: underline; }
+.gt-checks { border-bottom: 1px solid var(--line); padding-bottom: 3px; margin-bottom: 2px; }
+/* The answer to something you just clicked. Separate from the SSE log on purpose — there it
+   would scroll away under the daemon's own chatter. */
+.gt-status { font-size: 11px; color: var(--muted); padding: 3px 8px; min-height: 15px;
+             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gt-status.bad { color: var(--err); }
+/* A cell with no route is visibly not a button. */
+.gt-cell:not(.gt-go) { cursor: default; }

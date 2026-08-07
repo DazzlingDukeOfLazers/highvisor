@@ -8,13 +8,17 @@ signals for an app, decides which node that app is currently in. Gathering the s
 (window list, port check, OCR) lives in the engine, which has the backend.
 
 State evaluation (``evaluate``):
-  signals = {present: bool, port_open: bool|None, ocr_text: str|None, scene: str|None}
+  signals = {present: bool, port_open: bool|None, ocr_text: str|None, scene: str|None,
+             tab: str|None}
   - present False                       -> {"off": True}  (no window)
   - else walk the tree; a node MATCHES when every condition in its detect[app] holds:
         "port": True/False   -> requires port_open to equal it (skip if port_open is None)
         "ocr_any": [subs]    -> requires ocr_text to contain any substring
                                 (fails when ocr_text is None -> OCR-only nodes need an OCR poll)
         "scene": "name" | ["a","b"] -> requires the app-REPORTED scene to equal one of these.
+        "tab":   "name" | ["a","b"] -> same, for a sub-screen WITHIN the scene (Qud's status
+                                tabs). Pair it with "scene" so the tab name cannot match while
+                                a different window happens to be up.
                                 The apps author their own state files (the mod's qud_state.json;
                                 Raves' raves_state.json) — first-party truth, so it beats OCR
                                 guessing and works on every cheap poll. Fails when scene is None
@@ -30,22 +34,44 @@ documented there. The tree only STORES them (one canonical map: detection + navi
 import json
 import os
 
+#: How much a matching SIGNAL is worth when two nodes match at the same depth. The apps' own
+#: reports are ground truth; OCR is a reading of pixels; game_live/port are inferences from a
+#: timed socket probe and can be wrong simply because something was busy. Higher wins.
+TRUST = {"tab": 5, "scene": 4, "ocr": 3, "live": 2, "port": 1, "window": 0}
+
 _PATH = os.path.join(os.path.dirname(__file__), "gametree.json")
 _cache = None
 _cache_mtime = None
 
 
 def load_tree(force=False):
-    """Load (and cache) the tree JSON, reloading automatically when the file changes."""
+    """Load (and cache) the tree JSON, reloading automatically when the file changes.
+
+    A TORN READ KEEPS THE LAST GOOD TREE. The reload is mtime-driven, so whoever writes this
+    file races us: an editor saving non-atomically, or a script that dumps JSON and then
+    appends a trailing newline, leaves a window in which the file on disk is half a document.
+    Reading it there used to raise straight out of `load_tree` — and because every op goes
+    through the tree, the whole daemon answered JSONDecodeError until something touched the
+    file again. Observed live: "gamestate fail JSONDecodeError: Expecting value: line 1431".
+
+    Refusing to update is the right failure. The previous tree is stale by at most one save and
+    is certainly parseable; a half-written one is worth nothing. The mtime is deliberately NOT
+    recorded on a failed parse, so the next call retries rather than caching the failure.
+    """
     global _cache, _cache_mtime
     try:
         mtime = os.path.getmtime(_PATH)
     except OSError:
         mtime = None
     if force or _cache is None or mtime != _cache_mtime:
-        with open(_PATH, "r", encoding="utf-8") as fh:
-            _cache = json.load(fh)
-        _cache_mtime = mtime
+        try:
+            with open(_PATH, "r", encoding="utf-8") as fh:
+                loaded = json.load(fh)
+        except (ValueError, OSError):
+            if _cache is None:
+                raise            # nothing to fall back to: a broken tree at startup is fatal
+            return _cache        # keep serving the last good one; retry on the next call
+        _cache, _cache_mtime = loaded, mtime
     return _cache
 
 
@@ -102,6 +128,17 @@ def _matches(detect, app, signals):
         want = want if isinstance(want, list) else [want]
         if str(scene).lower() not in [str(w).lower() for w in want]:
             return False
+    if "tab" in cond:
+        # A SUB-SCREEN within the reported scene — Qud's status screens are eight tabs of one
+        # window, so `scene` alone bottoms out at status_screens and every tab below it was
+        # undetectable for Qud. The app reports the active tab by name in its state file.
+        tab = signals.get("tab")
+        if not tab:
+            return False
+        want = cond["tab"]
+        want = want if isinstance(want, list) else [want]
+        if str(tab).lower() not in [str(w).lower() for w in want]:
+            return False
     # matched every stated condition (a detector with only e.g. {"port": False} is valid)
     return True
 
@@ -117,7 +154,7 @@ def evaluate(tree, app, signals):
         return {"off": True, "running": False, "node": None, "label": "off",
                 "path": [], "via": "no-window", "ocr_used": ocr_used}
 
-    best = None  # (depth, node, path, via)
+    best = None  # (depth, trust, node, path, via)
 
     def walk(node, depth, path):
         nonlocal best
@@ -127,12 +164,30 @@ def evaluate(tree, app, signals):
             cond = node["detect"][app]
             if isinstance(cond, list):   # OR-list: report via the first signature that matched
                 cond = next((c for c in cond if _matches({app: c}, app, signals)), {})
-            via = ("scene" if "scene" in cond
+            via = ("tab" if "tab" in cond
+                   else "scene" if "scene" in cond
                    else "ocr" if "ocr_any" in cond
                    else "live" if "game_live" in cond
                    else "port" if "port" in cond else "window")
-            if best is None or depth > best[0]:
-                best = (depth, node, here_path, via)
+            # Deepest wins, and on a TIE the more trustworthy SIGNAL wins — not tree order.
+            #
+            # Both `title` and `in_game` sit at depth 1. `title` carries a `{"game_live": false}`
+            # fallback for reading the title when no scene file exists; `in_game` matches the
+            # mod's first-party `scene: "play"`. The game_live probe is a 0.35s read on Qud's
+            # bridge, so a busy or just-restarted Qud can miss it — and then BOTH matched at
+            # depth 1 and `title` won purely by appearing first in the children array.
+            #
+            # Observed live 2026-08-06: `hv state` reported "Title Screen  scene=play  via=live"
+            # while Qud was plainly in-game (confirmed by screenshot). Harmless when a human
+            # reads it; not harmless now that `gamego` PLANS from the detected state — a stray
+            # "title" makes it plan title->in_game, whose edge is `load_save`, i.e. reload the
+            # save over a running game.
+            #
+            # The ranking is the project's own standing rule made mechanical: first-party
+            # reports beat OCR, OCR beats inference from a port probe.
+            trust = TRUST.get(via, 0)
+            if best is None or (depth, trust) > (best[0], best[1]):
+                best = (depth, trust, node, here_path, via)
         for ch in node.get("children", []) or []:
             walk(ch, depth + 1, here_path)
 
@@ -143,6 +198,39 @@ def evaluate(tree, app, signals):
         # unmodelled screen). Honest "running, screen unknown".
         return {"off": False, "running": True, "node": None, "label": "running · unknown screen",
                 "path": [], "via": "window", "ocr_used": ocr_used}
-    _, node, path, via = best
+    _, _, node, path, via = best
     return {"off": False, "running": True, "node": node["id"], "label": node.get("label", node["id"]),
             "path": path, "via": via, "ocr_used": ocr_used}
+
+
+def find_test(tree, node_id, test_id):
+    """A registered check, by (node, id). ``node_id`` empty/None means the HARNESS-WIDE list.
+
+    Lookup by ID is the security model, such as it is: a caller names WHICH check to run, never
+    what to execute. The command text lives here, in version control, next to the state it
+    covers — so "run this node's check" from a UI can never become "run this string".
+    """
+    if not node_id:
+        pool = (tree or load_tree()).get("tests") or []
+    else:
+        node = find_node(tree, node_id)
+        pool = (node or {}).get("tests") or []
+    for t in pool:
+        if t.get("id") == test_id:
+            return t
+    return None
+
+
+def all_tests(tree=None):
+    """[(node_id or "", test)] for every registered check — harness-wide first."""
+    tree = tree or load_tree()
+    out = [("", t) for t in (tree.get("tests") or [])]
+
+    def walk(n):
+        for t in n.get("tests") or []:
+            out.append((n.get("id", ""), t))
+        for c in n.get("children") or []:
+            walk(c)
+
+    walk(tree["root"])
+    return out

@@ -15,10 +15,17 @@ which is exactly what a turn-driven export (or reconnect) waits on.
 PROFILES = {
     "qud": {
         "window": "CavesOfQud",
+        "proc": "CoQ",           # pkill -f pattern for a CLEAN restart (kills duplicates too)
+        "launcher": "qud_solo",
         "port": 48710,           # Raves mod bridge — opens on the first in-game tick
         "port_state": "in-game",
         "window_state": "menu",
         "off_state": "off",
+    },
+    "raves": {
+        "window": "Raves of Qud",
+        "proc": "RavesOfQud",
+        "launcher": "raves_solo",
     },
 }
 

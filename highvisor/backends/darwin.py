@@ -28,7 +28,7 @@ from typing import List, Optional
 import Quartz
 from AppKit import NSBitmapImageRep, NSRunningApplication, NSWorkspace
 from ApplicationServices import (
-    AXIsProcessTrusted, AXUIElementCopyActionNames,
+    AXIsProcessTrusted, AXIsProcessTrustedWithOptions, AXUIElementCopyActionNames,
     AXUIElementCopyAttributeValue, AXUIElementCreateApplication,
     AXUIElementPerformAction, AXUIElementSetAttributeValue, AXValueCreate,
     AXValueGetValue)
@@ -39,6 +39,7 @@ except ImportError:  # newer pyobjc
         kAXValueTypeCGPoint as kAXValueCGPointType,
         kAXValueTypeCGSize as kAXValueCGSizeType)
 
+from ..apps import PROFILES
 from ..backend import ActionResult, BackendError, Element, PlatformBackend, Target
 
 # NSBitmapImageFileTypePNG is 4; the symbol moved across pyobjc versions, so pin it.
@@ -67,6 +68,32 @@ KEYCODE = {
 }
 
 
+def _running_image() -> str:
+    """The executable image this process is actually running as — NOT sys.executable. The
+    framework python re-execs into Python.app, so the two differ, and only this one is what
+    TCC checks for Accessibility."""
+    import ctypes
+    import ctypes.util
+    try:
+        libc = ctypes.CDLL(ctypes.util.find_library("c"))
+        size = ctypes.c_uint32(4096)
+        buf = ctypes.create_string_buffer(size.value)
+        if libc._NSGetExecutablePath(buf, ctypes.byref(size)) == 0:
+            import os
+            return os.path.realpath(buf.value.decode())
+    except Exception:
+        pass
+    import sys
+    return sys.executable
+
+
+def _split_mods(spec):
+    """Modifier list, comma- OR plus-separated. The two platform lines grew different
+    spellings — `cmd,ctrl` on mac, `ctrl+alt+shift` on Windows — and unifying the name
+    without unifying the SEPARATOR would just move the bug."""
+    return [m.strip().lower() for m in str(spec or "").replace("+", ",").split(",") if m.strip()]
+
+
 class MacBackend(PlatformBackend):
     name = "macos"
 
@@ -79,6 +106,36 @@ class MacBackend(PlatformBackend):
                 "Accessibility permission is not granted to this process. Grant it in "
                 "System Settings > Privacy & Security > Accessibility (add the terminal / "
                 "python running highvisor), then retry.")
+
+    def request_input_grant(self) -> dict:
+        """Ask macOS to show the Accessibility prompt for THIS process, and report who it is.
+
+        Needed because the two TCC grants resolve to DIFFERENT identities, which is not
+        obvious and cost an evening:
+
+          * Screen Recording resolves via the RESPONSIBLE process — the launchd job, i.e.
+            Highvisor.app. Granting the bundle works.
+          * Accessibility is keyed to the calling process's own signed identity. The
+            framework build's `bin/python3.9` re-execs into `Resources/Python.app`, so the
+            daemon really is running as `com.apple.python3` no matter what launched it, and
+            a grant on Highvisor.app has no effect on input at all.
+
+        So the honest thing is to let the SYSTEM name the identity it wants, by prompting.
+        The dialog also creates the correct entry in the Accessibility list, which otherwise
+        may not be there to tick.
+
+        Narrower than what highvisor had before today, for what it is worth: the grant used
+        to come from Terminal, which covers every command anyone runs there.
+        """
+        import os
+        opts = {"AXTrustedCheckOptionPrompt": True}
+        trusted = bool(AXIsProcessTrustedWithOptions(opts))
+        return {"ok": True, "trusted": trusted,
+                "process": os.path.realpath("/proc/self/exe") if os.path.exists("/proc/self/exe")
+                           else _running_image(),
+                "detail": ("already trusted" if trusted else
+                           "a system dialog was raised — approve it, or tick the entry it "
+                           "added under Privacy & Security > Accessibility")}
 
     # -------------------------------------------------------- window enumeration
     def _windows(self):
@@ -114,12 +171,37 @@ class MacBackend(PlatformBackend):
                 if int(w.get("kCGWindowOwnerPID", -1)) == pid:
                     return w
             raise BackendError("no on-screen window for pid %d" % pid)
+        # A KNOWN APP ALIAS ("qud", "raves") resolves through the app registry, not by raw
+        # substring. This is not a convenience -- it is a correctness fix. Raves' window is
+        # titled "Raves of Qud (DEBUG)", so a bare "qud" substring matched BOTH apps and the
+        # front-to-back scan silently returned whichever happened to be frontmost. Every
+        # `hv shot qud` taken with Raves in front captured RAVES, and the same went for
+        # key/click/activate -- a wrong-window capture that still looks plausible is the
+        # worst possible failure for parity work, because it scores as a perfect match.
+        prof = PROFILES.get(ref.lower())
+        if prof and prof.get("window"):
+            want = prof["window"].lower()
+            for w in wins:
+                if want in (w.get("kCGWindowName") or "").lower():
+                    return w
+            raise BackendError("no window for app %r (expected title ~ %r)" % (ref, prof["window"]))
+
         low = ref.lower()
-        for w in wins:
-            if (low in (w.get("kCGWindowName") or "").lower()
-                    or low in (w.get("kCGWindowOwnerName") or "").lower()):
-                return w
-        raise BackendError("no window matching ~ %r" % ref)
+        hits = [w for w in wins
+                if low in (w.get("kCGWindowName") or "").lower()
+                or low in (w.get("kCGWindowOwnerName") or "").lower()]
+        if not hits:
+            raise BackendError("no window matching ~ %r" % ref)
+        # Ambiguity is an ERROR, not a coin flip on z-order: picking the frontmost is exactly
+        # how the bug above went unnoticed. Two windows of the SAME app are fine (that's one
+        # target); two different apps are not.
+        pids = {int(w.get("kCGWindowOwnerPID", -1)) for w in hits}
+        if len(pids) > 1:
+            names = ", ".join("win:%s %s" % (w.get("kCGWindowNumber"), w.get("kCGWindowName") or "?")
+                              for w in hits)
+            raise BackendError("%r is ambiguous across %d apps: %s -- use win:<id> or an app alias"
+                               % (ref, len(pids), names))
+        return hits[0]
 
     def _bounds(self, w) -> tuple:
         """(x, y, w, h) of a CGWindow dict, in points."""
@@ -322,11 +404,61 @@ class MacBackend(PlatformBackend):
         data = rep.representationUsingType_properties_(_PNG, None)
         return bytes(data)
 
+    _AX_INPUT_NOTE = (
+        "Accessibility permission is not granted to this process, so synthetic input goes "
+        "NOWHERE. Grant it in System Settings > Privacy & Security > Accessibility (the bundle "
+        "is \"Highvisor\" if the daemon was installed with `hv install-daemon`), then retry.")
+
+    def _require_ax_input(self):
+        """Refuse to pretend. CGEventPost does NOT fail when Accessibility is missing — it
+        returns cleanly and the event is dropped, so click/key/scroll all reported ok:true
+        while the target sat there doing nothing.
+
+        That cost an hour: Raves' title menu ignored every click and keypress, the app was
+        healthy, screenshots worked (Screen Recording is a SEPARATE grant and was in place),
+        and every layer in between said success. Screen capture already fails loudly; input
+        must too, or the first suspect is always the app.
+        """
+        if not AXIsProcessTrusted():
+            raise BackendError(self._AX_INPUT_NOTE)
+
+    def _hold_mods(self, src, mods: str):
+        """Press the real modifier keys and return the keycodes to release.
+
+        MEASURED TWICE, both times the hard way. Setting the flag on the event alone does NOT
+        reach Godot — not for a wheel (the Ctrl+wheel panel never opened) and not for a click
+        (a Ctrl+click on the playfield never fired the cell inspector, and Cmd+Right-click never
+        opened the feedback form, while unmodified clicks worked perfectly throughout). An
+        earlier comment here claimed flags-only was enough for Godot; it is not, and believing it
+        cost a live-test case in the FULL run.
+
+        Callers MUST release in a `finally` — an orphaned modifier makes every later synthetic
+        key arrive modified and silently no-op, survives app restarts, and is close to
+        undiagnosable from the app side.
+        """
+        held = self._mod_keycodes(mods)
+        for kc in held:
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap,
+                               Quartz.CGEventCreateKeyboardEvent(src, kc, True))
+        if held:
+            time.sleep(0.04)
+        return held
+
+    def _release_mods(self, src, held):
+        for kc in reversed(held or []):
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap,
+                               Quartz.CGEventCreateKeyboardEvent(src, kc, False))
+        if held:
+            time.sleep(0.03)
+            self._clear_stuck_mods(keep=0)
+
     def click(self, target: str, x: int, y: int, button: str = "left",
-              double: bool = False, hover: bool = False) -> ActionResult:
+              double: bool = False, hover: bool = False,
+              modifiers: str = "") -> ActionResult:
         w = self._resolve(target)
         if w is None:
             return ActionResult.fail("click needs a window target")
+        self._require_ax_input()
         wx, wy, ww, wh = self._bounds(w)
         gx, gy = wx + int(x), wy + int(y)          # window-relative -> global points
         self.activate(target)                       # a click on a bg app should focus it
@@ -360,16 +492,127 @@ class MacBackend(PlatformBackend):
         else:
             Quartz.CGWarpMouseCursorPosition(pt)
             time.sleep(0.03)
-        for _ in range(2 if double else 1):
-            ed = Quartz.CGEventCreateMouseEvent(src, down, pt, b)
-            eu = Quartz.CGEventCreateMouseEvent(src, up, pt, b)
-            Quartz.CGEventPost(Quartz.kCGHIDEventTap, ed)
-            Quartz.CGEventPost(Quartz.kCGHIDEventTap, eu)
-            time.sleep(0.02)
+        # Modifier-clicks (Cmd+Right-click = Raves' element-feedback gesture): set the flag on the
+        # MOUSE events themselves. Flags-only is enough for Godot -- it reads event.meta_pressed off
+        # the click -- and avoids the stuck-modifier class of bug entirely (nothing is ever held).
+        flags = self._mod_flags(modifiers)
+        # a stuck HID modifier (see _clear_stuck_mods) rides on mouse events too -- a plain
+        # left click would arrive as Cmd+click. Clear anything we didn't ask for.
+        self._clear_stuck_mods(keep=0)
+        held = self._hold_mods(src, modifiers)
+        try:
+            for _ in range(2 if double else 1):
+                ed = Quartz.CGEventCreateMouseEvent(src, down, pt, b)
+                eu = Quartz.CGEventCreateMouseEvent(src, up, pt, b)
+                if flags:
+                    Quartz.CGEventSetFlags(ed, flags)
+                    Quartz.CGEventSetFlags(eu, flags)
+                Quartz.CGEventPost(Quartz.kCGHIDEventTap, ed)
+                Quartz.CGEventPost(Quartz.kCGHIDEventTap, eu)
+                time.sleep(0.02)
+        finally:
+            self._release_mods(src, held)
         return ActionResult(ok=True, tier=4,
                             detail="%s%s%s click @ global (%d,%d)"
                                    % ("hover+" if hover else "", "double " if double else "",
                                       button, gx, gy))
+
+    def scroll(self, target: str, x: int, y: int, dy: int = 1, dx: int = 0,
+               modifiers: str = "") -> ActionResult:
+        """Post a scroll-wheel event at a window point, optionally modifier-flagged.
+
+        Written for a gesture no other op could reach: Raves' state-graph panel opens on
+        **Ctrl+wheel**, and there was no way to drive a wheel at all, let alone a modified one.
+        Working around that with a keyboard shortcut would have tested a different code path
+        than the one the viewer uses.
+
+        Same shape as `click`: warp the real cursor first (the wheel goes to whatever is under
+        it, and Unity/Godot read the actual position), HID source and HID tap, and the modifier
+        as a FLAG on the event rather than a held key — nothing to get stuck.
+
+        `dy` is in LINES, positive = wheel-up/away. macOS reports line units as the coarse,
+        universally-understood unit; pixel units would need a device profile to mean anything.
+        """
+        w = self._resolve(target)
+        if w is None:
+            return ActionResult.fail("scroll needs a window target")
+        self._require_ax_input()
+        wx, wy, ww, wh = self._bounds(w)
+        gx, gy = wx + int(x), wy + int(y)
+        self.activate(target)
+        time.sleep(0.06)
+        src = Quartz.CGEventSourceCreate(Quartz.kCGEventSourceStateHIDSystemState)
+        pt = Quartz.CGPointMake(gx, gy)
+        Quartz.CGWarpMouseCursorPosition(pt)
+        Quartz.CGEventPost(Quartz.kCGHIDEventTap,
+            Quartz.CGEventCreateMouseEvent(src, Quartz.kCGEventMouseMoved, pt,
+                                           Quartz.kCGMouseButtonLeft))
+        time.sleep(0.05)
+        flags = self._mod_flags(modifiers)
+        self._clear_stuck_mods(keep=0)
+        # MEASURED: flags alone are NOT enough for a modified WHEEL. Setting
+        # kCGEventFlagMaskControl on the scroll event and posting it gets the wheel through to
+        # Godot with ctrl_pressed FALSE — Raves' Ctrl+wheel panel never opened, while a plain
+        # wheel zoomed the camera every time. (The flags-only trick documented on `click` is a
+        # different path and stays as it is; do not "unify" them without re-measuring.)
+        #
+        # So for scroll we hold the REAL modifier around the event, which produces genuine
+        # hardware modifier state. That is the stuck-modifier bug class the repo lost a day to,
+        # so the release is in a `finally` and a belt-and-braces clear follows it: a modifier
+        # orphaned DOWN makes every later synthetic key arrive modified and silently no-op,
+        # surviving app restarts, and it is close to undiagnosable from the app side.
+        held = self._hold_mods(src, modifiers)
+        try:
+            ev = Quartz.CGEventCreateScrollWheelEvent(src, Quartz.kCGScrollEventUnitLine,
+                                                      2, int(dy), int(dx))
+            if flags:
+                Quartz.CGEventSetFlags(ev, flags)
+            # The wheel event carries no position of its own — it lands wherever the cursor is,
+            # which is why the warp above is not optional.
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+            time.sleep(0.05)
+        finally:
+            self._release_mods(src, held)
+        return ActionResult(ok=True, tier=4,
+                            detail="scroll dy=%d dx=%d%s @ global (%d,%d)"
+                                   % (int(dy), int(dx),
+                                      (" mods=%s" % modifiers) if modifiers else "", gx, gy))
+
+    # Virtual keycodes for the LEFT-hand modifier keys, for the cases where a flag on the
+    # event is not enough and the key has to actually be held.
+    _MOD_KEYCODE = {"cmd": 0x37, "meta": 0x37, "command": 0x37,
+                    "ctrl": 0x3B, "control": 0x3B,
+                    "shift": 0x38,
+                    "alt": 0x3A, "opt": 0x3A, "option": 0x3A}
+
+    @classmethod
+    def _mod_keycodes(cls, mods: str) -> list:
+        out = []
+        for m in _split_mods(mods):
+            kc = cls._MOD_KEYCODE.get(m.strip().lower())
+            if kc is not None and kc not in out:
+                out.append(kc)
+        return out
+
+
+    def mouse_move(self, target: str, x: int, y: int) -> ActionResult:
+        """Warp + post a real mouseMoved at a window point — NO buttons. Activates
+        the target first (Unity apps freeze/skip hover rendering when unfocused)."""
+        w = self._resolve(target)
+        if w is None:
+            return ActionResult.fail("mouse needs a window target")
+        self._require_ax_input()
+        wx, wy, ww, wh = self._bounds(w)
+        gx, gy = wx + int(x), wy + int(y)
+        self.activate(target)
+        time.sleep(0.06)
+        src = Quartz.CGEventSourceCreate(Quartz.kCGEventSourceStateHIDSystemState)
+        pt = Quartz.CGPointMake(gx, gy)
+        Quartz.CGWarpMouseCursorPosition(pt)
+        Quartz.CGEventPost(Quartz.kCGHIDEventTap,
+            Quartz.CGEventCreateMouseEvent(src, Quartz.kCGEventMouseMoved, pt,
+                                           Quartz.kCGMouseButtonLeft))
+        return ActionResult(ok=True, tier=4, detail="mouse @ global (%d,%d)" % (gx, gy))
 
     def inspect(self, target: str, depth: int = 3) -> Element:
         w = self._resolve(target)
@@ -518,15 +761,19 @@ class MacBackend(PlatformBackend):
         # Tier 4: activate + type the characters via CGEvent (steals focus).
         self.activate(target)
         time.sleep(0.06)
+        # GLOBAL tap, not per-pid: Godot ignores CGEventPostToPid exactly like Unity does (the
+        # same reason the key op posts to the HID tap). Per-pid typing looked delivered -- ok:true
+        # -- while the focused TextEdit never saw a character.
         for ch in text:
-            self._post_char(ch, pid)
+            self._post_char(ch, None)
         return ActionResult(ok=True, tier=4,
-                            detail="activate + CGEvent typing (tier1: %s)" % tier1_err)
+                            detail="activate + CGEvent typing, HID tap (tier1: %s)" % tier1_err)
 
     def key(self, target: str, keys: str, focus: bool = False) -> ActionResult:
         w = self._resolve(target)
         if w is None:
             return ActionResult.fail("key needs a window target")
+        self._require_ax_input()
         pid = int(w["kCGWindowOwnerPID"])
         name = keys.strip()
         parts = [p for p in name.replace("-", "+").split("+") if p]
@@ -552,8 +799,15 @@ class MacBackend(PlatformBackend):
 
     # ---- CGEvent helpers ----
     def _mod_flags(self, mods) -> int:
+        """Modifier NAMES (a list) or a spec string ("cmd,ctrl" / "ctrl+alt") -> CGEvent flags.
+
+        Takes both because it has two kinds of caller: `key()` parses "ctrl+m" itself and hands
+        over a list, while click/scroll receive the raw `modifiers` string off the wire. A second,
+        string-only copy of this used to exist above; being defined FIRST it was shadowed by this
+        one, so click/scroll were quietly iterating a string character by character.
+        """
         m = 0
-        for name in mods:
+        for name in (_split_mods(mods) if isinstance(mods, str) else mods):
             u = name.upper()
             if u in ("CMD", "COMMAND", "META"): m |= Quartz.kCGEventFlagMaskCommand
             elif u in ("SHIFT",): m |= Quartz.kCGEventFlagMaskShift
@@ -572,15 +826,76 @@ class MacBackend(PlatformBackend):
     def _char_keycode(self, ch: str):
         return _US_KEYCODES.get(ch.lower())
 
+    # Physical keycodes for the modifiers, so a combo can PRESS and RELEASE them for real.
+    _MOD_KEYS = (
+        (Quartz.kCGEventFlagMaskControl, 0x3B),
+        (Quartz.kCGEventFlagMaskShift, 0x38),
+        (Quartz.kCGEventFlagMaskAlternate, 0x3A),
+        (Quartz.kCGEventFlagMaskCommand, 0x37),
+    )
+
+    def _clear_stuck_mods(self, keep: int = 0):
+        """Release any modifier macOS believes is HELD that this op is not deliberately
+        holding. The bracketing in _post_key leaves the modifier state clean -- unless the
+        daemon dies BETWEEN the down and the up (the source watcher re-execs on any .py
+        save, so an edit landing mid-combo orphans the down). The stuck flag then lives in
+        the OS HID state: it survives app restarts, rides on EVERY later synthetic key
+        ("e" arrives as Cmd+E and silently does nothing), and only a real keypress of that
+        modifier clears it. Cost of finding this: a full day of 'the status screens
+        intermittently refuse to open' across two Raves builds that were never at fault.
+        Releasing is safe: if the flag is set because the HUMAN is holding the key mid-
+        gesture, one synthetic up ends that gesture a beat early -- transient, and far
+        cheaper than every scripted key silently no-opping."""
+        state = Quartz.CGEventSourceFlagsState(Quartz.kCGEventSourceStateHIDSystemState)
+        src = Quartz.CGEventSourceCreate(Quartz.kCGEventSourceStateHIDSystemState)
+        for mask, kc in self._MOD_KEYS:
+            if state & mask and not (keep & mask):
+                ev = Quartz.CGEventCreateKeyboardEvent(src, kc, False)
+                Quartz.CGEventSetFlags(ev, 0)
+                Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+                time.sleep(0.02)
+
     def _post_key(self, keycode: int, flags: int, pid: Optional[int] = None):
-        for down in (True, False):
-            ev = Quartz.CGEventCreateKeyboardEvent(None, keycode, down)
-            if flags:
-                Quartz.CGEventSetFlags(ev, flags)
+        # HID-system source, same as click(): Unity's input system IGNORES keyboard
+        # events synthesized with a None source (Qud's modern menus dropped every
+        # injected Escape until this matched the known-good click path). Small gap
+        # between down and up so per-frame pollers can't miss the pair.
+        #
+        # MODIFIERS ARE PRESSED AND RELEASED FOR REAL, not smuggled onto the key event.
+        # Setting kCGEventFlagMaskControl on a keyboard event posted to the HID tap makes
+        # macOS believe Control is HELD, and nothing here ever cleared it — so after one
+        # `hv key <win> ctrl+tab` EVERY subsequent key arrived modified. A later plain "n"
+        # reached the app as Ctrl+N and silently did nothing, which is exactly how Raves'
+        # status-screen openers "intermittently" stopped working: they stopped the moment a
+        # combo was first sent and stayed broken for the life of the session. Bracketing the
+        # key with genuine modifier down/up leaves the global modifier state as we found it.
+        self._clear_stuck_mods(keep=flags)
+        src = Quartz.CGEventSourceCreate(Quartz.kCGEventSourceStateHIDSystemState)
+
+        def _post(ev):
             if pid:
                 Quartz.CGEventPostToPid(pid, ev)
             else:
                 Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+            time.sleep(0.02)
+
+        mods = [(mask, kc) for mask, kc in self._MOD_KEYS if flags & mask]
+        acc = 0
+        for mask, kc in mods:                      # press each modifier
+            acc |= mask
+            ev = Quartz.CGEventCreateKeyboardEvent(src, kc, True)
+            Quartz.CGEventSetFlags(ev, acc)
+            _post(ev)
+        for down in (True, False):                 # the key itself
+            ev = Quartz.CGEventCreateKeyboardEvent(src, keycode, down)
+            if flags:
+                Quartz.CGEventSetFlags(ev, flags)
+            _post(ev)
+        for mask, kc in reversed(mods):            # release, innermost first
+            acc &= ~mask
+            ev = Quartz.CGEventCreateKeyboardEvent(src, kc, False)
+            Quartz.CGEventSetFlags(ev, acc)
+            _post(ev)
 
     def _post_char(self, ch: str, pid: Optional[int] = None):
         """Type one character by its unicode (keycode 0 + a unicode payload) so any

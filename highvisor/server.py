@@ -82,9 +82,26 @@ def _serve_conn(conn, addr, engine):
                 break
 
 
+def _write_version_file():
+    """Publish the daemon's version where Raves can read it (the reverse of Raves'
+    state files): the 1:1 title version corner shows raves + hv versions."""
+    try:
+        import re
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        m = re.search(r'^version = "([^"]+)"', open(os.path.join(root, "pyproject.toml")).read(), re.M)
+        v = m.group(1) if m else "?"
+        p = os.path.expanduser("~/Library/Application Support/RavesOfQud")
+        os.makedirs(p, exist_ok=True)
+        with open(os.path.join(p, "hv_version.txt"), "w") as f:
+            f.write(v)
+    except Exception:
+        pass
+
+
 def serve_forever(host=P.HOST, port=P.PORT, backend=None, web=True):
     from .events import EventBus
     _crash_fp = _install_crash_guards()
+    _write_version_file()
     backend = backend or make_backend()
     bus = EventBus()
     engine = Engine(backend, bus=bus)
@@ -172,7 +189,46 @@ def serve_forever(host=P.HOST, port=P.PORT, backend=None, web=True):
         engine.stop()
 
 
+def _watch_sources_and_reexec():
+    """Self-restart on code change: when any highvisor .py changes on disk, re-exec
+    the daemon in place (sockets close; clients are one-shot and reconnect). Ends the
+    'edit engine.py, ask Daniel to restart the daemon' loop. Crash-restart is the
+    launchd KeepAlive plist's job (`hv install-daemon`)."""
+    import glob
+    import os
+    import sys
+    import time
+    root = os.path.dirname(os.path.abspath(__file__))
+    paths = (glob.glob(os.path.join(root, "*.py"))
+             + glob.glob(os.path.join(root, "backends", "*.py")))
+    baseline = {p: os.path.getmtime(p) for p in paths}
+    while True:
+        time.sleep(2.0)
+        for p, m0 in list(baseline.items()):
+            try:
+                m = os.path.getmtime(p)
+            except OSError:
+                continue
+            if m != m0:
+                print("[hv] source changed: %s — re-exec" % os.path.basename(p), flush=True)
+                os.chdir(os.path.dirname(root))   # repo root, so -m resolves
+                if os.name == "nt":
+                    # Windows execv is spawn-and-exit with broken console/redirect
+                    # inheritance — a burst of changes (a git merge) killed the daemon.
+                    # Spawn a DETACHED successor after a settle, then exit hard.
+                    import subprocess
+                    time.sleep(1.0)   # let a multi-file change (merge) finish writing
+                    subprocess.Popen([sys.executable, "-m", "highvisor.server"] + sys.argv[1:],
+                                     creationflags=0x00000008 | 0x00000200,  # DETACHED | NEW_PROCESS_GROUP
+                                     close_fds=True)
+                    os._exit(0)
+                os.execv(sys.executable, [sys.executable, "-m", "highvisor.server"] + sys.argv[1:])
+
+
 def main():
+    import threading
+    threading.Thread(target=_watch_sources_and_reexec, daemon=True,
+                     name="hv-source-watch").start()
     serve_forever()
 
 

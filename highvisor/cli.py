@@ -67,6 +67,24 @@ def _cmd_ping(a):
     _print_json(_call({"op": P.OP_PING}))
 
 
+def _screen_recording_warning(targets):
+    """A one-line diagnosis for the failure that otherwise surfaces three layers away.
+
+    Without the Screen Recording grant macOS does not refuse the window list — it returns it
+    with every TITLE blanked, and captures come back empty. Downstream that reads as
+    "no window for app 'raves'", or an OCR step reporting "text 'continue' not on screen"
+    while looking straight at Continue. Several windows and not one title is the signature;
+    say so HERE, where it is one fact, instead of leaving it to be rediscovered.
+    """
+    named = [t for t in targets if (t.get("title") or "").strip()]
+    if len(targets) >= 3 and not named:
+        return ("!! %d windows, NONE with a title — the daemon has no Screen Recording grant.\n"
+                "   Captures and OCR will return nothing. Grant it to whatever runs the daemon:\n"
+                "   System Settings > Privacy & Security > Screen Recording (the bundle is "
+                "\"Highvisor\" if installed via `hv install-daemon`)." % len(targets))
+    return None
+
+
 def _cmd_ls(a):
     resp = _call({"op": P.OP_LIST})
     if not resp.get("ok"):
@@ -76,6 +94,9 @@ def _cmd_ls(a):
         mark = "*" if t.get("focused") else " "
         print("%s %-16s pid=%-6d %4dx%-4d  %s"
               % (mark, t["id"], t["pid"], t["w"], t["h"], t["title"]))
+    warn = _screen_recording_warning(resp.get("targets", []))
+    if warn:
+        print("\n" + warn)
 
 
 def _cmd_shot(a):
@@ -118,6 +139,11 @@ def _cmd_click(a):
     _print_json(_call({"op": P.OP_CLICK, "target": a.target, "x": a.x, "y": a.y,
                        "button": _button(a), "double": a.double,
                        "hover": a.hover, "modifiers": a.mod}))
+
+
+def _cmd_mouse(a):
+    """Warp + a real mouseMoved, NO buttons — the tool for capturing hover states."""
+    _print_json(_call({"op": P.OP_MOUSE, "target": a.target, "x": a.x, "y": a.y}))
 
 
 def _cmd_drag(a):
@@ -186,6 +212,11 @@ def _cmd_state(a):
         if extra.get("mode"):
             bits.append("mode=%s" % extra["mode"])
         bits.append("via=%s" % st.get("via"))
+        # A leaked second instance is the one condition that makes every OTHER field
+        # here untrustworthy (we may drive one window and read another), so it is shouted
+        # rather than tucked into --json.
+        if (sig.get("instances") or 0) > 1:
+            bits.append("!! %d INSTANCES — `hv restart %s`" % (sig["instances"], app))
         print("  ".join(str(b) for b in bits))
 
 
@@ -208,8 +239,46 @@ def _cmd_assert(a):
 
 
 def _cmd_goto(a):
-    """Drive an app to a state-tree node via its goto recipe."""
+    """Drive an app to a state-tree node along a planned route."""
     res = _call({"op": P.OP_GAMEGO, "app": a.app, "node": a.node})
+    if res.get("route"):
+        print("route: %s" % res["route"])
+    _print_json(res)
+    raise SystemExit(0 if res.get("ok") else 1)
+
+
+def _cmd_plan(a):
+    """Show the route `hv goto` WOULD take — nothing is driven.
+
+    Use it before a long run, and to check a route for a screen you are not on:
+    `hv plan raves status_skills --from off` answers "what happens if I ask for this
+    with nothing running", without launching anything.
+    """
+    req = {"op": P.OP_PLAN, "app": a.app, "node": a.node}
+    if a.frm:
+        req["from"] = a.frm
+    res = _call(req)
+    if not res.get("ok"):
+        print("no route: %s" % res.get("error"))
+        raise SystemExit(1)
+    print("%s" % res.get("summary"))
+    if a.node is None:
+        # bulk mode: every reachable state and what it would cost, cheapest first
+        for node, cost in sorted((res.get("costs") or {}).items(), key=lambda kv: (kv[1], kv[0])):
+            print("  %-6s %s" % (cost, node))
+        raise SystemExit(0)
+    for i, e in enumerate(res.get("steps") or [], 1):
+        print("  %d. -> %-22s cost %-4s %s" % (
+            i, e.get("to"), e.get("cost"),
+            " ".join(sorted(k for s in (e.get("steps") or []) for k in s
+                            if k not in ("window", "note", "args")))))
+    raise SystemExit(0)
+
+
+def _cmd_scroll(a):
+    """Wheel event at a window point, e.g. `hv scroll raves 960 540 --dy 1 --mod ctrl`."""
+    res = _call({"op": P.OP_SCROLL, "target": a.target, "x": a.x, "y": a.y,
+                 "dy": a.dy, "dx": a.dx, "modifiers": a.mod or ""})
     _print_json(res)
     raise SystemExit(0 if res.get("ok") else 1)
 
@@ -219,6 +288,211 @@ def _cmd_wish(a):
     res = _call({"op": P.OP_QUDWISH, "wish": " ".join(a.text)})
     _print_json(res)
     raise SystemExit(0 if res.get("ok") else 1)
+
+
+def _cmd_saves(a):
+    """The save list + picker row order, read from DISK (no game launch)."""
+    res = _call({"op": P.OP_QUD_SAVES})
+    if not res.get("ok"):
+        _print_json(res)
+        raise SystemExit(1)
+    for s in res["saves"]:
+        print("row %d: %-26r %-8s %-24s saved %s" % (
+            s["row"], s["name"], s["mode"], s["location"], s["saved"]))
+
+
+def _cmd_loadsave(a):
+    """Load a NAMED save (row computed from disk metadata — no top-row roulette)."""
+    res = _call({"op": P.OP_LOAD_SAVE, "name": " ".join(a.name)}, timeout=180.0)
+    _print_json(res)
+    raise SystemExit(0 if res.get("ok") else 1)
+
+
+def _cmd_restart(a):
+    """Clean restart: kill EVERY instance (duplicates too), launch solo, wait for the window."""
+    res = _call({"op": P.OP_RESTART, "app": a.app}, timeout=120.0)
+    _print_json(res)
+    raise SystemExit(0 if res.get("ok") else 1)
+
+
+def _cmd_trace(a):
+    """The last N goto runs, one line each: what it steered by -> what it reached.
+
+    Reads like a flight recorder, which is the point -- a goto that fails is usually
+    only diagnosable AFTER the fact, and the interesting field is `entry`: the state
+    the recipe believed it was starting from.
+    """
+    res = _call({"op": P.OP_TRACE, "limit": a.limit})
+    if a.json:
+        _print_json(res)
+        raise SystemExit(0 if res.get("ok") else 1)
+    runs = res.get("runs") or []
+    if not runs:
+        print("no goto runs recorded yet (%s)" % res.get("path"))
+        return
+    for r in runs:
+        entry = (r.get("entry") or {}).get("node") or "?"
+        exit_ = (r.get("exit") or {}).get("node") or "?"
+        mark = "ok " if r.get("ok") else "FAIL"
+        nsteps = len(r.get("steps") or [])
+        line = "%s  %s  %-6s %-18s %s -> %s  (%d steps)" % (
+            r.get("t", ""), mark, r.get("app", ""), r.get("node", ""), entry, exit_, nsteps)
+        if r.get("detail"):
+            line += "  [%s]" % r["detail"]
+        print(line)
+        if not r.get("ok"):
+            print("      error: %s" % r.get("error"))
+            for st in (r.get("steps") or []):
+                if not st.get("ok"):
+                    print("      failed step: %s" % st.get("step"))
+
+
+def _cmd_test(a):
+    """Run a REGISTERED check by id, or list them all with no arguments."""
+    if not a.test:
+        from . import gametree
+        for node, t in gametree.all_tests():
+            print("%-16s %-20s %-5s %s" % (node or "(harness)", t["id"], t.get("tier", "?"), t["cmd"]))
+        raise SystemExit(0)
+    res = _call({"op": P.OP_RUN_TEST, "node": a.node or "", "test": a.test}, timeout=660.0)
+    if not res.get("ok") and res.get("have"):
+        print("no such test. registered:")
+        for h in res["have"]:
+            print("  " + h)
+        raise SystemExit(1)
+    print("%s (%s) — %s" % (res.get("test"), res.get("tier"), res.get("detail", res.get("error"))))
+    for ln in res.get("tail") or []:
+        print("  " + ln)
+    raise SystemExit(0 if res.get("ok") else 1)
+
+
+def _cmd_grant_input(a):
+    """Raise the system Accessibility prompt for the DAEMON process, and say which identity
+    macOS is actually asking about — it is the interpreter, not Highvisor.app (see the
+    backend docstring; the two TCC grants resolve differently)."""
+    res = _call({"op": P.OP_GRANT_INPUT})
+    _print_json(res)
+    if res.get("process"):
+        print("\nmacOS keys ACCESSIBILITY to this binary:\n  %s" % res["process"])
+        print("Approve the dialog, or tick that entry under\n"
+              "  System Settings > Privacy & Security > Accessibility\n"
+              "then re-run `hv install-daemon` to confirm both grants.")
+    raise SystemExit(0 if res.get("trusted") else 1)
+
+
+def _cmd_abort(a):
+    """Panic: release focus/mouse NOW; refuse control ops for 30s."""
+    _print_json(_call({"op": P.OP_ABORT}))
+
+
+def _cmd_install_daemon(a):
+    """Write + bootstrap the launchd KeepAlive agent so the daemon restarts itself on crash
+    (code changes already re-exec in place).
+
+    Runs it through **Highvisor.app**, and that is the whole point of the bundle. macOS
+    attributes Screen Recording to a "responsible process": a daemon started from a terminal
+    inherits the terminal's grant, and the identical binary started by launchd does not — so
+    the first version of this command traded screen capture for crash survival, and the
+    symptom was three layers away (blank window titles -> "no window for app 'raves'" ->
+    "text 'continue' not on screen"). The bundle gives macOS ONE thing to grant that survives
+    venv rebuilds, Python upgrades and every source edit. Built here if missing.
+    """
+    import os
+    import plistlib
+    import subprocess
+    import sys
+    import time
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    app = os.path.join(repo, "build", "Highvisor.app")
+    exe = os.path.join(app, "Contents", "MacOS", "Highvisor")
+    if not os.path.exists(exe):
+        print("building %s …" % app)
+        b = subprocess.run([os.path.join(repo, "tools", "make_app.sh")],
+                           capture_output=True, text=True)
+        print((b.stdout or "").rstrip())
+        if b.returncode != 0:
+            print("could not build the app bundle:\n%s" % (b.stderr or "").rstrip())
+            print("falling back to the bare interpreter — expect NO screen capture under launchd")
+    program = [exe] if os.path.exists(exe) else [sys.executable, "-m", "highvisor.server"]
+
+    label = "com.highvisor.daemon"
+    plist = {
+        "Label": label,
+        "ProgramArguments": program,
+        "WorkingDirectory": repo,
+        "KeepAlive": True,
+        "RunAtLoad": True,
+        "StandardOutPath": os.path.expanduser("~/Library/Logs/highvisor.log"),
+        "StandardErrorPath": os.path.expanduser("~/Library/Logs/highvisor.log"),
+    }
+    path = os.path.expanduser("~/Library/LaunchAgents/%s.plist" % label)
+    with open(path, "wb") as fh:
+        plistlib.dump(plist, fh)
+    uid = os.getuid()
+    # A manually-run daemon would hold port 48720 and the launchd job would die on every
+    # restart attempt — which looks exactly like a broken agent. Clear it first rather than
+    # telling the user about it afterwards.
+    subprocess.run(["pkill", "-f", "highvisor.server"], capture_output=True)
+    subprocess.run(["launchctl", "bootout", "gui/%d/%s" % (uid, label)], capture_output=True)
+    time.sleep(1.5)
+    r = subprocess.run(["launchctl", "bootstrap", "gui/%d" % uid, path],
+                       capture_output=True, text=True)
+    print("plist:   %s" % path)
+    print("program: %s" % " ".join(program))
+    print("bootstrap: %s" % ("ok" if r.returncode == 0 else (r.stderr.strip() or "failed")))
+    print("logs -> ~/Library/Logs/highvisor.log")
+    if r.returncode != 0:
+        return 1
+
+    # VERIFY, do not assume. The agent can be running perfectly and still be unable to see a
+    # single window title, which is the failure this whole bundle exists to make fixable.
+    # RETRY THROUGH THE GAP. launchd has bootstrapped the job but the daemon needs a second or
+    # two to bind 48720, and `_call` RAISES on a refused connection rather than returning — so
+    # the first, expected refusal escaped this loop entirely and the install reported failure
+    # for a daemon that was about to come up fine.
+    resp = {}
+    for _ in range(12):
+        time.sleep(1.0)
+        try:
+            resp = _call({"op": P.OP_LIST})
+        except (OSError, SystemExit):
+            continue
+        if resp.get("ok"):
+            break
+    else:
+        print("\n!! the agent is bootstrapped but the daemon is not answering on 48720 — "
+              "check the log")
+        return 1
+    problems = []
+    warn = _screen_recording_warning(resp.get("targets", []))
+    if warn:
+        problems.append(("Screen Recording", warn))
+    else:
+        print("\nscreen capture:  OK (%d windows, titles readable)" % len(resp.get("targets", [])))
+
+    # ACCESSIBILITY IS A SEPARATE GRANT, and its absence is far nastier than Screen
+    # Recording's: CGEventPost does not fail without it, so every click and keypress returns
+    # ok:true and goes nowhere. Checking capture alone once let an install pass while the
+    # harness could not drive a single thing — an hour went into suspecting the app.
+    ax = _call({"op": P.OP_INSPECT, "target": (resp.get("targets") or [{}])[0].get("id", ""),
+                "depth": 1})
+    if "Accessibility permission" in str(ax.get("error", "")):
+        problems.append(("Accessibility",
+            "!! synthetic input is DEAD — the daemon has no Accessibility grant.\n"
+            "   click/key/scroll will report success and do nothing (CGEventPost does not\n"
+            "   fail without it). System Settings > Privacy & Security > Accessibility."))
+    else:
+        print("synthetic input: OK (Accessibility granted)")
+
+    if problems:
+        print()
+        for _, text in problems:
+            print(text)
+        print("\n   The bundle is registered, so \"Highvisor\" should be listed under %s.\n"
+              "   Enable it, then re-run `hv install-daemon` — it boots the agent out and back\n"
+              "   in, which is what makes a new grant take effect."
+              % " AND ".join(name for name, _ in problems))
+        return 1
 
 
 def _cmd_diff(a):
@@ -672,6 +946,12 @@ def build_parser():
                    help="activate + HID-tap delivery (for Unity/games that ignore background keys)")
     s.set_defaults(fn=_cmd_key)
 
+    s = sub.add_parser("mouse", help="move the mouse to window-relative x y — no click (hover-state capture)")
+    s.add_argument("target")
+    s.add_argument("x", type=int)
+    s.add_argument("y", type=int)
+    s.set_defaults(fn=_cmd_mouse)
+
     s = sub.add_parser("click", help="click at window-relative x y (points)")
     s.add_argument("target")
     s.add_argument("x", type=int)
@@ -747,14 +1027,63 @@ def build_parser():
     s.add_argument("--timeout", type=float, default=10.0)
     s.set_defaults(fn=_cmd_assert)
 
-    s = sub.add_parser("goto", help="drive an app to a state-tree node (its goto recipe), e.g. hv goto qud in_game")
+    s = sub.add_parser("goto", help="drive an app to a state-tree node along a planned route, e.g. hv goto qud in_game")
     s.add_argument("app", help="qud | raves")
     s.add_argument("node", help="tree node id, e.g. title | in_game")
     s.set_defaults(fn=_cmd_goto)
 
+    s = sub.add_parser("plan", help="show the route `hv goto` would take, WITHOUT driving anything")
+    s.add_argument("app", help="qud | raves")
+    s.add_argument("node", nargs="?", default=None,
+                   help="tree node id, e.g. title | in_game. OMIT it to list EVERY "
+                        "reachable state and its cost")
+    s.add_argument("--from", dest="frm", default=None,
+                   help="plan from this state instead of the detected one (a node id, "
+                        "'off' or 'unknown')")
+    s.set_defaults(fn=_cmd_plan)
+
+    s = sub.add_parser("scroll", help="wheel event at a window point (dy in LINES, + = up), e.g. hv scroll raves 960 540 --dy 1 --mod ctrl")
+    s.add_argument("target")
+    s.add_argument("x", type=int)
+    s.add_argument("y", type=int)
+    s.add_argument("--dy", type=int, default=1, help="lines; positive = wheel up/away")
+    s.add_argument("--dx", type=int, default=0, help="lines; horizontal")
+    s.add_argument("--mod", default=None, metavar="ctrl+alt+shift",
+                   help="modifiers HELD across the wheel (not just flagged — see backend.py)")
+    s.set_defaults(fn=_cmd_scroll)
+
     s = sub.add_parser("wish", help="run a Caves of Qud wish via the Raves bridge, e.g. hv wish godmode")
     s.add_argument("text", nargs="+", help="the wish text (godmode | item:<Blueprint> | xp:<n> | ...)")
     s.set_defaults(fn=_cmd_wish)
+
+    sub.add_parser("saves", help="Qud's save list + picker row order, from DISK (no game launch)").set_defaults(fn=_cmd_saves)
+
+    s = sub.add_parser("loadsave", help="load a NAMED Qud save (restarts to title if needed), e.g. hv loadsave meta")
+    s.add_argument("name", nargs="+", help="the save's character name, exactly as the picker shows it")
+    s.set_defaults(fn=_cmd_loadsave)
+
+    s = sub.add_parser("back", help="close/back out of Qud's current modern menu (first-party uiback)")
+    s.set_defaults(fn=lambda a: _print_json(_call({"op": P.OP_QUDBACK})))
+    s = sub.add_parser("restart", help="clean restart: kill ALL instances, launch solo, wait for the window")
+    s.add_argument("app", help="qud | raves")
+    s.set_defaults(fn=_cmd_restart)
+
+    s = sub.add_parser("trace", help="last N goto runs: what each STEERED BY and what it reached")
+    s.add_argument("limit", nargs="?", type=int, default=20)
+    s.add_argument("--json", action="store_true")
+    s.set_defaults(fn=_cmd_trace)
+
+    s = sub.add_parser("test", help="run a REGISTERED check from the tree by id (no args = list them)")
+    s.add_argument("test", nargs="?", default=None)
+    s.add_argument("--node", default=None, help="the node it is registered on (omit for harness-wide)")
+    s.set_defaults(fn=_cmd_test)
+
+    sub.add_parser("grant-input", help="raise the Accessibility prompt for the daemon "
+                   "(input needs a DIFFERENT grant than capture)").set_defaults(fn=_cmd_grant_input)
+
+    sub.add_parser("abort", help="PANIC: release focus/mouse now; refuse control ops for 30s").set_defaults(fn=_cmd_abort)
+
+    sub.add_parser("install-daemon", help="launchd KeepAlive agent: the daemon restarts itself on crash").set_defaults(fn=_cmd_install_daemon)
 
     s = sub.add_parser("probe", help="is an app up, and in what state? (e.g. hv probe --app qud)")
     s.add_argument("--app", help="known app profile (see apps.py): qud")

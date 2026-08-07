@@ -116,6 +116,45 @@ PYTHONPATH=<highvisor> python -m highvisor.cli scene --all --parity --text \
 
 ## Gotchas (the hard-won bits)
 
+- **A modified key used to leave its MODIFIER STUCK DOWN, silently corrupting every later key.**
+  `_post_key` set `kCGEventFlagMaskControl` on the key event and nothing ever cleared it, so macOS
+  went on believing Control was held: after one `hv key <win> ctrl+tab`, a later plain `n` reached
+  the app as **Ctrl+N** and did nothing. That is the whole explanation for Raves' status-screen
+  openers "intermittently" breaking — they stopped the moment a combo was first sent and stayed
+  broken for the rest of the session, on every app, for every key. Modifiers are now PRESSED AND
+  RELEASED as real key events around the keystroke. *Symptom to recognise:* single keys stop
+  working after you send your first combo, and a fresh app launch does not fix it (the stuck state
+  is in the OS, not the app).
+
+- **Qud's uiQueue does NOT drain while its window is in the BACKGROUND.** Measured: a
+  `uiprobe` command sent with Qud backgrounded logged nothing at all, and ran the instant
+  Qud was focused. Every bridge command that marshals onto that queue — `uiback`,
+  `uiprobe`, `statusscreen`, the exporters' chrome pass — is accepted, queued, and then
+  silently does nothing until focus returns. `_qud_bridge` therefore ACTIVATES Qud first
+  (only when it isn't already frontmost) and waits **2s**: at 0.35s the frame still landed
+  in a queue that wasn't running yet. Shorter is not cheaper here, it is a failure dressed
+  as a success.
+- **It also holds the socket open ~0.4s after sending.** Closing the instant `sendall`
+  returns races the mod's per-client reader — the server logs "dropped slow/broken client:
+  the socket has been shut down" and the command is lost.
+- **The cascade these two produce looks like something else entirely.** Qud parked in a
+  status screen stops publishing snapshots, so Raves can never leave its title screen, and
+  the visible symptom is "`hv goto raves in_game` is broken". It isn't: close Qud's screen
+  (`hv back`) and Raves recovers immediately. Verified as a reproduction and a recovery.
+- **`hv back` takes NO app argument.** `hv back qud` fails at argument parsing and never
+  reaches the daemon — which looks exactly like the daemon ignoring the command, and cost a
+  long detour chasing a bug that wasn't there. Check `hv <cmd> --help` before concluding an
+  op is broken.
+
+- **A target string is an APP ALIAS or a `win:<id>` — never a loose substring.** `_resolve`
+  used to substring-match window titles front-to-back, and Raves' window is titled
+  **"Raves of Qud (DEBUG)"** — which contains "qud". So `hv shot qud` returned whichever of
+  the two happened to be frontmost, and the same went for `key`/`click`/`activate`. It failed
+  silently and *plausibly*: a Raves capture labelled `qud` scores as a perfect parity match,
+  which is the worst way for a measurement rig to be wrong. Aliases in `apps.PROFILES` now
+  resolve through the registry's exact window name, and a free-form string that matches two
+  different apps is a hard error listing both rather than a coin flip on z-order. **If a
+  parity number from before this looks too good, re-measure it.**
 - **Qud's legacy popups need `--hover`.** A bare warp+click drives Unity UI buttons
   (Qud's toolbar, its title menu) but its *console* popups (the in-game ☰ menu, "press
   [Space]" prompts) activate the item under `Input.mousePosition`, which

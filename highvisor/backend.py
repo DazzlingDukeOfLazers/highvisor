@@ -156,6 +156,32 @@ class PlatformBackend:
         (Unity/other engines)."""
         raise NotImplementedError
 
+    # ------------------------------------------------------------------ MODIFIERS
+    # READ THIS BEFORE IMPLEMENTING click/drag/scroll ON A NEW BACKEND.
+    #
+    # A modifier must be REALLY HELD around the event. Setting a modifier bit on the event
+    # itself is not enough — and both existing backends learned that the hard way, separately,
+    # within a day of each other:
+    #
+    #   macOS  — CGEventSetFlags(kCGEventFlagMaskControl) on a click or a wheel reaches Godot
+    #            with ctrl_pressed FALSE. Ctrl+wheel never opened Raves' state-graph panel and
+    #            Ctrl+click never fired its cell inspector, while unmodified clicks worked
+    #            perfectly throughout. Fixed by pressing the real key around the event
+    #            (_hold_mods/_release_mods in darwin.py).
+    #   Windows — the same symptom; fixed by emitting BOTH the VK and the scancode form,
+    #            because Godot reads one and Unity the other.
+    #
+    # Two platforms, two mechanisms, one lesson: the app is not reading your flag, it is
+    # reading the keyboard. Whatever your OS calls "held", do that.
+    #
+    # And whatever you do, RELEASE IN A `finally`. An orphaned modifier makes every later
+    # synthetic key arrive modified and silently no-op, survives app restarts, and is close to
+    # undiagnosable from the app side — a full day went into it once, blamed on the app.
+    #
+    # `modifiers` is a string; accept BOTH separators ("cmd,ctrl" and "ctrl+alt+shift"). The
+    # two lines grew different spellings and unifying the name without the separator would
+    # just move the bug.
+
     def click(self, target: str, x: int, y: int, button: str = "left",
               double: bool = False, hover: bool = False,
               modifiers: Optional[str] = None) -> ActionResult:
@@ -168,6 +194,19 @@ class PlatformBackend:
         Backends that don't implement hover ignore it; the engine only forwards it
         when explicitly requested, so it never reaches a backend that lacks the arg."""
         raise NotImplementedError
+
+    def scroll(self, target: str, x: int, y: int, dy: int = 1, dx: int = 0,
+               modifiers: str = "") -> ActionResult:
+        """Wheel event at a window point. ``dy`` is in LINES, positive = up/away;
+        ``modifiers`` is HELD, not flagged — see the MODIFIERS note above; an earlier version
+        of this docstring asserted the opposite and it was measured wrong on both platforms.
+
+        Separate from ``click`` because a wheel is not a button: it carries no position
+        of its own and lands wherever the OS cursor is, so an implementation must warp
+        first. Added for Raves' Ctrl+wheel state-graph panel, which no other op could
+        reach — and a gesture that can only be tested by hand is a gesture that stops
+        being tested."""
+        return ActionResult.fail("scroll not implemented on this backend")
 
     def inspect(self, target: str, depth: int = 3) -> Element:
         raise NotImplementedError

@@ -38,6 +38,35 @@ def _slim_state(st):
             "extra": st.get("extra")}
 
 
+def _step_ok(ok, detail=None, error=None):
+    """A step result that carries `error` ONLY when it failed.
+
+    Trivial, and worth a name: the obvious `{"ok": r.ok, "error": r.error or "key failed"}`
+    stamps a fallback message onto SUCCESSES too, so a passing route prints a column of
+    "activate failed / key failed" next to ok=True. Read six months from now that is a
+    bug report about a working feature.
+    """
+    out = {"ok": bool(ok)}
+    if detail:
+        out["detail"] = detail
+    if not ok and error:
+        out["error"] = error
+    return out
+
+
+def _ocr_find(boxes, want):
+    """Find the OCR line for a UI label. Space-insensitive: Vision splits tight
+    monospace ('Options' -> 'Opti ons' on Raves' Source Code Pro), so compare with
+    all whitespace stripped. Exact (normalized) match beats substring; among
+    substrings the shortest line wins (long lines are prose, not buttons)."""
+    wn = "".join(str(want).lower().split())
+    norm = lambda t: "".join(t.lower().split())
+    exact = [x for x in boxes if norm(x["text"]) == wn]
+    subs = sorted((x for x in boxes if wn in norm(x["text"])),
+                  key=lambda x: len(x["text"]))
+    return (exact or subs or [None])[0]
+
+
 class _Job:
     __slots__ = ("request", "event", "result")
 
@@ -51,6 +80,8 @@ class Engine:
     def __init__(self, backend, bus=None):
         self.backend = backend
         self.bus = bus  # optional EventBus: each op is published for the onscreen log
+        from .guard import ControlGuard
+        self.guard = ControlGuard(bus)   # the timeshare guard (focus/mouse save-restore + abort)
         self.bridge = None  # optional Bridge: set by the server for peer_* ops
         self._q: "queue.Queue[_Job]" = queue.Queue()
         self._thread = threading.Thread(target=self._run, name="hv-engine",
@@ -125,7 +156,13 @@ class Engine:
         b = self.backend
 
         if op == P.OP_PING:
-            return {"ok": True, "backend": b.name, "version": __version__}
+            resp = {"ok": True, "backend": b.name, "version": __version__}
+            try:                       # windows: DPI awareness the daemon runs under
+                from .backends import windows as _w
+                resp["dpi_status"] = _w.DPI_STATUS
+            except Exception:
+                pass
+            return resp
 
         if op == P.OP_LIST:
             from .apps import classify_target
@@ -148,6 +185,12 @@ class Engine:
 
         # For actions, the response IS the ActionResult dict: its ``ok`` reports
         # whether the action landed (RPC-level failures come back as exceptions).
+        # Focus/mouse-stealing ops go through the TIMESHARE GUARD (audio countdown,
+        # focus+mouse save/restore, abort channels, 20s cap — see guard.py).
+        if op in (P.OP_ACTIVATE, P.OP_TEXT, P.OP_KEY, P.OP_CLICK, P.OP_MOUSE, P.OP_SCROLL, P.OP_DRAG):
+            _gerr = self.guard.begin()
+            if _gerr:
+                return {"ok": False, "error": _gerr}
         if op == P.OP_ACTIVATE:
             return b.activate(req["target"]).to_dict()
 
@@ -177,6 +220,21 @@ class Engine:
                 kw["modifiers"] = str(req["modifiers"])
             return b.drag(req["target"], int(req.get("x1", 0)), int(req.get("y1", 0)),
                           int(req.get("x2", 0)), int(req.get("y2", 0)), **kw).to_dict()
+
+        if op == P.OP_SCROLL:
+            # A WHEEL event, optionally modified. Distinct from click because a wheel carries
+            # no position: it lands under the OS cursor, so the backend warps first. Guarded
+            # like every other input op — it moves the mouse and takes focus.
+            return b.scroll(req["target"], int(req.get("x", 0)), int(req.get("y", 0)),
+                            dy=int(req.get("dy", 1)), dx=int(req.get("dx", 0)),
+                            modifiers=str(req.get("modifiers", ""))).to_dict()
+
+        if op == P.OP_MOUSE:
+            # pure hover: warp + a real mouseMoved so engines that read
+            # Input.mousePosition (Unity) see it — no button events. THE tool for
+            # capturing hover/highlight states without changing app state.
+            return b.mouse_move(req["target"], int(req.get("x", 0)),
+                                int(req.get("y", 0))).to_dict()
 
         if op == P.OP_INSPECT:
             tree = b.inspect(req["target"], int(req.get("depth", 3)))
@@ -227,6 +285,9 @@ class Engine:
         if op == P.OP_GAMEGO:
             return self._gamego(b, req.get("app"), req.get("node"))
 
+        if op == P.OP_PLAN:
+            return self._plan_route(b, req.get("app"), req.get("node"), req.get("from"))
+
         if op == P.OP_ASSERT:
             return self._assert_state(b, req)
 
@@ -235,6 +296,30 @@ class Engine:
 
         if op == P.OP_QUDWISH:
             return self._qudwish(req.get("wish", ""))
+
+        if op == P.OP_QUDBACK:
+            return self._qud_bridge("uiback")
+
+        if op == P.OP_QUD_SAVES:
+            return self._qud_saves()
+
+        if op == P.OP_LOAD_SAVE:
+            return self._load_save(b, req.get("name", ""))
+
+        if op == P.OP_TRACE:
+            return self._read_trace(req.get("limit", 20))
+
+        if op == P.OP_RESTART:
+            return self._restart_app(b, req.get("app", ""))
+
+        if op == P.OP_RUN_TEST:
+            return self._run_test(req.get("node") or "", req.get("test") or "")
+
+        if op == P.OP_GRANT_INPUT:
+            return b.request_input_grant()
+
+        if op == P.OP_ABORT:
+            return self.guard.abort("op")
 
         if op == P.OP_LAYOUT_LIST:
             from .layouts import load_layouts
@@ -310,6 +395,14 @@ class Engine:
                 return t
         return None
 
+    def _all_wins(self, wins, label):
+        """EVERY window matching ``label`` — how duplicate instances become visible."""
+        m = (label or "").lower()
+        if not m:
+            return []
+        return [t for t in wins
+                if m in (t.title or "").lower() or m in (t.class_name or "").lower()]
+
     def _stack_above(self, b, top_label, bottom_label, gap=8):
         """Move ``top`` into the anchor's column (matched x + width), directly above it."""
         if not top_label or not bottom_label:
@@ -323,9 +416,40 @@ class Engine:
             return {"ok": False, "error": "%r not found" % top_label}
         x, w, h = bot.x, bot.w, bot.h            # same column + size as the anchor
         y = bot.y - gap - h                      # stacked directly above it
+        if "raves of qud" in (top.title or "").lower():
+            # Godot's borderless window can't be moved via AX (sets land at wild
+            # coords or fail) — ask Raves to place ITSELF: write window_rect.json
+            # (the reverse of its state-report contract), verify by CG readback.
+            r2 = self._move_raves_file(b, top.id, int(x), int(y), int(w), int(h))
+            if r2.get("ok"):
+                return {"ok": True, "top": top.id, "bottom": bot.id,
+                        "rect": [int(x), int(y), int(w), int(h)], "via": "file"}
+            # fall through to the AX attempt as a last resort
         r = b.move(top.id, int(x), int(y), int(w), int(h), None)
         return {"ok": r.ok, "top": top.id, "bottom": bot.id,
                 "rect": [int(x), int(y), int(w), int(h)], "error": r.error}
+
+    def _move_raves_file(self, b, win_id, x, y, w, h, timeout_s=6.0):
+        """Placement via Raves' window_rect.json poll (Settings.gd applies it with
+        DisplayServer within ~0.5s). Verified by CG frame readback, ±3px."""
+        import json as _json
+        import os as _os
+        import time as _time
+        path = _os.path.expanduser(
+            "~/Library/Application Support/RavesOfQud/window_rect.json")
+        try:
+            with open(path, "w") as f:
+                _json.dump({"x": x, "y": y, "w": w, "h": h, "ts": _time.time()}, f)
+        except OSError as e:
+            return {"ok": False, "error": "window_rect write failed: %s" % e}
+        end = _time.monotonic() + timeout_s
+        while _time.monotonic() < end:
+            _time.sleep(0.5)
+            t = next((t for t in b.list_targets() if t.id == win_id), None)
+            if t and all(abs(a - b_) <= 3 for a, b_ in
+                         ((t.x, x), (t.y, y), (t.w, w), (t.h, h))):
+                return {"ok": True}
+        return {"ok": False, "error": "raves did not land on the rect (file channel)"}
 
     def _dock(self, b, target):
         """Apply the standing dock rule for ``target`` (id or title substring)."""
@@ -440,6 +564,284 @@ class Engine:
             return {"ok": False,
                     "error": "Qud bridge :%s unreachable (%s) — is Qud in-game?" % (port, e)}
 
+    def _qud_command(self, command):
+        """Push a named QUD command (CmdQuit, CmdEquipment, …) through the mod bridge.
+
+        Distinct from _qud_bridge, which names a MOD command: this one names a command
+        in Qud's own table, so it runs through Qud's command path and any UI it owns
+        opens for real. Binding-independent -- no key guessing.
+        """
+        import json as _json
+        import socket as _socket
+        import struct as _struct
+        from .apps import PROFILES
+        port = PROFILES.get("qud", {}).get("port", 48710)
+        payload = _json.dumps({"type": "command", "name": "command",
+                               "command": command}).encode("utf-8")
+        try:
+            with _socket.create_connection(("127.0.0.1", port), timeout=3) as s:
+                s.sendall(_struct.pack(">I", len(payload)) + payload)
+            return {"ok": True, "command": command}
+        except OSError as e:
+            return {"ok": False, "error": "qud bridge: %s" % e}
+
+    def _qud_popup_answer(self, btn):
+        """Answer Qud's OWN popup by its bottom-button command (Yes/No/Cancel).
+
+        The mod dismisses the popup it announced, so this needs no keys and no focus --
+        which matters because Qud's modern UI ignores OS-synthesized keys entirely.
+        Answering when no popup is up is a harmless no-op (the mod logs "no target"),
+        so a fixed sequence can be sent without first detecting each prompt.
+        """
+        import json as _json
+        import socket as _socket
+        import struct as _struct
+        from .apps import PROFILES
+        port = PROFILES.get("qud", {}).get("port", 48710)
+        payload = _json.dumps({"type": "command", "name": "popup",
+                               "action": "button", "btn": btn}).encode("utf-8")
+        try:
+            with _socket.create_connection(("127.0.0.1", port), timeout=3) as s:
+                s.sendall(_struct.pack(">I", len(payload)) + payload)
+            return {"ok": True, "btn": btn}
+        except OSError as e:
+            return {"ok": False, "error": "qud bridge: %s" % e}
+
+    def _qud_bridge(self, name, focus=True, args=None):
+        """Send a bare {"type":"command","name":...} frame to the Qud mod bridge
+        (listener is up from the main menu on — ModSensitiveCacheInit). First-party
+        UI driving: e.g. "uiback" fires the modern-UI CancelButton, the real Escape
+        for menu screens that ignore every OS-synthesized key.
+
+        ACTIVATES QUD FIRST, and that is load-bearing. These commands marshal onto the
+        mod's uiQueue, and **Unity does not drain that queue while the window is in the
+        background** (measured: a probe command logged nothing backgrounded and ran the
+        instant Qud was focused). The frame is accepted, queued, and simply sits there —
+        so an unfocused `uiback` looks like it worked and the screen stays up. That in
+        turn strands the pair: Qud holds a status screen, stops publishing snapshots, and
+        Raves can never leave its title screen. Diagnosed as "the Raves goto is broken"
+        more than once; it is this.
+
+        Anything that drives the app's UI has to go through here focused. Pass focus=False
+        only for a command you know touches no Unity object."""
+        import json as _json
+        import socket as _socket
+        import struct as _struct
+        from .apps import PROFILES
+        win = PROFILES.get("qud", {}).get("window", "CavesOfQud")
+        if focus:
+            try:
+                # Only pay the settle when Qud isn't already frontmost — list_targets is
+                # front-to-back, so the first entry is the active window.
+                tops = self.backend.list_targets()
+                front = (tops[0].to_dict().get("title") or "") if tops else ""
+                if win not in front:
+                    self.backend.activate(win)
+                    import time as _t
+                    # 2s, measured. Unity needs a beat AFTER regaining focus before it drains
+                    # the mod's uiQueue again: at 0.35s the command still landed in a queue that
+                    # wasn't running yet and did nothing. Shorter is not safer here, it is just
+                    # a failure that looks like success.
+                    _t.sleep(2.0)
+            except Exception:
+                pass                # not fatal: a focused Qud is the common case anyway
+        port = PROFILES.get("qud", {}).get("port", 48710)
+        frame = {"type": "command", "name": name}
+        # Extra fields ride ALONGSIDE name — the mod reads its arguments off the same flat
+        # command object (f.TryGetValue("tab", ...)), so a nested dict would be invisible to it.
+        for k, v in (args or {}).items():
+            if k not in ("type", "name"):
+                frame[k] = v
+        payload = _json.dumps(frame).encode("utf-8")
+        try:
+            with _socket.create_connection(("127.0.0.1", port), timeout=3) as s:
+                s.sendall(_struct.pack(">I", len(payload)) + payload)
+                # HOLD THE SOCKET OPEN briefly. Closing the instant sendall returns races the
+                # mod's per-client reader: the server logs "dropped slow/broken client: the
+                # socket has been shut down" and the command is lost. The bridge client the
+                # capture tools use keeps its socket alive, which is why an identical frame
+                # sent from there worked while `hv back` silently did nothing.
+                import time as _t2
+                _t2.sleep(0.4)
+            return {"ok": True, "name": name, "focused": True, "held": 0.4}
+        except OSError as e:
+            return {"ok": False, "error": "Qud bridge :%s unreachable (%s)" % (port, e)}
+
+    # ------------------------------------------------------- qud saves (from DISK)
+    def _qud_saves(self):
+        """The save list AND the Load Game picker's row order, read from disk —
+        Qud writes Primary.json (name/location/mode/SaveTime) into each save dir at
+        SAVE TIME, so no game launch is needed to know what the picker will show.
+        Row order = mtime desc, matching the picker (verified against it)."""
+        import json as _json
+        import os as _os
+        # Qud's data dir differs per OS (Unity persistentDataPath): the Mac uses
+        # the bundle-id Library path, Windows uses AppData/LocalLow/<company>.
+        if _os.name == "nt":
+            qroot = _os.path.join(_os.path.expanduser("~"), "AppData", "LocalLow",
+                                  "Freehold Games", "CavesOfQud")
+        else:
+            qroot = _os.path.expanduser(
+                "~/Library/Application Support/com.FreeholdGames.CavesOfQud")
+        root = _os.path.join(qroot, "Synced", "Saves")
+        out = []
+        try:
+            for guid in _os.listdir(root):
+                pj = _os.path.join(root, guid, "Primary.json")
+                if not _os.path.isfile(pj):
+                    continue
+                try:
+                    meta = _json.load(open(pj))
+                except Exception:
+                    meta = {}
+                out.append({"guid": guid, "name": meta.get("Name", "?"),
+                            "id": meta.get("ID", guid),
+                            "location": meta.get("Location", "?"),
+                            "mode": meta.get("GameMode", "?"),
+                            "saved": meta.get("SaveTime", "?"),
+                            "mtime": _os.path.getmtime(pj)})
+        except OSError as e:
+            return {"ok": False, "error": str(e)}
+        out.sort(key=lambda s: -s["mtime"])
+        for i, s in enumerate(out):
+            s["row"] = i
+        return {"ok": True, "saves": out}
+
+    # ------------------------------------------------------- clean restart
+    def _restart_app(self, b, app):
+        """Kill EVERY instance of the app (duplicates included — the double-launch
+        class), launch its solo launcher, wait for the window. The one true restart."""
+        import subprocess as _sp
+        import time as _t
+        from .apps import PROFILES
+        prof = PROFILES.get(app) or {}
+        proc, launcher, win = prof.get("proc"), prof.get("launcher"), prof.get("window", "")
+        if not proc or not launcher:
+            return {"ok": False, "error": "no proc/launcher profile for app %r" % app}
+        import os as _os
+        if _os.name == "nt":
+            # taskkill matches the IMAGE NAME, not a command-line pattern —
+            # profiles carry the pkill -f stem, so append .exe (CoQ -> CoQ.exe).
+            _sp.run(["taskkill", "/F", "/IM", proc + ".exe"], capture_output=True)
+        else:
+            _sp.run(["pkill", "-9", "-f", proc], capture_output=True)
+        deadline = _t.time() + 10
+        while _t.time() < deadline:
+            if not any(win in (t.to_dict().get("title") or "") for t in b.list_targets()):
+                break
+            _t.sleep(0.5)
+        from .launch import resolve_launch
+        spec, largs = resolve_launch(launcher)
+        if not spec:
+            return {"ok": False, "error": "no launcher %r" % launcher}
+        launched_at = _t.time()
+        b.launch(spec, largs)
+        deadline = _t.time() + 45
+        appeared = False
+        while _t.time() < deadline:
+            if any(win in (t.to_dict().get("title") or "") for t in b.list_targets()):
+                appeared = True
+                break
+            _t.sleep(1.0)
+        if not appeared:
+            return {"ok": False, "launched": spec, "window": None,
+                    "error": "window never appeared"}
+        try:
+            self._dock(b, win)   # standing slot rule, best-effort
+        except Exception:
+            pass
+        # A WINDOW IS NOT READINESS: Godot puts one up in about a second, before the
+        # app has loaded settings, connected or reported anything. Returning on the
+        # window alone gave callers a postcondition they could not use -- "restart
+        # succeeded" told you nothing about whether driving it would work.
+        #
+        # This waits for a report written AFTER we launched, which is the difference
+        # between the new process's first word and the dead one's last (freshness
+        # alone cannot tell them apart: the corpse's write is only a second old).
+        #
+        # HONEST SCOPE: this was written to fix an intermittent restart->goto->assert
+        # failure, and it does NOT demonstrably do so -- by the time it existed the
+        # failure had stopped reproducing (6 trials, warm and cold, with the gate
+        # both on and off, all passed; and no ghost report was observable either).
+        # The flakiness most likely came from the popup re-announce churn fixed in
+        # raves-of-qud cd62ff8, which had Qud dumping a GPU texture twice a second.
+        # Kept because the postcondition is strictly better and costs ~0.7s, not
+        # because it is a proven fix.
+        reporting = self._await_report(app, launched_at)
+        return {"ok": True, "launched": spec, "window": win,
+                "reporting": reporting,
+                "error": None if reporting
+                         else "window up but the app never reported a scene; "
+                              "driving it now would steer by the previous process"}
+
+    def _await_report(self, app, since, timeout=60.0):
+        """Block until `app`'s state file carries a write NEWER than `since`.
+
+        mtime > launch time is what separates the new process's first report from the
+        dead one's last -- freshness alone cannot, because the corpse's write is only
+        a second or two old and looks perfectly fresh.
+        """
+        import os as _os
+        import time as _t
+        from . import gametree
+        cfg = (gametree.apps(gametree.load_tree()).get(app) or {})
+        path = cfg.get("state_file")
+        if not path:
+            return None          # app authors no report; nothing to wait for
+        p = _os.path.expanduser(path)
+        deadline = _t.time() + timeout
+        while _t.time() < deadline:
+            try:
+                if _os.path.getmtime(p) > since:
+                    return True
+            except OSError:
+                pass
+            _t.sleep(0.25)
+        return False
+
+    # ------------------------------------------------------- load save BY NAME
+    def _load_save(self, b, name):
+        """Load a NAMED Qud save via the mod's `loadsave {id}` bridge command — exact
+        ID match, no coordinate clicks, no focus stealing. (The old row-click drive
+        loaded the wrong save when the picker's order drifted from disk mtime order.)
+        The mod completes Qud's own picker completionSource, opening the picker itself
+        from the title if needed; it REFUSES while a game is live, so restart first."""
+        import json as _json
+        import socket as _socket
+        import struct as _struct
+        import time as _t
+        saves = self._qud_saves()
+        if not saves.get("ok"):
+            return saves
+        sid = next((s["id"] for s in saves["saves"] if s["name"] == name), None)
+        if sid is None:
+            return {"ok": False, "error": "no save named %r" % name,
+                    "have": [s["name"] for s in saves["saves"]]}
+        st = (self._gamestate(b).get("states", {}).get("qud") or {})
+        # Restart on a LIVE GAME even when the tree says title: after an unfocused load
+        # Qud's view (and scene report) can stay "MainMenu" while a game runs — the mod
+        # refuses loadsave mid-game, so trust the game_live probe over the scene.
+        if st.get("node") != "title" or (st.get("signals") or {}).get("game_live"):
+            r = self._restart_app(b, "qud")
+            if not r.get("ok"):
+                return {"ok": False, "error": "restart failed", "detail": r}
+            _t.sleep(8)   # title settle after the window appears
+        from .apps import PROFILES
+        port = PROFILES.get("qud", {}).get("port", 48710)
+        payload = _json.dumps({"type": "command", "name": "loadsave", "id": sid}).encode("utf-8")
+        try:
+            with _socket.create_connection(("127.0.0.1", port), timeout=3) as s:
+                s.sendall(_struct.pack(">I", len(payload)) + payload)
+        except OSError as e:
+            return {"ok": False, "error": "Qud bridge :%s unreachable (%s)" % (port, e)}
+        deadline = _t.time() + 40
+        while _t.time() < deadline:
+            stq = (self._gamestate(b).get("states", {}).get("qud") or {})
+            if stq.get("node") == "in_game":
+                return {"ok": True, "name": name, "id": sid, "via": "bridge loadsave"}
+            _t.sleep(1.5)
+        return {"ok": False, "error": "load did not reach in_game", "name": name, "id": sid}
+
     def _gamestate(self, b, ocr=False):
         """Evaluate the game state-machine tree against live signals for each app.
 
@@ -454,9 +856,15 @@ class Engine:
         states = {}
         for app, cfg in gametree.apps(tree).items():
             win = self._find_win(wins, cfg.get("window"))
+            # DUPLICATE INSTANCES are reported, never silently averaged over. _find_win
+            # takes the first match, so with two windows up we may drive one and read the
+            # other; the pid below at least ties the scene report to the window we picked.
+            dupes = len(self._all_wins(wins, cfg.get("window")))
+            wpid = win.pid if win is not None else None
             signals = {"present": win is not None, "port_open": None,
                        "game_live": None, "ocr_text": None,
-                       "scene": self._read_scene(cfg.get("state_file"))}
+                       "scene": self._read_scene(cfg.get("state_file"), wpid),
+                       "tab": self._read_tab(cfg.get("state_file"), wpid)}
             port = cfg.get("port")
             if port:
                 try:
@@ -486,9 +894,10 @@ class Engine:
             st["window"] = win.to_dict() if win else None
             st["signals"] = {"present": signals["present"], "port_open": signals["port_open"],
                              "game_live": signals["game_live"],
-                             "scene": signals["scene"],
+                             "scene": signals["scene"], "tab": signals["tab"],
+                             "pid": wpid, "instances": dupes,
                              "ocr_used": signals["ocr_text"] is not None}
-            st["extra"] = self._read_state_extra(cfg.get("state_file"))
+            st["extra"] = self._read_state_extra(cfg.get("state_file"), wpid)
             states[app] = st
         return {"ok": True, "ocr": bool(ocr), "states": states}
 
@@ -498,30 +907,58 @@ class Engine:
     # last write must not pin the tree to a stale screen.
     STATE_FILE_TTL = 6.0
 
-    def _read_state_file(self, path):
-        """Parsed JSON dict of a fresh state file, else None."""
+    def _read_state_file(self, path, pid=None):
+        """Parsed JSON dict of a fresh state file, else None.
+
+        `pid` is the process that OWNS the window we are evaluating. It matters because
+        the shared path has one writer per running instance: three live Raves processes
+        had raves_state.json cycling in_game -> status_tinkering -> title every two
+        seconds, so a single read was a coin flip and `hv state` confidently reported a
+        screen the window in front of us was not on. Given a pid we read that process's
+        own sidecar (raves_state.<pid>.json) and are immune to duplicates.
+
+        The shared file is still the fallback, but only when it does not CONTRADICT the
+        pid: a report stamped with somebody else's pid is a foreign window's, and None
+        (detection falls back to OCR/port) beats a confident wrong answer. Reports with
+        no pid key -- the Qud mod's qud_state.json -- are read exactly as before.
+        """
         import json as _json
         import os as _os
         import time as _time
         if not path:
             return None
-        p = _os.path.expanduser(path)
-        try:
-            if _time.time() - _os.path.getmtime(p) > self.STATE_FILE_TTL:
-                return None
-            with open(p, "r", encoding="utf-8") as fh:
-                d = _json.load(fh)
-            return d if isinstance(d, dict) else None
-        except (OSError, ValueError):
-            return None
+        base = _os.path.expanduser(path)
+        cands = [base]
+        if pid:
+            stem, ext = _os.path.splitext(base)
+            cands.insert(0, "%s.%d%s" % (stem, int(pid), ext))
+        for p in cands:
+            try:
+                if _time.time() - _os.path.getmtime(p) > self.STATE_FILE_TTL:
+                    continue
+                with open(p, "r", encoding="utf-8") as fh:
+                    d = _json.load(fh)
+            except (OSError, ValueError):
+                continue
+            if not isinstance(d, dict):
+                continue
+            if pid and d.get("pid") and int(d["pid"]) != int(pid):
+                continue     # another instance's report — refuse rather than guess
+            return d
+        return None
 
-    def _read_scene(self, path):
-        d = self._read_state_file(path)
+    def _read_scene(self, path, pid=None):
+        d = self._read_state_file(path, pid)
         return d.get("scene") if d else None
 
-    def _read_state_extra(self, path):
+    def _read_tab(self, path, pid=None):
+        """The active SUB-SCREEN within the reported scene (Qud's status-screen tab)."""
+        d = self._read_state_file(path, pid)
+        return d.get("tab") if d else None
+
+    def _read_state_extra(self, path, pid=None):
         """The full fresh report minus the scene key (mode, popup, zone, …) for the UI."""
-        d = self._read_state_file(path)
+        d = self._read_state_file(path, pid)
         if not d:
             return None
         return {k: v for k, v in d.items() if k != "scene"}
@@ -595,24 +1032,253 @@ class Engine:
                 return False
         return True
 
-    # ------------------------------------------------------- gamego (drive-to-state)
-    def _gamego(self, b, app, node_id, _depth=0):
-        """Drive ``app`` to tree state ``node_id`` via the node's goto[app] recipe.
+    # ------------------------------------------------------- goto tracing
+    # Every goto run appends one record here: the state it STEERED BY on entry, each
+    # step's outcome, and the state it left behind. Written for the failure that could
+    # not be diagnosed after the fact -- a goto that reported ok because the app was
+    # "already at" a node it had actually just left, followed by an assert that failed
+    # with nothing to show why. A trivial success and a real one look identical in the
+    # return value; they do not look identical here.
+    TRACE_PATH = "~/.config/highvisor/goto-trace.jsonl"
+    TRACE_KEEP = 400          # lines; a bounded ring so it can be left on forever
 
-        Idempotent: if the app is already at (or inside) the target node, no steps run.
-        Steps (executed in order; the first failure stops the run):
+    def _trace(self, record):
+        import json as _json
+        import os as _os
+        import time as _time
+        try:
+            p = _os.path.expanduser(self.TRACE_PATH)
+            _os.makedirs(_os.path.dirname(p), exist_ok=True)
+            record = dict(record, t=_time.strftime("%Y-%m-%dT%H:%M:%S"))
+            with open(p, "a", encoding="utf-8") as fh:
+                fh.write(_json.dumps(record) + "\n")
+            # trim in place, cheaply, only when it has grown well past the cap
+            try:
+                with open(p, "r", encoding="utf-8") as fh:
+                    lines = fh.readlines()
+                if len(lines) > self.TRACE_KEEP * 2:
+                    with open(p, "w", encoding="utf-8") as fh:
+                        fh.writelines(lines[-self.TRACE_KEEP:])
+            except OSError:
+                pass
+        except Exception:
+            pass          # tracing must never break a drive
+
+    def _read_trace(self, limit=20):
+        import json as _json
+        import os as _os
+        p = _os.path.expanduser(self.TRACE_PATH)
+        try:
+            with open(p, "r", encoding="utf-8") as fh:
+                lines = fh.readlines()[-int(limit):]
+        except OSError:
+            return {"ok": True, "runs": [], "path": p, "note": "no trace yet"}
+        runs = []
+        for ln in lines:
+            try:
+                runs.append(_json.loads(ln))
+            except ValueError:
+                pass
+        return {"ok": True, "runs": runs, "path": p}
+
+    # ------------------------------------------------------- planner (route-to-state)
+    def _planner_state(self, st):
+        """Which PLANNER state the app is in — the tree node, or one of the two
+        non-node states the graph needs so that "get me out of here" always has a
+        starting point: ``off`` (no window) and ``unknown`` (window up, nothing matched)."""
+        from . import plan
+        if not st or st.get("off"):
+            return plan.OFF
+        return st.get("node") or plan.UNKNOWN
+
+    def _when_holds(self, when, st):
+        """Does a preflight rule's ``when`` block describe the app's current state?"""
+        sig = (st or {}).get("signals") or {}
+        extra = (st or {}).get("extra") or {}
+        for key, want in (when or {}).items():
+            have = sig.get(key) if key in sig else extra.get(key)
+            want_list = want if isinstance(want, list) else [want]
+            if str(have or "").lower() not in [str(w).lower() for w in want_list]:
+                return False
+        return True
+
+    def _preflight(self, b, app, tree):
+        """Clear conditions that sit ON TOP of a state, before planning against it.
+
+        A ghost modal is not a place you can be — it is something that can be true
+        anywhere, and it silently eats every key while it is. Planning a route while one is
+        up produces a perfectly good route whose first keypress vanishes. So: clear first,
+        re-read, then plan against what is actually there. See plan.preflight for why this
+        is a guard and not a graph edge.
+        """
+        from . import plan
+        done = []
+        for rule in plan.preflight(tree, app):
+            cur = self._gamestate(b).get("states", {}).get(app) or {}
+            if not self._when_holds(rule.get("when"), cur):
+                continue
+            for step in rule.get("steps") or []:
+                r = self._run_step(b, app, tree, step)
+                done.append({"step": step, "ok": r.get("ok"), "detail": "preflight",
+                             "error": r.get("error")})
+                if not r.get("ok"):
+                    break
+        return done
+
+    def _drive_route(self, b, app, tree, route, steps, _depth):
+        """Run a planned route, edge by edge, verifying every arrival.
+
+        The per-edge verify is not belt-and-braces — it is what makes re-planning safe.
+        An edge that ran its steps without erroring has not necessarily ARRIVED (a click
+        that landed on nothing errors nowhere), and a route that continues from a state it
+        merely assumes fails several steps later somewhere unrelated. Checking at every
+        edge means a failure names the transition that actually broke.
+        """
+        for edge in route:
+            self.bus.publish("gamego", app=app, node=edge.get("to"),
+                             step={"transition": edge.get("id"), "cost": edge.get("cost")})
+            for step in edge.get("steps") or []:
+                r = self._run_step(b, app, tree, step, _depth)
+                steps.append({"step": step, "ok": bool(r.get("ok")), "edge": edge.get("id"),
+                              "detail": r.get("detail", ""), "error": r.get("error")})
+                if not r.get("ok"):
+                    return {"ok": False, "error": "%s: %s" % (edge.get("id"), r.get("error"))}
+            a = dict(edge.get("verify") or {"node": edge.get("to")})
+            a.setdefault("app", app)
+            a["timeout"] = edge.get("timeout", 15)
+            ar = self._assert_state(b, a)
+            steps.append({"step": {"verify": a}, "ok": bool(ar.get("passed")),
+                          "edge": edge.get("id"), "actual": ar.get("actual")})
+            if not ar.get("passed"):
+                return {"ok": False, "error": "%s did not arrive: wanted %s, got %s"
+                        % (edge.get("id"), edge.get("verify"),
+                           (ar.get("actual") or {}).get("label"))}
+        return {"ok": True}
+
+    # ------------------------------------------------------------- registered checks
+    #: Where a test's ``cwd`` resolves. Repos are SIBLINGS on both machines, so a bare name
+    #: resolves next to this checkout rather than against a machine-local path in the tree —
+    #: gametree.json is committed and shared with the PC branch.
+    TEST_TIMEOUT = 600
+
+    def _run_test(self, node_id, test_id):
+        """Run a check REGISTERED IN THE TREE, by id. Never an arbitrary command.
+
+        The caller names which check; the command text lives in gametree.json under version
+        control, next to the state it covers. That is what makes "run this node's check" safe
+        to expose from a UI — it can never become "run this string".
+        """
+        import os as _os
+        import subprocess as _sp
+        import time as _t
+        from . import gametree
+        tree = gametree.load_tree()
+        test = gametree.find_test(tree, node_id, test_id)
+        if test is None:
+            have = ["%s/%s" % (n or "-", t.get("id")) for n, t in gametree.all_tests(tree)]
+            return {"ok": False, "error": "no registered test %r on %r"
+                    % (test_id, node_id or "the harness"), "have": have}
+        repo = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+        want = test.get("cwd") or ""
+        cwd = repo if want in ("", "highvisor") else _os.path.join(_os.path.dirname(repo), want)
+        if not _os.path.isdir(cwd):
+            return {"ok": False, "error": "cwd %r for test %r does not exist (expected a sibling "
+                    "of the highvisor checkout)" % (cwd, test_id)}
+        started = _t.time()
+        try:
+            r = _sp.run(test["cmd"], shell=True, cwd=cwd, capture_output=True, text=True,
+                        timeout=self.TEST_TIMEOUT)
+            out, err, code = r.stdout, r.stderr, r.returncode
+        except _sp.TimeoutExpired:
+            return {"ok": False, "test": test_id, "node": node_id, "timeout": self.TEST_TIMEOUT,
+                    "error": "timed out after %ds" % self.TEST_TIMEOUT}
+        secs = round(_t.time() - started, 1)
+        # TAIL, not head: a check that fails says so at the END (the summary line), and the
+        # front of the output is the part you already know.
+        tail = [ln for ln in (out + err).splitlines() if ln.strip()][-12:]
+        return {"ok": code == 0, "test": test_id, "node": node_id, "exit": code,
+                "seconds": secs, "cmd": test["cmd"], "cwd": cwd, "tier": test.get("tier"),
+                "tail": tail,
+                "detail": "%s in %.1fs" % ("passed" if code == 0 else "FAILED (exit %d)" % code, secs)}
+
+    def _plan_route(self, b, app, node_id, start=None):
+        """The route ``gamego`` WOULD take — without touching anything.
+
+        A dry run is only useful because routing is now derived. Under the recipe model the
+        answer to "what will this do?" was "read the recipe, then read the recipe it chains
+        to"; here it is a search whose result can simply be printed. It is also how an
+        unreachable target gets diagnosed before an app has been driven halfway there.
+
+        ``start`` overrides the detected state, so a route can be checked for a screen we
+        are not currently on — including with nothing running at all.
+
+        With NO ``node_id`` it returns ``costs``: the cheapest cost to every reachable state
+        at once. That is one call instead of one per node per app (132 on the current tree),
+        and it is what lets Raves' panel grey the states it cannot drive to.
+        """
+        from . import gametree, plan
+        tree = gametree.load_tree()
+        if app not in gametree.apps(tree):
+            return {"ok": False, "error": "unknown app %r" % app}
+        signals = None
+        if start is None:
+            st = self._gamestate(b).get("states", {}).get(app) or {}
+            start = self._planner_state(st)
+            signals = st.get("signals")
+        if not node_id:
+            costs = plan.reachable(tree, app, start, signals=signals)
+            return {"ok": True, "app": app, "from": start, "costs": costs,
+                    "summary": "%d states reachable from %s" % (len(costs), start)}
+        rt = plan.route(tree, app, start, node_id, signals=signals)
+        rt["app"] = app
+        rt["summary"] = plan.summarize(rt)
+        if rt.get("ok"):
+            rt["steps"] = [{"to": e.get("to"), "cost": e.get("cost"), "id": e.get("id"),
+                            "steps": e.get("steps"), "verify": e.get("verify"),
+                            "note": e.get("note")} for e in rt["route"]]
+            rt.pop("route", None)
+        return rt
+
+    # ------------------------------------------------------- gamego (drive-to-state)
+    def _gamego(self, b, app, node_id, _depth=0, _replans=0):
+        """Drive ``app`` to tree state ``node_id``.
+
+        PLANNED, not scripted. The route is searched at call time from the state the app is
+        actually detected in, over the transition graph in gametree.json (see plan.py for
+        why that beats the per-node recipes this replaced). Sequence:
+
+          1. refuse to drive duplicate instances; return immediately if already there
+          2. run preflight self-heals (ghost modals), then RE-READ the state
+          3. plan a route from the detected state; an impossible target fails HERE,
+             before anything has been touched
+          4. execute each transition's steps and verify its arrival
+          5. on a failed edge, re-read — if the app moved somewhere unexpected, RE-PLAN
+             from there rather than continuing a route that no longer applies
+
+        Step 5 is the capability the recipe model could not have: a recipe is a fixed
+        sequence, so an unexpected screen mid-run could only be a failure.
+
+        Legacy ``goto[app]`` recipes still run for any node the graph cannot reach, so a
+        node not yet modelled as transitions keeps working. Steps (shared by both):
           {"goto": node}                  run that node's recipe first (recursion, depth-capped)
           {"launch": name, "unless_running": bool}   launch unless the app's window is up
+          {"restart": app}                kill all instances, relaunch, wait for the report
           {"wait_window": label, "timeout": s}       poll for the window
           {"activate": label}             front the window
           {"click_hover": [x,y], "window": label}    hover-click (menus need the hover)
           {"click": [x,y], "window": label}          plain click
+          {"click_text": "label", "window": label}   OCR-locate the text, hover-click its
+                                                     center — survives menu reflow (items
+                                                     shift when Continue/Quick Start appear)
           {"key": keys, "window": label}  focused key injection
+          {"command": name, "answers": [btn]}        a Qud command + the confirms it raises
+          {"bridge": name, "args": {...}} first-party mod command
+          {"dock": label}                 place the window by its standing dock rule
+          {"dismiss": {...}}              conditional self-heal (see _run_step)
           {"sleep": s}                    settle pause
           {"assert": {...}, "timeout": s} inline _assert_state (app defaults to this app)
         """
-        import time
-        from . import gametree
+        from . import gametree, plan
         if _depth > 4:
             return {"ok": False, "error": "goto recursion too deep (recipe cycle?)"}
         tree = gametree.load_tree()
@@ -621,115 +1287,441 @@ class Engine:
         node = gametree.find_node(tree, node_id)
         if node is None:
             return {"ok": False, "error": "no tree node %r" % node_id}
-        recipe = (node.get("goto") or {}).get(app)
-        if not recipe:
-            return {"ok": False, "error": "node %r has no goto recipe for %s" % (node_id, app)}
-        # already there? (node current or an ancestor of the current node)
+        # already there? EXACT node only — ancestor containment lies here: detection
+        # correctly reports records as title>menu_box>records, but being on the Records
+        # SCREEN is not being on the title screen, and skipping the recipe strands us.
         st = self._gamestate(b).get("states", {}).get(app) or {}
-        if st.get("node") == node_id or node_id in (st.get("path") or []):
+        # REFUSE to drive duplicates. With two windows up, _find_win picks one and the
+        # clicks go to whichever the OS fronts — so a recipe can drive window A, read
+        # window B's state, and "fail" on a step that actually worked. That is what made
+        # `hv goto raves in_game` need retries. Fail fast with the remedy instead: killing
+        # instances from under the caller is not ours to decide (Raves' launcher owns Qud).
+        _inst = (st.get("signals") or {}).get("instances") or 0
+        if _inst > 1 and _depth == 0:
+            return {"ok": False, "error": "%d instances of %s are running — driving one "
+                    "while reading another is undefined. Run `hv restart %s` first."
+                    % (_inst, app, app), "instances": _inst}
+        entry = _slim_state(st)
+        if st.get("node") == node_id:
+            # The trivial success. Worth tracing precisely BECAUSE it runs no steps:
+            # when it is wrong, it is wrong silently and the caller's next assert is
+            # what fails.
+            self._trace({"app": app, "node": node_id, "depth": _depth, "ok": True,
+                         "entry": entry, "steps": [], "detail": "already there"})
             return {"ok": True, "app": app, "node": node_id, "steps": [],
                     "detail": "already at %s" % node_id, "state": _slim_state(st)}
         steps = []
 
+        def _finish(ok, error=None):
+            """Record the run: what it steered by, what it did, where it ended up."""
+            try:
+                after = _slim_state(self._gamestate(b).get("states", {}).get(app) or {})
+            except Exception:
+                after = None
+            self._trace({"app": app, "node": node_id, "depth": _depth, "ok": ok,
+                         "entry": entry, "exit": after, "steps": steps, "error": error,
+                         "route": route_label})
+
         def fail(step, why):
             steps.append({"step": step, "ok": False, "error": why})
+            _finish(False, why)
             return {"ok": False, "app": app, "node": node_id, "steps": steps, "error": why}
 
+        route_label = None
+        steps.extend(self._preflight(b, app, tree))
+        # RE-READ after preflight: clearing a ghost modal can change the reported scene,
+        # and planning from the pre-clear reading is planning from a state we just left.
+        st = self._gamestate(b).get("states", {}).get(app) or st
+        start = self._planner_state(st)
+        rt = plan.route(tree, app, start, node_id, signals=st.get("signals"))
+        if rt.get("ok"):
+            route_label = plan.summarize(rt)
+            self.bus.publish("gamego", app=app, node=node_id, step={"plan": route_label})
+            r = self._drive_route(b, app, tree, rt["route"], steps, _depth)
+            if r.get("ok"):
+                _finish(True)
+                return {"ok": True, "app": app, "node": node_id, "steps": steps,
+                        "route": route_label, "planned": True,
+                        "state": _slim_state(self._gamestate(b).get("states", {}).get(app))}
+            # THE RE-PLAN. A failed edge usually means the app is not where the route
+            # thought — a confirm we did not expect, a screen that ignored a key. If it
+            # MOVED, the honest response is to plan again from where it actually is; if it
+            # did not, planning again would produce the same route and loop.
+            st2 = self._gamestate(b).get("states", {}).get(app) or {}
+            moved = self._planner_state(st2)
+            if _replans < 2 and moved != start:
+                steps.append({"step": {"replan": True}, "ok": True,
+                              "detail": "%s failed at %s; re-planning from %s"
+                                        % (route_label, start, moved)})
+                _finish(False, r.get("error"))
+                again = self._gamego(b, app, node_id, _depth, _replans + 1)
+                again["steps"] = steps + (again.get("steps") or [])
+                return again
+            _finish(False, r.get("error"))
+            return {"ok": False, "app": app, "node": node_id, "steps": steps,
+                    "route": route_label, "error": r.get("error")}
+
+        # No route in the graph — fall back to the node's legacy recipe if it still has
+        # one. Reported either way: a node driven by a recipe is a node whose transitions
+        # nobody has written yet, and that should be visible, not silent.
+        recipe = (node.get("goto") or {}).get(app)
+        if not recipe:
+            _finish(False, rt.get("error"))
+            return {"ok": False, "app": app, "node": node_id, "steps": steps,
+                    "error": rt.get("error"), "from": start}
+        route_label = "legacy recipe (%s)" % rt.get("error", "no route")
+        self.bus.publish("gamego", app=app, node=node_id, step={"legacy": node_id})
         for step in recipe:
             self.bus.publish("gamego", app=app, node=node_id, step=step)
+            r = self._run_step(b, app, tree, step, _depth)
+            if not r.get("ok"):
+                return fail(step, r.get("error", "step failed"))
+            steps.append({"step": step, "ok": True, "detail": r.get("detail", "")})
+        st = self._gamestate(b).get("states", {}).get(app)
+        # A recipe that ran every step without error has still not necessarily ARRIVED --
+        # that is the case the trace exists for, so record where it actually ended up.
+        _finish(True)
+        return {"ok": True, "app": app, "node": node_id, "steps": steps,
+                "route": route_label, "planned": False, "state": _slim_state(st)}
+
+    def _run_step(self, b, app, tree, step, _depth=0):
+        """Execute ONE step of a transition or a legacy recipe -> {ok, detail?, error?}.
+
+        One vocabulary, shared by both drivers on purpose: the graph refactor changed how
+        routes are CHOSEN, not what a move is. Every hard-won step — the hover-first click,
+        the conditional dismiss that verifies what it pressed, the first-party bridge exit
+        for Qud's modern menus — carries over unchanged.
+        """
+        import time
+        from . import gametree
+        try:
             if "goto" in step:
+                # A LEGACY-RECIPE step: run another node's recipe as a prefix. The graph
+                # does not need it (an edge names its own source), and it survives only to
+                # keep unmigrated recipes working.
+                #
+                # "unless_within": skip the chain when we are already INSIDE the node it names.
+                # Every status TAB chained through `status_screens`, whose own recipe starts at
+                # `in_game` -- unreachable from inside the status screens without closing them --
+                # so tab-to-tab switching failed while switching from the map worked. OPT-IN,
+                # because plenty of recipes chain to an ancestor precisely to get back to a known
+                # base: making the skip automatic fixed Qud and broke Raves. In the graph this
+                # whole distinction disappears -- the planner inserts the exit edge only when the
+                # route actually needs it.
+                if step.get("unless_within"):
+                    cur = self._gamestate(b).get("states", {}).get(app) or {}
+                    if step["goto"] in (cur.get("path") or []):
+                        return {"ok": True, "detail": "already within"}
                 r = self._gamego(b, app, step["goto"], _depth + 1)
-                steps.append({"step": step, "ok": r.get("ok"), "detail": r.get("detail", "")})
-                if not r.get("ok"):
-                    return fail(step, r.get("error", "goto failed"))
-            elif "launch" in step:
+                return _step_ok(r.get("ok"), r.get("detail"), r.get("error") or "goto failed")
+
+            if "launch" in step:
                 cfg = gametree.apps(tree).get(app, {})
                 if step.get("unless_running") and self._find_win(b.list_targets(), cfg.get("window")):
-                    steps.append({"step": step, "ok": True, "detail": "already running"})
-                    continue
+                    return {"ok": True, "detail": "already running"}
                 from .launch import resolve_launch
                 spec, largs = resolve_launch(step["launch"])
                 if not spec:
-                    return fail(step, "no launcher %r" % step["launch"])
+                    return {"ok": False, "error": "no launcher %r" % step["launch"]}
                 r = b.launch(spec, largs)
-                steps.append({"step": step, "ok": r.ok, "detail": r.detail})
-                if not r.ok:
-                    return fail(step, r.error or "launch failed")
-            elif "wait_window" in step:
+                return _step_ok(r.ok, r.detail, r.error or "launch failed")
+
+            if "restart" in step:
+                # The last-resort edge: kills every instance (duplicates included), relaunches,
+                # and waits for the app to REPORT rather than merely to show a window. Priced at
+                # 120 in the cost table so the planner reaches for it only when nothing else can
+                # get out of where we are.
+                r = self._restart_app(b, step["restart"])
+                return _step_ok(r.get("ok"), "restarted %s" % step["restart"],
+                                r.get("error") or "restart failed")
+
+            if "wait_window" in step:
                 deadline = time.monotonic() + float(step.get("timeout", 30))
                 while self._find_win(b.list_targets(), step["wait_window"]) is None:
                     if time.monotonic() > deadline:
-                        return fail(step, "window %r never appeared" % step["wait_window"])
+                        return {"ok": False,
+                                "error": "window %r never appeared" % step["wait_window"]}
                     time.sleep(1.0)
-                steps.append({"step": step, "ok": True})
-            elif "activate" in step:
+                return {"ok": True}
+
+            if "activate" in step:
                 win = self._find_win(b.list_targets(), step["activate"])
                 if win is None:
-                    return fail(step, "no window %r" % step["activate"])
+                    return {"ok": False, "error": "no window %r" % step["activate"]}
                 r = b.activate(win.id)
-                steps.append({"step": step, "ok": r.ok})
                 time.sleep(0.6)
-            elif "click_hover" in step or "click" in step:
+                return _step_ok(r.ok, None, r.error or "activate failed")
+
+            if "click_hover" in step or "click" in step:
                 key = "click_hover" if "click_hover" in step else "click"
                 win = self._find_win(b.list_targets(), step.get("window", ""))
                 if win is None:
-                    return fail(step, "no window %r" % step.get("window"))
+                    return {"ok": False, "error": "no window %r" % step.get("window")}
                 x, y = step[key]
                 kw = {"hover": True} if key == "click_hover" else {}
                 r = b.click(win.id, int(x), int(y), **kw)
-                steps.append({"step": step, "ok": r.ok})
                 if not r.ok:
-                    return fail(step, r.error or "click failed")
+                    return {"ok": False, "error": r.error or "click failed"}
                 time.sleep(0.5)
-            elif "key" in step:
+                return {"ok": True}
+
+            if "click_text" in step:
                 win = self._find_win(b.list_targets(), step.get("window", ""))
                 if win is None:
-                    return fail(step, "no window %r" % step.get("window"))
+                    return {"ok": False, "error": "no window %r" % step.get("window")}
+                want = str(step["click_text"]).strip().lower()
+                # POLL, don't snapshot. Qud's window does not repaint while unfocused, so the
+                # first frame after an `activate` is whatever was on screen BEFORE — the
+                # documented settle is ~2s and `activate` waits 0.6. A single OCR therefore
+                # read the old screen and failed to find a label that was plainly there:
+                # `goto qud in_game` from the title reported "text 'continue' not on screen
+                # (14 ocr lines)" while looking straight at Continue. The 14 lines were the
+                # in-game HUD it had just left.
+                #
+                # Retrying also covers the honest second case -- a menu still animating in --
+                # and costs nothing when the text is already up, which is the normal path.
+                # Deliberately NOT fixed by sleeping longer after activate: that taxes every
+                # step to serve the one that reads pixels.
+                deadline = time.monotonic() + float(step.get("timeout", 6.0))
+                hit, boxes, tries = None, [], 0
+                while True:
+                    tries += 1
+                    try:
+                        ocr = b.ocr(win.id)
+                    except Exception as e:
+                        return {"ok": False, "error": "ocr failed: %s" % e}
+                    boxes = ocr.get("boxes") or []
+                    hit = _ocr_find(boxes, want)
+                    if hit is not None or time.monotonic() >= deadline:
+                        break
+                    time.sleep(0.5)
+                if hit is None:
+                    return {"ok": False,
+                            "error": "text %r not on screen after %d OCR passes (%d lines: %s)"
+                            % (want, tries, len(boxes),
+                               ", ".join(x.get("text", "") for x in boxes[:8]))}
+                bx, by, bw, bh = hit["bbox"]
+                # ocr bbox is in CAPTURE px; clicks are window points (Retina shot = 2x)
+                scale = (float(ocr.get("w") or win.w) / float(win.w)) if win.w else 1.0
+                cx, cy = int((bx + bw / 2.0) / scale), int((by + bh / 2.0) / scale)
+                # optional [dx,dy] when the hit-area sits away from the label (Qud's
+                # Back chevron lives ~40px above its "[Esc] Back" caption)
+                ox, oy = step.get("offset") or (0, 0)
+                cx, cy = cx + int(ox), cy + int(oy)
+                r = b.click(win.id, cx, cy, hover=True)
+                if not r.ok:
+                    return {"ok": False, "error": r.error or "click failed"}
+                time.sleep(0.5)
+                return {"ok": True, "detail": "%r @ win(%d,%d)" % (hit["text"], cx, cy)}
+
+            if "key" in step:
+                win = self._find_win(b.list_targets(), step.get("window", ""))
+                if win is None:
+                    return {"ok": False, "error": "no window %r" % step.get("window")}
                 r = b.key(win.id, step["key"], focus=True)
-                steps.append({"step": step, "ok": r.ok})
                 time.sleep(0.4)
-            elif "sleep" in step:
+                return _step_ok(r.ok, None, r.error or "key failed")
+
+            if "sleep" in step:
                 time.sleep(float(step["sleep"]))
-                steps.append({"step": step, "ok": True})
-            elif "dock" in step:
+                return {"ok": True}
+
+            if "bridge" in step:
+                # first-party command over the Qud mod bridge (e.g. "uiback", "statustab")
+                r = self._qud_bridge(step["bridge"], args=step.get("args"))
+                if not r.get("ok"):
+                    return {"ok": False, "error": r.get("error", "bridge send failed")}
+                time.sleep(0.6)
+                return {"ok": True, "detail": step["bridge"]}
+
+            if "command" in step:
+                # A named QUD command through the mod (CmdQuit &c) plus the confirms it
+                # raises, answered BY BUTTON. Binding-independent, and the only way to start a
+                # flow the game's own UI owns -- Qud's modern screens ignore synthesized keys.
+                # Unconditional here, because a transition already knows which state it is
+                # leaving; the `dismiss` form below is for when that has to be re-checked.
+                r = self._qud_command(step["command"])
+                if not r.get("ok"):
+                    return {"ok": False,
+                            "error": "command %s: %s" % (step["command"], r.get("error"))}
+                answers = step.get("answers") or []
+                for btn in answers:
+                    # BLIND, deliberately, and this was tried the other way. Gating each answer on
+                    # a reported popup looked like the obvious upgrade — the mod publishes the
+                    # active modal — but the CmdQuit confirms are not among the kinds it reports,
+                    # so the gate never opened and it broke a path that worked. An answer with
+                    # nothing to answer is a no-op, so sending on a timer is safe; what is NOT
+                    # safe is assuming the app has settled by the time the edge verifies, which is
+                    # handled by the dismiss step after this one.
+                    time.sleep(1.2)
+                    rr = self._qud_popup_answer(btn)
+                    if not rr.get("ok"):
+                        return {"ok": False, "error": "answer %r: %s" % (btn, rr.get("error"))}
+                return {"ok": True,
+                        "detail": "%s + %d answer(s)" % (step["command"], len(answers))}
+
+            if "load_save" in step:
+                # Load a save through the mod's own `loadsave {id}` bridge command: exact ID,
+                # no coordinates, no OCR, and it opens Qud's picker itself from the title.
+                #
+                # This replaced a blind {"click_hover": [900, 190]} "top save row" that the
+                # recipe had carried for months and that failed here on the first live run of
+                # the planner -- the same top-row roulette `hv loadsave` was written to end,
+                # still hiding inside the one recipe nobody had re-driven. Take the value as a
+                # NAME, or {"row": n} to resolve it from DISK metadata (which is what makes it
+                # generic: the graph should not hardcode a character).
+                sel = step["load_save"]
+                name = sel
+                if not isinstance(sel, str):
+                    row = int((sel or {}).get("row", 0))
+                    saves = self._qud_saves()
+                    if not saves.get("ok"):
+                        return _step_ok(False, None, saves.get("error", "save list failed"))
+                    match = next((s for s in saves.get("saves") or [] if s.get("row") == row), None)
+                    if match is None:
+                        return _step_ok(False, None, "no save at row %d (%d saves)"
+                                        % (row, len(saves.get("saves") or [])))
+                    name = match["name"]
+                r = self._load_save(b, name)
+                return _step_ok(r.get("ok"), "loaded %r via %s" % (name, r.get("via", "")),
+                                r.get("error") or "load failed")
+
+            if "dock" in step:
                 # place the window by its standing dock rule (Raves stacks above Qud with the
-                # anchor's size) — a fresh solo launch otherwise lands wherever the OS puts it
-                # and the recipe's window-relative clicks assume the standard 1920x1080 slot.
+                # anchor's size) -- a fresh solo launch otherwise lands wherever the OS puts it
+                # and window-relative clicks assume the standard 1920x1080 slot.
                 r = self._dock(b, step["dock"])
-                steps.append({"step": step, "ok": bool(r.get("ok")), "detail": r.get("error", "")})
                 time.sleep(0.4)
-            elif "dismiss" in step:
-                # Conditional dismissal: if the app currently reports this scene (e.g. a quit
-                # dialog left open by a stray Escape), press the key to clear it; otherwise
-                # no-op. Keeps recipes self-healing without a full conditional language.
-                cond = step["dismiss"]
-                cur = (self._gamestate(b).get("states", {}).get(app) or {})
-                scene = (cur.get("signals") or {}).get("scene") or ""
-                want_scene = cond.get("scene", "")
-                if str(scene).lower() == str(want_scene).lower():
-                    cfg = gametree.apps(tree).get(app, {})
-                    win = self._find_win(b.list_targets(), cfg.get("window"))
-                    if win is not None:
-                        b.key(win.id, cond.get("key", "Escape"), focus=True)
-                        time.sleep(0.6)
-                    steps.append({"step": step, "ok": True, "detail": "dismissed %s" % scene})
-                else:
-                    steps.append({"step": step, "ok": True, "detail": "not present"})
-            elif "assert" in step:
+                return _step_ok(r.get("ok"), None, r.get("error") or "dock failed")
+
+            if "dismiss" in step:
+                return self._run_dismiss(b, app, tree, step)
+
+            if "assert" in step:
                 a = dict(step["assert"])
                 a.setdefault("app", app)
                 a["timeout"] = step.get("timeout", a.get("timeout", 15))
                 r = self._assert_state(b, a)
-                steps.append({"step": step, "ok": bool(r.get("passed")),
-                              "actual": r.get("actual")})
                 if not r.get("passed"):
-                    return fail(step, "assert failed: wanted %s, got %s"
-                                % (a, (r.get("actual") or {}).get("label")))
-            else:
-                return fail(step, "unknown step %r" % step)
-        st = self._gamestate(b).get("states", {}).get(app)
-        return {"ok": True, "app": app, "node": node_id, "steps": steps,
-                "state": _slim_state(st)}
+                    return {"ok": False, "error": "assert failed: wanted %s, got %s"
+                            % (a, (r.get("actual") or {}).get("label"))}
+                return {"ok": True}
+
+            if set(step) <= {"note"}:
+                return {"ok": True, "detail": "note only"}
+            return {"ok": False, "error": "unknown step %r" % step}
+        except Exception as e:
+            # A step that RAISES must fail its transition, not the whole daemon thread --
+            # the route is mid-flight and the trace is what tells us where it stopped.
+            return {"ok": False, "error": "%s: %s" % (type(e).__name__, e)}
+
+    def _run_dismiss(self, b, app, tree, step):
+        """A conditional self-heal step: if the app is in the named state, clear it.
+
+        Kept verbatim from the recipe model, and still earning its place inside
+        transitions. The confirms raised by leaving a live game all share one scene, so
+        only the reported POPUP tells them apart -- and a blind Space on a screen with no
+        confirm up does something else entirely. Every branch VERIFIES that what it pressed
+        actually moved something: a silent "dismissed" is how a stray Cancel once reached
+        the main menu, where Cancel means quit.
+        """
+        import time
+        from . import gametree
+        cond = step["dismiss"]
+        cur = (self._gamestate(b).get("states", {}).get(app) or {})
+        scene = (cur.get("signals") or {}).get("scene") or ""
+        # `popup` conditions on the app's reported MODAL kind rather than its screen.
+        # Leaving a live game means answering a chain of confirms while the scene stays
+        # "in_game" throughout, so scene alone cannot tell the steps apart.
+        want_popup = cond.get("popup")
+        if want_popup is not None:
+            have = str(((cur.get("extra") or {}).get("popup")) or "")
+            hit = have.lower() == str(want_popup).lower()
+        else:
+            # A LIST of scenes is one condition, not several steps: Raves reports its status
+            # screens as eight distinct scenes that all clear the same way, and spelling out
+            # eight dismiss steps would run eight state polls to clear one screen.
+            want_scene = cond.get("scene", "")
+            want_list = want_scene if isinstance(want_scene, list) else [want_scene]
+            hit = str(scene).lower() in [str(w).lower() for w in want_list]
+        # What the step must CHANGE. Taking the PAIR, rather than the scene, is what lets one
+        # branch serve all three shapes: closing a screen moves the scene, raising a confirm
+        # moves the popup, and answering one moves the popup back -- CmdQuit does the middle,
+        # and demanding a scene change failed it even though it had worked.
+        before = (str(scene).lower(),
+                  str(((cur.get("extra") or {}).get("popup")) or "").lower())
+        if not hit:
+            return {"ok": True, "detail": "not present"}
+        cfg = gametree.apps(tree).get(app, {})
+        win = self._find_win(b.list_targets(), cfg.get("window"))
+        if win is None:
+            return {"ok": False, "error": "dismiss: no window for %s" % app}
+        if cond.get("command"):
+            r = self._qud_command(cond["command"])
+            if not r.get("ok"):
+                return {"ok": False, "error": "dismiss command: %s" % r.get("error")}
+            for btn in (cond.get("answers") or []):
+                time.sleep(1.2)
+                rr = self._qud_popup_answer(btn)
+                if not rr.get("ok"):
+                    return {"ok": False, "error": "dismiss answer: %s" % rr.get("error")}
+        elif cond.get("bridge"):
+            # first-party dismissal -- no OCR, no coords, no focus steal
+            r = self._qud_bridge(cond["bridge"])
+            if not r.get("ok"):
+                return {"ok": False, "error": "dismiss bridge: %s" % r.get("error")}
+        elif cond.get("click_text"):
+            # Qud's modern UI screens IGNORE OS-synthesized keys (the GameSummaryScreen
+            # gotcha generalizes) -- but synthesized clicks land, so exit via the screen's
+            # clickable affordance. A miss here MUST fail: a fuzzy match that clicks the
+            # wrong thing on the wrong screen is how stray games get started.
+            want = str(cond["click_text"]).strip().lower()
+            try:
+                ocr = b.ocr(win.id)
+            except Exception as e:
+                return {"ok": False, "error": "dismiss ocr failed: %s" % e}
+            boxes = ocr.get("boxes") or []
+            found = _ocr_find(boxes, want)
+            if found is None:
+                return {"ok": False, "error": "dismiss: text %r not on the %s screen"
+                        % (cond["click_text"], scene)}
+            bx, by, bw, bh = found["bbox"]
+            sc = (float(ocr.get("w") or win.w) / float(win.w)) if win.w else 1.0
+            ox, oy = cond.get("offset") or (0, 0)
+            b.click(win.id, int((bx + bw / 2.0) / sc) + int(ox),
+                    int((by + bh / 2.0) / sc) + int(oy), hover=True)
+        elif cond.get("answers"):
+            # A fixed chain of popup ANSWERS, first-party through the mod. Qud reports no
+            # popup state of its own, so the steps cannot be conditioned individually the way
+            # Raves' can -- but an answer with nothing to answer is a no-op, so the chain is
+            # safe to send blind and still says exactly what it is doing.
+            for btn in cond["answers"]:
+                rr = self._qud_popup_answer(btn)
+                if not rr.get("ok"):
+                    return {"ok": False, "error": "dismiss answer: %s" % rr.get("error")}
+                time.sleep(1.2)
+        elif cond.get("keys"):
+            # A SEQUENCE, verified once at the end. Needed because some keys move a selection
+            # INSIDE a modal rather than answering it: the Right that shifts a confirm from
+            # Yes to No changes nothing observable, so verifying after it fails a step that
+            # worked.
+            for k in cond["keys"]:
+                b.key(win.id, k, focus=True)
+                time.sleep(0.5)
+        else:
+            b.key(win.id, cond.get("key", "Escape"), focus=True)
+        # verify the dismissal actually TOOK -- one that did not must stop the run, or later
+        # steps land on the wrong screen. For a popup condition the thing that must change is
+        # the modal, not the scene: answering a quit confirm leaves the scene where it was.
+        what = ("popup %s" % want_popup) if want_popup is not None else scene
+        for _ in range(8):
+            time.sleep(0.7)
+            cur2 = (self._gamestate(b).get("states", {}).get(app) or {})
+            now = (str((cur2.get("signals") or {}).get("scene") or "").lower(),
+                   str(((cur2.get("extra") or {}).get("popup")) or "").lower())
+            if now != before:
+                return {"ok": True, "detail": "dismissed %s" % what}
+        return {"ok": False, "error": "dismiss ran but %s is still up" % what}
 
     def _apply_layout(self, b, name):
         from .layouts import load_layouts, placement_rect

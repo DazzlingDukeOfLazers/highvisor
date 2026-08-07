@@ -65,50 +65,6 @@
             }
           ]
         },
-        "goto": {
-          "qud": [
-            {
-              "launch": "qud_solo",
-              "unless_running": true
-            },
-            {
-              "wait_window": "CavesOfQud",
-              "timeout": 60
-            },
-            {
-              "assert": {
-                "scene": "MainMenu"
-              },
-              "timeout": 90
-            }
-          ],
-          "raves": [
-            {
-              "launch": "raves_solo",
-              "unless_running": true
-            },
-            {
-              "wait_window": "Raves of Qud",
-              "timeout": 30
-            },
-            {
-              "dock": "Raves of Qud",
-              "note": "stack into the standard slot above Qud (fresh launches land off-slot)"
-            },
-            {
-              "dismiss": {
-                "scene": "quit_dialog",
-                "key": "Escape"
-              }
-            },
-            {
-              "assert": {
-                "node": "title"
-              },
-              "timeout": 20
-            }
-          ]
-        },
         "children": [
           {
             "id": "background",
@@ -188,55 +144,6 @@
                           "scene": "chargen_game_mode"
                         }
                       ]
-                    },
-                    "goto": {
-                      "raves": [
-                        {
-                          "goto": "title"
-                        },
-                        {
-                          "activate": "Raves of Qud"
-                        },
-                        {
-                          "click_hover": [
-                            945,
-                            536
-                          ],
-                          "window": "Raves of Qud",
-                          "note": "New Game (needs Qud running, else it launches Qud instead)"
-                        },
-                        {
-                          "assert": {
-                            "scene": "chargen_game_mode"
-                          },
-                          "timeout": 12
-                        }
-                      ],
-                      "qud": [
-                        {
-                          "goto": "title"
-                        },
-                        {
-                          "activate": "CavesOfQud"
-                        },
-                        {
-                          "click_hover": [
-                            958,
-                            534
-                          ],
-                          "window": "CavesOfQud",
-                          "note": "New Game on the title menu"
-                        },
-                        {
-                          "sleep": 1.0
-                        },
-                        {
-                          "assert": {
-                            "ocr_contains": "game mode"
-                          },
-                          "timeout": 15
-                        }
-                      ]
                     }
                   },
                   {
@@ -252,24 +159,6 @@
                           "scene": "chargen_genotype"
                         }
                       ]
-                    },
-                    "goto": {
-                      "raves": [
-                        {
-                          "goto": "game_mode"
-                        },
-                        {
-                          "key": "enter",
-                          "window": "Raves of Qud",
-                          "note": "confirm the default card (Classic)"
-                        },
-                        {
-                          "assert": {
-                            "scene": "chargen_genotype"
-                          },
-                          "timeout": 10
-                        }
-                      ]
                     }
                   },
                   {
@@ -283,24 +172,6 @@
                       "raves": [
                         {
                           "scene": "chargen_subtype"
-                        }
-                      ]
-                    },
-                    "goto": {
-                      "raves": [
-                        {
-                          "goto": "genotype"
-                        },
-                        {
-                          "key": "enter",
-                          "window": "Raves of Qud",
-                          "note": "confirm the default genotype"
-                        },
-                        {
-                          "assert": {
-                            "scene": "chargen_subtype"
-                          },
-                          "timeout": 10
                         }
                       ]
                     }
@@ -323,59 +194,34 @@
                     },
                     "detect": {}
                   }
-                ],
-                "goto": {
-                  "raves": [
-                    {
-                      "goto": "game_mode"
-                    }
-                  ],
-                  "qud": [
-                    {
-                      "goto": "title"
-                    },
-                    {
-                      "activate": "CavesOfQud"
-                    },
-                    {
-                      "click_hover": [
-                        958,
-                        534
-                      ],
-                      "window": "CavesOfQud",
-                      "note": "New Game on the title menu"
-                    },
-                    {
-                      "sleep": 1.0
-                    },
-                    {
-                      "assert": {
-                        "ocr_contains": "game mode"
-                      },
-                      "timeout": 15
-                    }
-                  ]
-                }
+                ]
               },
               {
                 "id": "continue",
                 "label": "Continue → Load Game",
                 "done": {
                   "qud": 0.9,
-                  "raves": 0.2
+                  "raves": 0.6
                 },
                 "detect": {
-                  "qud": {
-                    "ocr_any": [
-                      "load game"
-                    ],
-                    "game_live": false
-                  },
-                  "raves": {
-                    "ocr_any": [
-                      "load game"
-                    ]
-                  }
+                  "qud": [
+                    {
+                      "scene": [
+                        "ModernSaveManagement"
+                      ]
+                    },
+                    {
+                      "ocr_any": [
+                        "load game"
+                      ],
+                      "game_live": false
+                    }
+                  ],
+                  "raves": [
+                    {
+                      "scene": "loadgame"
+                    }
+                  ]
                 },
                 "children": [
                   {
@@ -387,7 +233,8 @@
                     },
                     "detect": {}
                   }
-                ]
+                ],
+                "note": "the Load Game picker; qud reports scene=ModernSaveManagement first-party (OCR fallback kept)"
               },
               {
                 "id": "records",
@@ -401,56 +248,23 @@
                     {
                       "scene": "records"
                     }
-                  ]
-                },
-                "goto": {
-                  "raves": [
-                    {
-                      "goto": "title"
-                    },
-                    {
-                      "activate": "Raves of Qud"
-                    },
-                    {
-                      "click_hover": [
-                        945,
-                        628
-                      ],
-                      "window": "Raves of Qud"
-                    },
-                    {
-                      "assert": {
-                        "scene": "records"
-                      },
-                      "timeout": 12
-                    }
                   ],
                   "qud": [
                     {
-                      "goto": "title"
+                      "scene": [
+                        "ModernHighScores"
+                      ]
                     },
                     {
-                      "activate": "CavesOfQud"
-                    },
-                    {
-                      "click_hover": [
-                        958,
-                        626
+                      "ocr_any": [
+                        "ended runs",
+                        "daily (global)"
                       ],
-                      "window": "CavesOfQud",
-                      "note": "Records on the title menu"
-                    },
-                    {
-                      "sleep": 1.0
-                    },
-                    {
-                      "assert": {
-                        "ocr_contains": "records"
-                      },
-                      "timeout": 15
+                      "game_live": false
                     }
                   ]
-                }
+                },
+                "note": "The OCR signature below is a SAFETY NET, not the primary path — Qud reports ModernHighScores first-party again as of raves fa9fc3f. It was added on 2026-08-07 when a merged UI sampler was overwriting that correct report with \"MainMenu\", which made this node undetectable and stranded Qud here. Kept because it costs nothing (scene is tried first) and it is the one screen where we have now been burned; drop it if the OCR poll ever becomes a cost."
               },
               {
                 "id": "options",
@@ -464,53 +278,12 @@
                     {
                       "scene": "options"
                     }
-                  ]
-                },
-                "goto": {
-                  "raves": [
-                    {
-                      "goto": "title"
-                    },
-                    {
-                      "activate": "Raves of Qud"
-                    },
-                    {
-                      "click_hover": [
-                        945,
-                        674
-                      ],
-                      "window": "Raves of Qud"
-                    },
-                    {
-                      "assert": {
-                        "scene": "options"
-                      },
-                      "timeout": 12
-                    }
                   ],
                   "qud": [
                     {
-                      "goto": "title"
-                    },
-                    {
-                      "activate": "CavesOfQud"
-                    },
-                    {
-                      "click_hover": [
-                        958,
-                        672
-                      ],
-                      "window": "CavesOfQud",
-                      "note": "Options on the title menu"
-                    },
-                    {
-                      "sleep": 1.0
-                    },
-                    {
-                      "assert": {
-                        "ocr_contains": "options"
-                      },
-                      "timeout": 15
+                      "scene": [
+                        "ModernOptionsMenu"
+                      ]
                     }
                   ]
                 }
@@ -527,53 +300,12 @@
                     {
                       "scene": "mods"
                     }
-                  ]
-                },
-                "goto": {
-                  "raves": [
-                    {
-                      "goto": "title"
-                    },
-                    {
-                      "activate": "Raves of Qud"
-                    },
-                    {
-                      "click_hover": [
-                        945,
-                        720
-                      ],
-                      "window": "Raves of Qud"
-                    },
-                    {
-                      "assert": {
-                        "scene": "mods"
-                      },
-                      "timeout": 12
-                    }
                   ],
                   "qud": [
                     {
-                      "goto": "title"
-                    },
-                    {
-                      "activate": "CavesOfQud"
-                    },
-                    {
-                      "click_hover": [
-                        958,
-                        718
-                      ],
-                      "window": "CavesOfQud",
-                      "note": "Mods on the title menu"
-                    },
-                    {
-                      "sleep": 1.0
-                    },
-                    {
-                      "assert": {
-                        "ocr_contains": "mods"
-                      },
-                      "timeout": 15
+                      "scene": [
+                        "ModManager"
+                      ]
                     }
                   ]
                 }
@@ -618,43 +350,11 @@
                 }
               ]
             },
-            "goto": {
-              "qud": [
-                {
-                  "goto": "title"
-                },
-                {
-                  "activate": "CavesOfQud"
-                },
-                {
-                  "click_hover": [
-                    156,
-                    902
-                  ],
-                  "window": "CavesOfQud",
-                  "note": "Modding Toolkit link, lower-left secondary list"
-                },
-                {
-                  "click_hover": [
-                    156,
-                    902
-                  ],
-                  "window": "CavesOfQud",
-                  "note": "repeat — first click may be eaten by activation; lands in empty space if already open"
-                },
-                {
-                  "assert": {
-                    "node": "modding_toolkit"
-                  },
-                  "timeout": 10
-                }
-              ]
-            },
             "children": [
               {
                 "id": "mod_manager",
                 "label": "Mod Manager",
-                "note": "opens the SAME Mods screen as title>menu_box>mods (two-pane list + tile preview, footer [Esc] Back / [v] Disable All); list empty until mods are installed. Esc exits to TITLE (verified), not the toolkit menu.",
+                "note": "LEFT AS A LEGACY RECIPE. Converted to a transition on 2026-08-07 and reverted the same hour: driven from a clean Modding Toolkit, the click lands nowhere and Qud ends up back at the TITLE. The coordinates here are window points captured on the PC rig and look stale for this layout — the recipe is equally broken, so this is not a regression, but an edge asserts routability and a recipe does not. Re-measure the coordinates against a screenshot, drive it, THEN convert.",
                 "done": {
                   "qud": 0.9,
                   "raves": 0.0
@@ -665,26 +365,12 @@
                       "scene": "ModManagerUI"
                     }
                   ]
-                },
-                "goto": {
-                  "qud": [
-                    {
-                      "goto": "modding_toolkit"
-                    },
-                    {
-                      "click_hover": [
-                        862,
-                        437
-                      ],
-                      "window": "CavesOfQud"
-                    }
-                  ]
                 }
               },
               {
                 "id": "workshop_uploader",
                 "label": "Workshop Uploader",
-                "note": "modern full-screen UI: < Back / browse mods folder / refresh, Mods-folder list, 'Select a mod to manage it'. Esc does NOT exit — click < Back at [217,74]; Back returns to TITLE, not the toolkit menu.",
+                "note": "LEFT AS A LEGACY RECIPE. Converted to a transition on 2026-08-07 and reverted the same hour: driven from a clean Modding Toolkit, the click lands nowhere and Qud ends up back at the TITLE. The coordinates here are window points captured on the PC rig and look stale for this layout — the recipe is equally broken, so this is not a regression, but an edge asserts routability and a recipe does not. Re-measure the coordinates against a screenshot, drive it, THEN convert.",
                 "done": {
                   "qud": 0.9,
                   "raves": 0.0
@@ -693,20 +379,6 @@
                   "qud": [
                     {
                       "scene": "SteamWorkshopUploaderView"
-                    }
-                  ]
-                },
-                "goto": {
-                  "qud": [
-                    {
-                      "goto": "modding_toolkit"
-                    },
-                    {
-                      "click_hover": [
-                        862,
-                        463
-                      ],
-                      "window": "CavesOfQud"
                     }
                   ]
                 }
@@ -722,21 +394,10 @@
                 "detect": {
                   "qud": [
                     {
-                      "scene": "MapEditorWindow"
-                    }
-                  ]
-                },
-                "goto": {
-                  "qud": [
-                    {
-                      "goto": "modding_toolkit"
-                    },
-                    {
-                      "click_hover": [
-                        862,
-                        489
-                      ],
-                      "window": "CavesOfQud"
+                      "scene": [
+                        "MapEditorWindow",
+                        "MapEditor"
+                      ]
                     }
                   ]
                 },
@@ -744,23 +405,19 @@
                   {
                     "id": "me_menu_file",
                     "label": "File menu",
-                    "note": "New map (Ctrl+N) · Load map... (Ctrl+O) · Test (Ctrl+T) · Save (Ctrl+S) · Save As... | Reload Blueprints | Exit. Captured; MapEditorView backs these with NewMap/LoadMap/RunTest+BuildTestZone/Save/SaveAs/_ReloadBlueprints/Exit. Open at [46,16]; Exit at [64,260], confirm Yes at [925,555].",
+                    "note": "New map (Ctrl+N) · Load map... (Ctrl+O) · Test (Ctrl+T) · Save (Ctrl+S) · Save As... | Reload Blueprints | Exit. Captured; MapEditorView backs these with NewMap/LoadMap/RunTest+BuildTestZone/Save/SaveAs/_ReloadBlueprints/Exit. Open at [46,16]; Exit at [64,260], confirm Yes at [925,555]. Detectable since 2026-08-07: the mod's UI sampler reads each MenuBarButton's Menu.IsVisible (DialogBase) on the main thread and reports the open dropdown in the state file's `tab` slot. The menu bar is a legacy RedShadow dialog, so neither UIManager._currentWindow nor _ActiveGameView moves when it opens — that is why these five kept goto recipes after every other toolkit screen became an edge. NOT YET CLOSABLE BY EDGE: leaving a dropdown is unmodelled. `key escape` looks right on paper (DialogBase.Update cancels the top dialog on Escape) and an escape->click edge was written and driven — it reported success while arriving NOWHERE. Two faults, both worth knowing: the escape did not close the menu inside the verify window, and the verify could not tell, because `assert node=X` passes when X is an ANCESTOR of the detected node (engine._assert_holds) — so 'verify map_editor' is satisfied by the still-open me_menu_file. The click then landed on the bar with a menu down, which cancels it and opens nothing. Escaping needs measuring on its own before it is an edge.",
                     "done": {
                       "qud": 0.95,
                       "raves": 0.8
                     },
-                    "detect": {},
-                    "goto": {
+                    "detect": {
                       "qud": [
                         {
-                          "goto": "map_editor"
-                        },
-                        {
-                          "click_hover": [
-                            46,
-                            16
+                          "scene": [
+                            "MapEditorWindow",
+                            "MapEditor"
                           ],
-                          "window": "CavesOfQud"
+                          "tab": "File"
                         }
                       ]
                     }
@@ -768,23 +425,19 @@
                   {
                     "id": "me_menu_edit",
                     "label": "Edit menu",
-                    "note": "Select All (Ctrl+A) · Undo (Ctrl+Z) · Redo (Ctrl+Y). Captured. MapEditorView: SelectAll/Undo/Redo over UndoStack+RedoStack, with ReverseAction as the primitive.",
+                    "note": "Select All (Ctrl+A) · Undo (Ctrl+Z) · Redo (Ctrl+Y). Captured. MapEditorView: SelectAll/Undo/Redo over UndoStack+RedoStack, with ReverseAction as the primitive. Detectable since 2026-08-07: the mod's UI sampler reads each MenuBarButton's Menu.IsVisible (DialogBase) on the main thread and reports the open dropdown in the state file's `tab` slot. The menu bar is a legacy RedShadow dialog, so neither UIManager._currentWindow nor _ActiveGameView moves when it opens — that is why these five kept goto recipes after every other toolkit screen became an edge. NOT YET CLOSABLE BY EDGE: leaving a dropdown is unmodelled. `key escape` looks right on paper (DialogBase.Update cancels the top dialog on Escape) and an escape->click edge was written and driven — it reported success while arriving NOWHERE. Two faults, both worth knowing: the escape did not close the menu inside the verify window, and the verify could not tell, because `assert node=X` passes when X is an ANCESTOR of the detected node (engine._assert_holds) — so 'verify map_editor' is satisfied by the still-open me_menu_file. The click then landed on the bar with a menu down, which cancels it and opens nothing. Escaping needs measuring on its own before it is an edge.",
                     "done": {
                       "qud": 0.95,
                       "raves": 0.8
                     },
-                    "detect": {},
-                    "goto": {
+                    "detect": {
                       "qud": [
                         {
-                          "goto": "map_editor"
-                        },
-                        {
-                          "click_hover": [
-                            112,
-                            16
+                          "scene": [
+                            "MapEditorWindow",
+                            "MapEditor"
                           ],
-                          "window": "CavesOfQud"
+                          "tab": "Edit"
                         }
                       ]
                     }
@@ -792,23 +445,19 @@
                   {
                     "id": "me_menu_transform",
                     "label": "Transform menu",
-                    "note": "Flip Horizontal · Flip Vertical (no hotkeys). Captured. MapEditorView: FlipHorizontal/FlipVertical — they act on SelectedRegion when one is set.",
+                    "note": "Flip Horizontal · Flip Vertical (no hotkeys). Captured. MapEditorView: FlipHorizontal/FlipVertical — they act on SelectedRegion when one is set. Detectable since 2026-08-07: the mod's UI sampler reads each MenuBarButton's Menu.IsVisible (DialogBase) on the main thread and reports the open dropdown in the state file's `tab` slot. The menu bar is a legacy RedShadow dialog, so neither UIManager._currentWindow nor _ActiveGameView moves when it opens — that is why these five kept goto recipes after every other toolkit screen became an edge. NOT YET CLOSABLE BY EDGE: leaving a dropdown is unmodelled. `key escape` looks right on paper (DialogBase.Update cancels the top dialog on Escape) and an escape->click edge was written and driven — it reported success while arriving NOWHERE. Two faults, both worth knowing: the escape did not close the menu inside the verify window, and the verify could not tell, because `assert node=X` passes when X is an ANCESTOR of the detected node (engine._assert_holds) — so 'verify map_editor' is satisfied by the still-open me_menu_file. The click then landed on the bar with a menu down, which cancels it and opens nothing. Escaping needs measuring on its own before it is an edge.",
                     "done": {
                       "qud": 0.95,
                       "raves": 0.8
                     },
-                    "detect": {},
-                    "goto": {
+                    "detect": {
                       "qud": [
                         {
-                          "goto": "map_editor"
-                        },
-                        {
-                          "click_hover": [
-                            203,
-                            16
+                          "scene": [
+                            "MapEditorWindow",
+                            "MapEditor"
                           ],
-                          "window": "CavesOfQud"
+                          "tab": "Transform"
                         }
                       ]
                     }
@@ -816,23 +465,19 @@
                   {
                     "id": "me_menu_view",
                     "label": "View menu",
-                    "note": "Toggle NorthSheva Overlay (Ctrl+F1) — the ONLY item. It overlays the NorthSheva artwork as a tracing guide (MapEditorView.ToggleOverlay); that same sprite, NorthShevaTransparent, is the BackdropWindow asset found during the toolkit backdrop hunt.",
+                    "note": "Toggle NorthSheva Overlay (Ctrl+F1) — the ONLY item. It overlays the NorthSheva artwork as a tracing guide (MapEditorView.ToggleOverlay); that same sprite, NorthShevaTransparent, is the BackdropWindow asset found during the toolkit backdrop hunt. Detectable since 2026-08-07: the mod's UI sampler reads each MenuBarButton's Menu.IsVisible (DialogBase) on the main thread and reports the open dropdown in the state file's `tab` slot. The menu bar is a legacy RedShadow dialog, so neither UIManager._currentWindow nor _ActiveGameView moves when it opens — that is why these five kept goto recipes after every other toolkit screen became an edge. NOT YET CLOSABLE BY EDGE: leaving a dropdown is unmodelled. `key escape` looks right on paper (DialogBase.Update cancels the top dialog on Escape) and an escape->click edge was written and driven — it reported success while arriving NOWHERE. Two faults, both worth knowing: the escape did not close the menu inside the verify window, and the verify could not tell, because `assert node=X` passes when X is an ANCESTOR of the detected node (engine._assert_holds) — so 'verify map_editor' is satisfied by the still-open me_menu_file. The click then landed on the bar with a menu down, which cancels it and opens nothing. Escaping needs measuring on its own before it is an edge.",
                     "done": {
                       "qud": 0.95,
                       "raves": 0.8
                     },
-                    "detect": {},
-                    "goto": {
+                    "detect": {
                       "qud": [
                         {
-                          "goto": "map_editor"
-                        },
-                        {
-                          "click_hover": [
-                            293,
-                            16
+                          "scene": [
+                            "MapEditorWindow",
+                            "MapEditor"
                           ],
-                          "window": "CavesOfQud"
+                          "tab": "View"
                         }
                       ]
                     }
@@ -840,23 +485,19 @@
                   {
                     "id": "me_menu_recent",
                     "label": "Recent menu",
-                    "note": "Recently-opened maps (MapEditorView RecentMenu/AddRecentFile/UpdateRecent/RecentClick, persisted via WriteModSettings). EMPTY on a fresh install — verified: opening it drew no panel, which is the expected zero-state, not a failure.",
+                    "note": "Recently-opened maps (MapEditorView RecentMenu/AddRecentFile/UpdateRecent/RecentClick, persisted via WriteModSettings). EMPTY on a fresh install — verified: opening it drew no panel, which is the expected zero-state, not a failure. Detectable since 2026-08-07: the mod's UI sampler reads each MenuBarButton's Menu.IsVisible (DialogBase) on the main thread and reports the open dropdown in the state file's `tab` slot. The menu bar is a legacy RedShadow dialog, so neither UIManager._currentWindow nor _ActiveGameView moves when it opens — that is why these five kept goto recipes after every other toolkit screen became an edge. NOT YET CLOSABLE BY EDGE: leaving a dropdown is unmodelled. `key escape` looks right on paper (DialogBase.Update cancels the top dialog on Escape) and an escape->click edge was written and driven — it reported success while arriving NOWHERE. Two faults, both worth knowing: the escape did not close the menu inside the verify window, and the verify could not tell, because `assert node=X` passes when X is an ANCESTOR of the detected node (engine._assert_holds) — so 'verify map_editor' is satisfied by the still-open me_menu_file. The click then landed on the bar with a menu down, which cancels it and opens nothing. Escaping needs measuring on its own before it is an edge.",
                     "done": {
                       "qud": 0.9,
                       "raves": 0.8
                     },
-                    "detect": {},
-                    "goto": {
+                    "detect": {
                       "qud": [
                         {
-                          "goto": "map_editor"
-                        },
-                        {
-                          "click_hover": [
-                            369,
-                            16
+                          "scene": [
+                            "MapEditorWindow",
+                            "MapEditor"
                           ],
-                          "window": "CavesOfQud"
+                          "tab": "Recent"
                         }
                       ]
                     }
@@ -904,12 +545,22 @@
                   {
                     "id": "me_context_menu",
                     "label": "Cell/region context menu (SOLVED — raised via the mod's MapEditorDriver)",
-                    "note": "SOLVED AND SEEN (2026-08-06). Trigger, from IL: MapEditorSelectedObjectsRow.OnPointerClick is `if (eventData.button != InputButton.Right) return; MapEditorView.instance.DisplayContextInRegion(this.bp);` — a RIGHT-CLICK ON A ROW of the selected-contents list, not on the canvas. Rows come from SelectedCellContentsView, filled by UpdateSelectedContents from HasSelectedRegion/SelectedRegion, so a region containing objects is the precondition. MENU CONTENTS, now captured rather than inferred: Set owner | Set part | Add string property | Add int property | Remove property — matching SetOwnerForContext / SetPartForContext / AddPropertyForContext / AddIntPropertyForContext / RemovePropertyForContext. (Flood, DeleteInRegion and ReplaceInRegion exist on MapEditorView but are NOT on this menu.) HOW TO DRIVE IT: synthetic mouse input cannot — see me_controls. The mod now drives the editor through its own API instead (mod/MapEditorDriver.cs, bridge command `mapedit`, the same skip-the-UI approach EmbarkDriver uses for chargen): {\"name\":\"mapedit\",\"do\":\"paint\",\"x\":21,\"y\":8,\"bp\":\"Across1\"} then {\"do\":\"select\",\"x\":19,\"y\":7,\"x2\":22,\"y2\":9} then {\"do\":\"context\",\"x\":20,\"y\":8}. Verified end to end: canvas gains the objects, the readout reads 'Selected Cell: 19, 7 - 23, 10', the contents rows populate, and the menu appears at x862..988 y490..574. `{\"do\":\"state\"}` logs a JSON readback for asserts. GOTCHA worth keeping: MapFile is NOT a MapFileRegion — the cell grid is MapFile.Cells, and the driver's first version logged 'no GetOrCreateCellAt on MapFile' until that was fixed.",
+                    "note": "SOLVED AND SEEN (2026-08-06). Trigger, from IL: MapEditorSelectedObjectsRow.OnPointerClick is `if (eventData.button != InputButton.Right) return; MapEditorView.instance.DisplayContextInRegion(this.bp);` — a RIGHT-CLICK ON A ROW of the selected-contents list, not on the canvas. Rows come from SelectedCellContentsView, filled by UpdateSelectedContents from HasSelectedRegion/SelectedRegion, so a region containing objects is the precondition. MENU CONTENTS, now captured rather than inferred: Set owner | Set part | Add string property | Add int property | Remove property — matching SetOwnerForContext / SetPartForContext / AddPropertyForContext / AddIntPropertyForContext / RemovePropertyForContext. (Flood, DeleteInRegion and ReplaceInRegion exist on MapEditorView but are NOT on this menu.) HOW TO DRIVE IT: synthetic mouse input cannot — see me_controls. The mod now drives the editor through its own API instead (mod/MapEditorDriver.cs, bridge command `mapedit`, the same skip-the-UI approach EmbarkDriver uses for chargen): {\"name\":\"mapedit\",\"do\":\"paint\",\"x\":21,\"y\":8,\"bp\":\"Across1\"} then {\"do\":\"select\",\"x\":19,\"y\":7,\"x2\":22,\"y2\":9} then {\"do\":\"context\",\"x\":20,\"y\":8}. Verified end to end: canvas gains the objects, the readout reads 'Selected Cell: 19, 7 - 23, 10', the contents rows populate, and the menu appears at x862..988 y490..574. `{\"do\":\"state\"}` logs a JSON readback for asserts. GOTCHA worth keeping: MapFile is NOT a MapFileRegion — the cell grid is MapFile.Cells, and the driver's first version logged 'no GetOrCreateCellAt on MapFile' until that was fixed. Detected off the same sampler read as the menu-bar dropdowns (MapEditorView.ContextMenu.IsVisible -> tab=\"Context\"); it has no edge because it opens at the MOUSE, from a right-click on a canvas cell.",
                     "done": {
                       "qud": 0.95,
                       "raves": 0.0
                     },
-                    "detect": {}
+                    "detect": {
+                      "qud": [
+                        {
+                          "scene": [
+                            "MapEditorWindow",
+                            "MapEditor"
+                          ],
+                          "tab": "Context"
+                        }
+                      ]
+                    }
                   },
                   {
                     "id": "map_editor_exit_confirm",
@@ -936,7 +587,7 @@
               {
                 "id": "blueprint_browser",
                 "label": "Blueprint Browser",
-                "note": "filterable collapsible tree of the full ObjectBlueprints hierarchy (Object, SultanMuralController expandable) — the natural UI mirror of the Object Checker enumeration. Back [3709,2068] returns to TITLE. RAVES: BlueprintBrowserScreen.gd — reads blueprints.json (BlueprintExporter walks GameObjectFactory.Factory.Blueprints, so a modded install shows its own; 5247 rows, and its 9 roots + expander set match Qud's screen exactly). PIXEL-DIFFED 2026-08-06: 99.77% content match, no divergent region. Layout MEASURED off Qud, not nudged — filter box x18..305 y12..38, row glyph tops 62/86/110 (pitch 24), expander x8..17, cube icon x27..43 (17x18, drawn as an isometric outline — a text glyph measured 9px against Qud's 17), text x48, Back glyph x1832..1884 y1026..1042; all now exact. The status line and opening row highlight are user-mode-only (Qud has neither). REMAINING (the whole residual): Qud's list font is ElliotSans, condensed — ~6.5px/char vs Atkinson's 8.4 at a matched cap height, so names run ~29% wide. The screen loads ElliotSans from title/chrome/ when present (correct on the Mac) and falls back otherwise; NO mod exporter for it exists yet — that is the next unit of work for this leaf, and it is shared with every other modern-UI screen. FONTS EXTRACTED (2026-08-07) -- the long-standing blocker is gone. Unity's Font asset keeps the ORIGINAL file in m_FontData, so Caves of Qud ships the real vector TTFs verbatim inside sharedassets0.assets; tools/capture/fonts.py carves them structurally (parse the sfnt table directory at each candidate offset and require every record to be self-consistent, plus a size ceiling -- without which a chance 'OTTO' inside texture data validates as a 120 MB font). 18 fonts are embedded; 4 matter: Elliot Sans Regular/Medium/Bold and LIBERATION SANS, which is what Qud's modding-tool dialogs actually use (Unity's stock UI face, not Qud's console mono). They go player-install -> player-support-dir like the tile art and are NEVER committed. THE LIST FACE IS ELLIOT SANS *MEDIUM* AT 13 px, and width alone cannot establish that: width-per-cap puts Qud at 13.56, between Regular's 13.39 and Medium's 13.89, inside the noise. Ink DENSITY separates them -- same string at a matched 9 px cap gives total ink 74805 (Regular) / 99652 (Medium) / 123041 (Bold) against Qud's own 95458. I picked Regular off the width ratio first and the density check corrected it; use density to pick a WEIGHT and width-per-cap to pick a SIZE. A 2 px baseline offset the real face exposed is fixed too, so row baselines now match to the pixel. METHOD NOTE worth carrying: whole-screen content_match moved only 99.75 -> 99.79 because a 1920x1080 screen is dominated by matching black and the metric is nearly blind to a text column; scored on the name column, glyph agreement went 15.3% -> 27.2%. Score per REGION when judging a single element. The residual is rasteriser difference (Unity TMP atlas vs Godot FreeType at a 9 px cap), not layout.",
+                "note": "LEFT AS A LEGACY RECIPE deliberately. Its route starts at `modding_toolkit`, and RAVES has no transition to that node — only Qud does — so an edge from there would be unreachable from every state, which selftest_plan rejects (correctly). Convert it once a raves title -> modding_toolkit edge exists and has been driven; Raves' title does carry a Modding Toolkit link, so that edge is writable, just unverified as of 2026-08-07. filterable collapsible tree of the full ObjectBlueprints hierarchy (Object, SultanMuralController expandable) — the natural UI mirror of the Object Checker enumeration. Back [3709,2068] returns to TITLE. RAVES: BlueprintBrowserScreen.gd — reads blueprints.json (BlueprintExporter walks GameObjectFactory.Factory.Blueprints, so a modded install shows its own; 5247 rows, and its 9 roots + expander set match Qud's screen exactly). PIXEL-DIFFED 2026-08-06: 99.77% content match, no divergent region. Layout MEASURED off Qud, not nudged — filter box x18..305 y12..38, row glyph tops 62/86/110 (pitch 24), expander x8..17, cube icon x27..43 (17x18, drawn as an isometric outline — a text glyph measured 9px against Qud's 17), text x48, Back glyph x1832..1884 y1026..1042; all now exact. The status line and opening row highlight are user-mode-only (Qud has neither). REMAINING (the whole residual): Qud's list font is ElliotSans, condensed — ~6.5px/char vs Atkinson's 8.4 at a matched cap height, so names run ~29% wide. The screen loads ElliotSans from title/chrome/ when present (correct on the Mac) and falls back otherwise; NO mod exporter for it exists yet — that is the next unit of work for this leaf, and it is shared with every other modern-UI screen. FONTS EXTRACTED (2026-08-07) -- the long-standing blocker is gone. Unity's Font asset keeps the ORIGINAL file in m_FontData, so Caves of Qud ships the real vector TTFs verbatim inside sharedassets0.assets; tools/capture/fonts.py carves them structurally (parse the sfnt table directory at each candidate offset and require every record to be self-consistent, plus a size ceiling -- without which a chance 'OTTO' inside texture data validates as a 120 MB font). 18 fonts are embedded; 4 matter: Elliot Sans Regular/Medium/Bold and LIBERATION SANS, which is what Qud's modding-tool dialogs actually use (Unity's stock UI face, not Qud's console mono). They go player-install -> player-support-dir like the tile art and are NEVER committed. THE LIST FACE IS ELLIOT SANS *MEDIUM* AT 13 px, and width alone cannot establish that: width-per-cap puts Qud at 13.56, between Regular's 13.39 and Medium's 13.89, inside the noise. Ink DENSITY separates them -- same string at a matched 9 px cap gives total ink 74805 (Regular) / 99652 (Medium) / 123041 (Bold) against Qud's own 95458. I picked Regular off the width ratio first and the density check corrected it; use density to pick a WEIGHT and width-per-cap to pick a SIZE. A 2 px baseline offset the real face exposed is fixed too, so row baselines now match to the pixel. METHOD NOTE worth carrying: whole-screen content_match moved only 99.75 -> 99.79 because a 1920x1080 screen is dominated by matching black and the metric is nearly blind to a text column; scored on the name column, glyph agreement went 15.3% -> 27.2%. Score per REGION when judging a single element. The residual is rasteriser difference (Unity TMP atlas vs Godot FreeType at a 9 px cap), not layout.",
                 "done": {
                   "qud": 0.9,
                   "raves": 0.95
@@ -1011,7 +662,7 @@
               {
                 "id": "histographicnomicon",
                 "label": "Histographicnomicon",
-                "note": "history-generation debug tool: Generate / Test Failure Redirect / Test Variable, scrollable output canvas, Reload + Back. Back [3717,2097] returns to TITLE.",
+                "note": "LEFT AS A LEGACY RECIPE. Converted to a transition on 2026-08-07 and reverted the same hour: driven from a clean Modding Toolkit, the click lands nowhere and Qud ends up back at the TITLE. The coordinates here are window points captured on the PC rig and look stale for this layout — the recipe is equally broken, so this is not a regression, but an edge asserts routability and a recipe does not. Re-measure the coordinates against a screenshot, drive it, THEN convert.",
                 "done": {
                   "qud": 0.9,
                   "raves": 0.0
@@ -1022,26 +673,12 @@
                       "scene": "HistoryTestView"
                     }
                   ]
-                },
-                "goto": {
-                  "qud": [
-                    {
-                      "goto": "modding_toolkit"
-                    },
-                    {
-                      "click_hover": [
-                        862,
-                        619
-                      ],
-                      "window": "CavesOfQud"
-                    }
-                  ]
                 }
               },
               {
                 "id": "wfc_generator",
                 "label": "Waveform Collapse Map Generator",
-                "note": "white preview canvas + parameter console (default 'pass:temple,n=3,width=78,height=23'), Generate / Generate Fast / Reseed To Static / TTest. Back [3706,2090] returns to TITLE.",
+                "note": "LEFT AS A LEGACY RECIPE. Converted to a transition on 2026-08-07 and reverted the same hour: driven from a clean Modding Toolkit, the click lands nowhere and Qud ends up back at the TITLE. The coordinates here are window points captured on the PC rig and look stale for this layout — the recipe is equally broken, so this is not a regression, but an edge asserts routability and a recipe does not. Re-measure the coordinates against a screenshot, drive it, THEN convert.",
                 "done": {
                   "qud": 0.9,
                   "raves": 0.0
@@ -1050,20 +687,6 @@
                   "qud": [
                     {
                       "scene": "WaveformTestView"
-                    }
-                  ]
-                },
-                "goto": {
-                  "qud": [
-                    {
-                      "goto": "modding_toolkit"
-                    },
-                    {
-                      "click_hover": [
-                        862,
-                        646
-                      ],
-                      "window": "CavesOfQud"
                     }
                   ]
                 }
@@ -1138,7 +761,10 @@
               "scene": [
                 "play",
                 "Stage",
-                "in_game"
+                "in_game",
+                "PopupMessage",
+                "PopupText",
+                "PopupYesNo"
               ]
             },
             {
@@ -1160,67 +786,6 @@
             }
           ]
         },
-        "goto": {
-          "qud": [
-            {
-              "goto": "title"
-            },
-            {
-              "activate": "CavesOfQud"
-            },
-            {
-              "click_hover": [
-                958,
-                580
-              ],
-              "window": "CavesOfQud",
-              "note": "Continue on the title menu"
-            },
-            {
-              "sleep": 1.0
-            },
-            {
-              "click_hover": [
-                900,
-                190
-              ],
-              "window": "CavesOfQud",
-              "note": "top save row in the Load Game picker"
-            },
-            {
-              "assert": {
-                "node": "in_game"
-              },
-              "timeout": 30
-            }
-          ],
-          "raves": [
-            {
-              "goto": "title"
-            },
-            {
-              "activate": "Raves of Qud"
-            },
-            {
-              "sleep": 2.5,
-              "note": "let Continue enable (heartbeat poll) after a fresh launch"
-            },
-            {
-              "click_hover": [
-                945,
-                580
-              ],
-              "window": "Raves of Qud",
-              "note": "hover-select Continue"
-            },
-            {
-              "assert": {
-                "node": "in_game"
-              },
-              "timeout": 20
-            }
-          ]
-        },
         "children": [
           {
             "id": "world",
@@ -1228,6 +793,16 @@
             "done": {
               "qud": 1.0,
               "raves": 0.5
+            },
+            "detect": {}
+          },
+          {
+            "id": "world_map",
+            "label": "World Map (parasang overview)",
+            "note": "zone.z < 0 on the wire; renders inside the gameplay frame but is a distinct screen: worldTerrain tiles, landmarks, standing cards, 'you are here' player card. Unverified — see raves docs/pc-zone-plan.md  MERGE NOTE (2026-08-07): scoreboard-only — detect{} and no inbound transition, so the planner cannot drive here and the panel/cockpit draw it dim with no click target. That is correct for now; give it a `detect` and a transition when it becomes drivable.",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.4
             },
             "detect": {}
           },
@@ -1293,9 +868,1876 @@
               "raves": 0.4
             },
             "detect": {}
+          },
+          {
+            "id": "status_screens",
+            "label": "Status screens (8-tab in-game menu)",
+            "note": "Qud: ONE scene (StatusScreensScreen) for all tabs; per-tab detection needs the planned heartbeat statusTab export. Tab clicks REQUIRE hover-first (hv click --hover) — plain clicks only hover-select. Plan: raves docs/status-screens-plan.md Qud opener: hover-click the person icon (1729,70). Raves opener keys = Qud's Commands.xml defaults (k/x/e/i/n/j/q, ctrl+f).",
+            "done": {
+              "qud": 0.5,
+              "raves": 0.0
+            },
+            "detect": {
+              "qud": [
+                {
+                  "scene": [
+                    "StatusScreensScreen"
+                  ]
+                }
+              ],
+              "raves": [
+                {
+                  "scene": [
+                    "status_skills",
+                    "status_attributes",
+                    "status_equipment",
+                    "status_tinkering",
+                    "status_journal",
+                    "status_quests",
+                    "status_reputation",
+                    "status_messagelog"
+                  ]
+                }
+              ]
+            },
+            "children": [
+              {
+                "id": "status_skills",
+                "label": "skills",
+                "done": {
+                  "qud": 0.5,
+                  "raves": 0.0
+                },
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "status_skills"
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "scene": "StatusScreensScreen",
+                      "tab": "SkillsAndPowers"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "status_attributes",
+                "label": "attributes",
+                "done": {
+                  "qud": 0.5,
+                  "raves": 0.0
+                },
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "status_attributes"
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "scene": "StatusScreensScreen",
+                      "tab": "Character"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "status_equipment",
+                "label": "equipment",
+                "done": {
+                  "qud": 0.5,
+                  "raves": 0.0
+                },
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "status_equipment"
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "scene": "StatusScreensScreen",
+                      "tab": "InventoryAndEquipment"
+                    }
+                  ]
+                },
+                "note": "Leaf scores come from raves-of-qud tools/capture/parity.py with reports/2026-08-04-status-screens/parity-equipment.json — region-scoped, masked diffs (image = sprite ink with the chrome masked out, frame = chrome with the interior masked, composite = both). Whole-frame means are too noisy to adjudicate these: the live playfield behind the scrim shifts the average by ~0.7 between identical builds.",
+                "children": [
+                  {
+                    "id": "equipment_doll_image",
+                    "label": "Doll: item images",
+                    "note": "parity leaf doll_image[*] — equipped sprite ink only.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.3
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_doll_frame",
+                    "label": "Doll: slot frames",
+                    "note": "parity leaf doll_frame[*] — slot chrome only.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.7
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_doll_cell",
+                    "label": "Doll: slot (image+frame)",
+                    "note": "parity leaf doll_cell[*] — what the eye sees.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.5
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_filter_image",
+                    "label": "Filter: category icons",
+                    "note": "parity leaf filter_image[*] — icon ink only.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.3
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_filter_frame",
+                    "label": "Filter: cell frames",
+                    "note": "parity leaf filter_frame[*] — corner-loop chrome, ported 2026-08-04.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.8
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_filter_cell",
+                    "label": "Filter: cell (image+frame)",
+                    "note": "parity leaf filter_cell[*].",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.6
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_category_image",
+                    "label": "Category cell: image",
+                    "note": "parity leaf filter_image[*] — Qud's categoryImageMap sprite, tan two-tone.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.5
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_category_frame",
+                    "label": "Category cell: frame",
+                    "note": "parity leaf filter_frame[*] — corner-loop chrome (ported 2026-08-04).",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.8
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_category_hover",
+                    "label": "Category cell: hover",
+                    "note": "Qud brightens the whole cell frame (51,80,91)->(65,106,115) on hover; ported and verified live (delta 4.05 vs Qud 4.12).",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.9
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_category_select",
+                    "label": "Category cell: select",
+                    "note": "gold frame + list filtering on click; multi-select mirrors enabledCategories.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.8
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_category_order",
+                    "label": "Category strip: order",
+                    "note": "filterOrder = category of the alphabetically-first item; equipped items included.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.9
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_category_water",
+                    "label": "Category header: water/drams",
+                    "note": "the $drams figure in the header line (GetFreeDrams).",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.7
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_category_weight",
+                    "label": "Category header: weight",
+                    "note": "carried/max lbs in the header; the header block placement is still ~2px off.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.6
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_list_categories",
+                    "label": "List: categories",
+                    "note": "category rows with [-]/[+] and Qud's own name colouring.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.8
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_list_category_weight",
+                    "label": "List: category weight",
+                    "note": "the |n lbs.| column, right-aligned at x1673.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.9
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_line_icon",
+                    "label": "Line item: icon",
+                    "note": "per-row item tile from RenderForUI(\"Inventory\").",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.7
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_line_text",
+                    "label": "Line item: description text",
+                    "note": "row label from GameObject.DisplayName incl. the nameless-item fallback.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.9
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_line_colors",
+                    "label": "Line item: description colours",
+                    "note": "Qud markup resolved through the palette + CP437 badge glyphs.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.9
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_scrolling",
+                    "label": "List: scrolling",
+                    "note": "wheel/PageUp/PageDown through the inventory; no capture-diff coverage yet.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.5
+                    },
+                    "detect": {}
+                  },
+                  {
+                    "id": "equipment_item_popup",
+                    "label": "Item interaction popup",
+                    "note": "Qud's own menu, raised by EquipmentAPI.TwiddleObject and mirrored over the popup channel. Parity spec: raves-of-qud/reports/2026-08-05-item-popup/parity-item-popup.json. Qud's popup carries a HEADER above the commands (item tile + name + notched divider) that Raves does not draw yet -- the leaves below measure that gap, so their scores are the size of the work remaining, not a misalignment.",
+                    "done": {
+                      "qud": 1.0,
+                      "raves": 0.5
+                    },
+                    "detect": {},
+                    "children": [
+                      {
+                        "id": "item_popup_image_frame",
+                        "label": "Image frame (above the commands)",
+                        "note": "parity leaf popup_image_frame - the framed header block, Qud x825-1079 y334-486. 16.48.",
+                        "done": {
+                          "qud": 1.0,
+                          "raves": 0.0
+                        },
+                        "detect": {}
+                      },
+                      {
+                        "id": "item_popup_frame_text_content",
+                        "label": "Image frame: text content",
+                        "note": "parity leaf popup_frame_text_content - the item name line inside the block. 32.21.",
+                        "done": {
+                          "qud": 1.0,
+                          "raves": 0.0
+                        },
+                        "detect": {}
+                      },
+                      {
+                        "id": "item_popup_frame_text_color",
+                        "label": "Image frame: text colour",
+                        "note": "parity leaf popup_frame_text_color (kind ink_color - palette only, position ignored). 25.80.",
+                        "done": {
+                          "qud": 1.0,
+                          "raves": 0.0
+                        },
+                        "detect": {}
+                      },
+                      {
+                        "id": "item_popup_image_geometry",
+                        "label": "Image: size / position",
+                        "note": "parity leaf popup_image_geometry (kind geometry - ink bbox only, colour ignored). Qud 42x54 at x939 y369; 47.00px mean.",
+                        "done": {
+                          "qud": 1.0,
+                          "raves": 0.0
+                        },
+                        "detect": {}
+                      },
+                      {
+                        "id": "item_popup_image_color",
+                        "label": "Image: colour",
+                        "note": "parity leaf popup_image_color (kind ink_color). 106.33.",
+                        "done": {
+                          "qud": 1.0,
+                          "raves": 0.0
+                        },
+                        "detect": {}
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "status_tinkering",
+                "label": "tinkering",
+                "done": {
+                  "qud": 0.5,
+                  "raves": 0.0
+                },
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "status_tinkering"
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "scene": "StatusScreensScreen",
+                      "tab": "Tinkering"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "status_journal",
+                "label": "journal",
+                "done": {
+                  "qud": 0.5,
+                  "raves": 0.0
+                },
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "status_journal"
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "scene": "StatusScreensScreen",
+                      "tab": "Journal"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "status_quests",
+                "label": "quests",
+                "done": {
+                  "qud": 0.5,
+                  "raves": 0.0
+                },
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "status_quests"
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "scene": "StatusScreensScreen",
+                      "tab": "Quests"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "status_reputation",
+                "label": "reputation",
+                "done": {
+                  "qud": 0.5,
+                  "raves": 0.0
+                },
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "status_reputation"
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "scene": "StatusScreensScreen",
+                      "tab": "Factions"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "status_messagelog",
+                "label": "messagelog",
+                "done": {
+                  "qud": 0.9,
+                  "raves": 0.8
+                },
+                "detect": {
+                  "raves": [
+                    {
+                      "scene": "status_messagelog"
+                    }
+                  ],
+                  "qud": [
+                    {
+                      "scene": "StatusScreensScreen",
+                      "tab": "MessageLog"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "control_mapping",
+            "label": "Control Mapping",
+            "note": "system menu -> Control Mapping. QUD DETECTION GAP: KeybindsScreen never updates _ActiveGameView (scene stays 'play'), so qud detect leans on OCR only.",
+            "done": {
+              "qud": 0.8,
+              "raves": 0.3
+            },
+            "detect": {
+              "raves": [
+                {
+                  "scene": "control_mapping"
+                }
+              ],
+              "qud": [
+                {
+                  "ocr_any": [
+                    "control mapping",
+                    "configuring controller"
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "tests": [
+          {
+            "id": "typing_guard",
+            "tier": "spot",
+            "cmd": "python3 tools/regression/typing_guard_audit.py",
+            "cwd": "raves-of-qud",
+            "note": "STATIC, ~0.2s, no apps. Fails if a keyboard hotkey is dispatched from _input without TypingGuard, and prints the text-field inventory so a NEW field shows in the diff. Live counterpart is the FULL case in docs/testing.md."
           }
         ]
+      },
+      {
+        "id": "summary",
+        "label": "Game over / summary",
+        "note": "the tombstone + GameSummaryScreen after a death (Wander mode returns to the picker afterwards). Injected Esc is IGNORED here — a restart is the reliable exit.",
+        "done": {
+          "qud": 1.0,
+          "raves": 0.0
+        },
+        "detect": {
+          "qud": [
+            {
+              "scene": [
+                "GameSummaryScreen",
+                "TombstoneScreen"
+              ]
+            }
+          ]
+        }
       }
     ]
-  }
+  },
+  "costs": {
+    "_note": "What a step costs us -- not seconds, but how much we want to AVOID it. Overlays plan.DEFAULT_COSTS. Bridge commands are near-free and never miss; click_text is dear because OCR is the one class that goes flaky, and a missed match does not fail cleanly, it clicks the wrong thing; launch is slow; restart always works and is therefore the last thing the planner should reach for."
+  },
+  "preflight": [
+    {
+      "app": "qud",
+      "when": {
+        "scene": [
+          "PopupMessage",
+          "DynamicPopupMessage"
+        ]
+      },
+      "steps": [
+        {
+          "bridge": "uiback"
+        }
+      ],
+      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up. That is what made the equipment key look broken for a whole session. It is a CONDITION sitting on top of a state, not a state: modelling it as a node would double the graph and as an edge it would need a self-loop, which a shortest-path search cannot use. So it runs before planning, and the plan is made against what is actually there. This one declaration replaced sixteen copy-pasted dismiss steps across the status-tab recipes."
+    }
+  ],
+  "transitions": [
+    {
+      "app": "qud",
+      "from": "off",
+      "to": "title",
+      "steps": [
+        {
+          "launch": "qud_solo"
+        },
+        {
+          "wait_window": "CavesOfQud",
+          "timeout": 60
+        }
+      ],
+      "verify": {
+        "scene": "MainMenu"
+      },
+      "timeout": 25,
+      "note": "COLD START. No `unless_running` guard any more: the planner only picks this edge from `off`, which is exactly what that flag was hand-checking on every run."
+    },
+    {
+      "app": "qud",
+      "from": "*",
+      "to": "title",
+      "steps": [
+        {
+          "restart": "qud"
+        }
+      ],
+      "verify": {
+        "scene": "MainMenu"
+      },
+      "timeout": 120,
+      "cost": 120,
+      "note": "THE UNIVERSAL ESCAPE HATCH, and the reason there is always a route. Every state that has no modelled exit -- the tombstone (injected Esc is ignored there), an unmodelled modern screen, or `unknown` after a cheap poll -- can still reach the title by restarting. Cost 120 keeps it last: the planner takes any chain of first-party moves over it, and picking it AT ALL is the signal that a real exit edge is missing."
+    },
+    {
+      "app": "qud",
+      "from": "in_game",
+      "to": "title",
+      "steps": [
+        {
+          "command": "CmdQuit",
+          "answers": [
+            "Yes",
+            "No"
+          ]
+        },
+        {
+          "dismiss": {
+            "scene": "PopupMessage",
+            "bridge": "uiback"
+          },
+          "note": "SETTLE. Answering the quit confirms over the bridge can leave a PopupMessage reported for a while after the game has actually ended — and PopupMessage is one of the scenes in_game's detector claims, so the edge verified 'still In-Game' and failed while Qud was already on its way to the menu (it read MainMenu ~40s later, unaided). Driving popups over the bridge is what leaves them, so the edge that drives them clears them. Conditional, so it is a no-op when nothing is up — an unconditional uiback at the MainMenu would hit the menu's own Cancel."
+        }
+      ],
+      "verify": {
+        "scene": "MainMenu"
+      },
+      "timeout": 45,
+      "note": "LEAVE A LIVE GAME, first-party throughout: CmdQuit goes through Qud's own command path and the confirms are answered BY BUTTON via the mod, so nothing here depends on synthesized keys -- which Qud's modern UI ignores outright. Yes to 'are you sure you want to quit', then NO to 'do you want to save first': Yes would overwrite the fixture save with whatever state the harness drove the character into, destroying the reference every parity capture is measured against."
+    },
+    {
+      "app": "qud",
+      "from": {
+        "within": "status_screens"
+      },
+      "to": "in_game",
+      "steps": [
+        {
+          "bridge": "uiback"
+        }
+      ],
+      "verify": {
+        "node": "in_game"
+      },
+      "timeout": 12,
+      "note": "uiback routes StatusScreensScreen to its unguarded Exit(). Written ONCE against the whole subtree; in the recipe model this was a copy-pasted dismiss step at the head of every recipe that might follow a status screen, and the copies drifted."
+    },
+    {
+      "app": "qud",
+      "from": "in_game",
+      "to": "status_screens",
+      "steps": [
+        {
+          "activate": "CavesOfQud"
+        },
+        {
+          "click_hover": [
+            1729,
+            70
+          ],
+          "window": "CavesOfQud"
+        },
+        {
+          "sleep": 1.2
+        }
+      ],
+      "verify": {
+        "scene": "StatusScreensScreen"
+      },
+      "timeout": 12,
+      "note": "the person icon in the top bar. Unity menus need the HOVER-first click."
+    },
+    {
+      "app": "qud",
+      "from": {
+        "within": "status_screens"
+      },
+      "to": "status_skills",
+      "steps": [
+        {
+          "bridge": "statustab",
+          "args": {
+            "tab": "SkillsAndPowers"
+          }
+        }
+      ],
+      "verify": {
+        "node": "status_skills"
+      },
+      "timeout": 8,
+      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab. From OUTSIDE the status screens the planner routes in_game -> status_screens -> here on its own."
+    },
+    {
+      "app": "qud",
+      "from": {
+        "within": "status_screens"
+      },
+      "to": "status_attributes",
+      "steps": [
+        {
+          "bridge": "statustab",
+          "args": {
+            "tab": "Character"
+          }
+        }
+      ],
+      "verify": {
+        "node": "status_attributes"
+      },
+      "timeout": 8,
+      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab. From OUTSIDE the status screens the planner routes in_game -> status_screens -> here on its own."
+    },
+    {
+      "app": "qud",
+      "from": {
+        "within": "status_screens"
+      },
+      "to": "status_equipment",
+      "steps": [
+        {
+          "bridge": "statustab",
+          "args": {
+            "tab": "InventoryAndEquipment"
+          }
+        }
+      ],
+      "verify": {
+        "node": "status_equipment"
+      },
+      "timeout": 8,
+      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab. From OUTSIDE the status screens the planner routes in_game -> status_screens -> here on its own."
+    },
+    {
+      "app": "qud",
+      "from": {
+        "within": "status_screens"
+      },
+      "to": "status_tinkering",
+      "steps": [
+        {
+          "bridge": "statustab",
+          "args": {
+            "tab": "Tinkering"
+          }
+        }
+      ],
+      "verify": {
+        "node": "status_tinkering"
+      },
+      "timeout": 8,
+      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab. From OUTSIDE the status screens the planner routes in_game -> status_screens -> here on its own."
+    },
+    {
+      "app": "qud",
+      "from": {
+        "within": "status_screens"
+      },
+      "to": "status_journal",
+      "steps": [
+        {
+          "bridge": "statustab",
+          "args": {
+            "tab": "Journal"
+          }
+        }
+      ],
+      "verify": {
+        "node": "status_journal"
+      },
+      "timeout": 8,
+      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab. From OUTSIDE the status screens the planner routes in_game -> status_screens -> here on its own."
+    },
+    {
+      "app": "qud",
+      "from": {
+        "within": "status_screens"
+      },
+      "to": "status_quests",
+      "steps": [
+        {
+          "bridge": "statustab",
+          "args": {
+            "tab": "Quests"
+          }
+        }
+      ],
+      "verify": {
+        "node": "status_quests"
+      },
+      "timeout": 8,
+      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab. From OUTSIDE the status screens the planner routes in_game -> status_screens -> here on its own."
+    },
+    {
+      "app": "qud",
+      "from": {
+        "within": "status_screens"
+      },
+      "to": "status_reputation",
+      "steps": [
+        {
+          "bridge": "statustab",
+          "args": {
+            "tab": "Factions"
+          }
+        }
+      ],
+      "verify": {
+        "node": "status_reputation"
+      },
+      "timeout": 8,
+      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab. From OUTSIDE the status screens the planner routes in_game -> status_screens -> here on its own."
+    },
+    {
+      "app": "qud",
+      "from": {
+        "within": "status_screens"
+      },
+      "to": "status_messagelog",
+      "steps": [
+        {
+          "bridge": "statustab",
+          "args": {
+            "tab": "MessageLog"
+          }
+        }
+      ],
+      "verify": {
+        "node": "status_messagelog"
+      },
+      "timeout": 8,
+      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab. From OUTSIDE the status screens the planner routes in_game -> status_screens -> here on its own."
+    },
+    {
+      "app": "qud",
+      "from": "title",
+      "to": "in_game",
+      "steps": [
+        {
+          "load_save": {
+            "row": 0
+          }
+        }
+      ],
+      "verify": {
+        "node": "in_game"
+      },
+      "timeout": 60,
+      "note": "First-party load through the mod's `loadsave {id}` bridge command, with the id resolved from DISK metadata -- no coordinates, no OCR. It replaced {click_text Continue, sleep, click_hover [900,190]}: the blind 'top save row' click failed on the planner's first live run, which is the same top-row roulette `hv loadsave` was built to end, still hiding in the one recipe nobody had re-driven. row 0 rather than a character name so the graph stays generic."
+    },
+    {
+      "app": "qud",
+      "from": "title",
+      "to": "continue",
+      "steps": [
+        {
+          "activate": "CavesOfQud"
+        },
+        {
+          "click_text": "Continue",
+          "window": "CavesOfQud"
+        },
+        {
+          "sleep": 1.0
+        }
+      ],
+      "verify": {
+        "scene": "ModernSaveManagement"
+      },
+      "timeout": 15
+    },
+    {
+      "app": "qud",
+      "from": "title",
+      "to": "records",
+      "steps": [
+        {
+          "activate": "CavesOfQud"
+        },
+        {
+          "click_text": "Records",
+          "window": "CavesOfQud"
+        },
+        {
+          "sleep": 1.0
+        }
+      ],
+      "verify": {
+        "scene": "ModernHighScores"
+      },
+      "timeout": 15
+    },
+    {
+      "app": "qud",
+      "from": "title",
+      "to": "options",
+      "steps": [
+        {
+          "activate": "CavesOfQud"
+        },
+        {
+          "click_text": "Options",
+          "window": "CavesOfQud"
+        },
+        {
+          "sleep": 1.0
+        }
+      ],
+      "verify": {
+        "scene": "ModernOptionsMenu"
+      },
+      "timeout": 15
+    },
+    {
+      "app": "qud",
+      "from": "title",
+      "to": "mods",
+      "steps": [
+        {
+          "activate": "CavesOfQud"
+        },
+        {
+          "click_text": "Mods",
+          "window": "CavesOfQud"
+        },
+        {
+          "sleep": 1.0
+        }
+      ],
+      "verify": {
+        "scene": "ModManager"
+      },
+      "timeout": 15
+    },
+    {
+      "app": "qud",
+      "from": "title",
+      "to": "new_game",
+      "steps": [
+        {
+          "activate": "CavesOfQud"
+        },
+        {
+          "click_text": "New Game",
+          "window": "CavesOfQud"
+        },
+        {
+          "sleep": 1.0
+        }
+      ],
+      "verify": {
+        "ocr_contains": "game mode"
+      },
+      "timeout": 15
+    },
+    {
+      "app": "qud",
+      "from": "continue",
+      "to": "title",
+      "steps": [
+        {
+          "bridge": "uiback"
+        }
+      ],
+      "verify": {
+        "scene": "MainMenu"
+      },
+      "timeout": 12,
+      "note": "Qud's modern menus ignore ALL OS-synthesized keys; uiback is the mod's first-party back command and is the only thing that closes them."
+    },
+    {
+      "app": "qud",
+      "from": "options",
+      "to": "title",
+      "steps": [
+        {
+          "bridge": "uiback"
+        }
+      ],
+      "verify": {
+        "scene": "MainMenu"
+      },
+      "timeout": 12,
+      "note": "Qud's modern menus ignore ALL OS-synthesized keys; uiback is the mod's first-party back command and is the only thing that closes them."
+    },
+    {
+      "app": "qud",
+      "from": "mods",
+      "to": "title",
+      "steps": [
+        {
+          "bridge": "uiback"
+        }
+      ],
+      "verify": {
+        "scene": "MainMenu"
+      },
+      "timeout": 12,
+      "note": "Qud's modern menus ignore ALL OS-synthesized keys; uiback is the mod's first-party back command and is the only thing that closes them."
+    },
+    {
+      "app": "qud",
+      "from": "records",
+      "to": "title",
+      "steps": [
+        {
+          "activate": "CavesOfQud"
+        },
+        {
+          "click_text": "Back",
+          "window": "CavesOfQud",
+          "offset": [
+            0,
+            -40
+          ],
+          "note": "CLICK, not uiback. ModernHighScores ignores the mod's first-party back command — measured twice (2026-08-06 from the daemon and from a raw socket, so it is the screen, not the transport), and again in the 2026-08-07 FULL run where it stranded Qud on Records and took options/mods down with it. Qud's modern screens DO take synthesized clicks. The hit area is ~40px ABOVE the '[Esc] Back' caption, which is what `offset` is for."
+        }
+      ],
+      "verify": {
+        "scene": "MainMenu"
+      },
+      "timeout": 12,
+      "note": "MEASURED FLAKY, priced accordingly. uiback reaches the active window's own OnCancel/Exit, which covers the other modern menus -- but ModernHighScores did NOT budge when this was measured directly (2026-08-06, both from the daemon and from a raw socket, so it is the screen and not the transport). The edge stays because it sometimes works and it verifies its own arrival; the explicit cost keeps the planner from routing THROUGH Records, and a failure re-plans onto restart instead of stranding on a screen with no exit."
+    },
+    {
+      "app": "raves",
+      "from": "off",
+      "to": "title",
+      "steps": [
+        {
+          "launch": "raves_solo"
+        },
+        {
+          "wait_window": "Raves of Qud",
+          "timeout": 30
+        },
+        {
+          "dock": "Raves of Qud",
+          "note": "stack into the standard slot above Qud (fresh launches land off-slot)"
+        }
+      ],
+      "verify": {
+        "node": "title"
+      },
+      "timeout": 25
+    },
+    {
+      "app": "raves",
+      "from": "*",
+      "to": "title",
+      "steps": [
+        {
+          "restart": "raves"
+        }
+      ],
+      "verify": {
+        "node": "title"
+      },
+      "timeout": 90,
+      "cost": 120,
+      "note": "the universal escape hatch — see the qud twin. Also the only modelled way out of character creation, which has no verified back-out yet."
+    },
+    {
+      "app": "raves",
+      "from": "in_game",
+      "to": "title",
+      "steps": [
+        {
+          "dismiss": {
+            "popup": "message",
+            "key": "Escape"
+          },
+          "note": "CANCEL a stray modal first. A popup left over from an earlier run blocks CmdQuit entirely -- the command goes nowhere and the step then fails for lack of any change. Escape is Cancel on these confirms, so this clears the way without ANSWERING anything."
+        },
+        {
+          "dismiss": {
+            "scene": "in_game",
+            "command": "CmdQuit"
+          },
+          "note": "CmdQuit runs Qud's own quit, whose UI mirrors into Raves, so the confirms below are answered on the Raves window."
+        },
+        {
+          "dismiss": {
+            "popup": "message",
+            "key": "space"
+          },
+          "note": "'Are you sure you want to quit?' -> [Space] Yes"
+        },
+        {
+          "dismiss": {
+            "popup": "message",
+            "keys": [
+              "Right",
+              "space"
+            ]
+          },
+          "note": "'Do you want to save first?' -> Right moves off Yes, Space answers NO. Deliberate: Yes would overwrite the fixture save. One step, because Right alone changes nothing observable."
+        }
+      ],
+      "verify": {
+        "node": "title"
+      },
+      "timeout": 25,
+      "note": "Kept as conditional `dismiss` steps rather than flattened to plain keys: each one verifies that the thing it pressed actually moved, and a blind Space on a screen with no confirm up does something else entirely."
+    },
+    {
+      "app": "raves",
+      "from": {
+        "within": "status_screens"
+      },
+      "to": "in_game",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "Escape",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "node": "in_game"
+      },
+      "timeout": 10,
+      "note": "THE EDGE THAT FIXES TAB-TO-TAB. Raves reaches each tab by pressing its key from in_game, so switching tabs means leaving the current one first. In the recipe model each tab recipe carried its own eight-scene dismiss AND a chain step to in_game whose own recipe routed through `title` -- which from a status screen dismissed it, landed in the game and failed its own assert. Tab-to-tab alternated pass/fail. Here it is one edge the planner inserts when, and only when, it is needed."
+    },
+    {
+      "app": "raves",
+      "from": "title",
+      "to": "in_game",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "sleep": 2.5,
+          "note": "let Continue enable (heartbeat poll) after a fresh launch"
+        },
+        {
+          "click_text": "Continue",
+          "window": "Raves of Qud"
+        },
+        {
+          "key": "space",
+          "window": "Raves of Qud",
+          "note": "ACTIVATE. Raves' main menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted Continue and stopped there."
+        },
+        {
+          "dismiss": {
+            "scene": "loadgame",
+            "key": "space"
+          },
+          "note": "CONDITIONAL: Continue opens the LOAD GAME picker when there is a choice to make and goes straight in-game when there is not, so this presses the picker's [Space] select only if we actually landed there."
+        }
+      ],
+      "verify": {
+        "node": "in_game"
+      },
+      "timeout": 60
+    },
+    {
+      "app": "raves",
+      "from": "title",
+      "to": "continue",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "click_text": "Continue",
+          "window": "Raves of Qud"
+        },
+        {
+          "key": "space",
+          "window": "Raves of Qud",
+          "note": "ACTIVATE. Raves' title menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted the item and stopped there — the recipe then failed its own assert while sitting on the title. Only the in_game edge carried this, which is why that one worked and every other title edge did not. An older note claimed a hover-click self-activates here; that stopped being true when the menus went 1:1 keyboard-first, and nothing re-drove them until this FULL run."
+        }
+      ],
+      "verify": {
+        "scene": "loadgame"
+      },
+      "timeout": 12,
+      "note": "CONDITIONAL SCREEN — this edge legitimately fails sometimes. Raves' Continue opens the Load Game picker only when there is a choice to make; otherwise it goes STRAIGHT in-game and `loadgame` never exists to arrive at. Measured 2026-08-07 with four saves on disk and it still went straight in, so the condition is not simply 'more than one save'. The verify says 'got In-Game' rather than passing on the wrong screen, which is the right failure: treat it as 'the picker did not appear', not as a broken recipe. `hv loadsave <name>` is the way to reach a SPECIFIC save regardless."
+    },
+    {
+      "app": "raves",
+      "from": "continue",
+      "to": "title",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "Escape",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "node": "title"
+      },
+      "timeout": 12
+    },
+    {
+      "app": "raves",
+      "from": "title",
+      "to": "records",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "click_text": "Records",
+          "window": "Raves of Qud"
+        },
+        {
+          "key": "space",
+          "window": "Raves of Qud",
+          "note": "ACTIVATE. Raves' title menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted the item and stopped there — the recipe then failed its own assert while sitting on the title. Only the in_game edge carried this, which is why that one worked and every other title edge did not. An older note claimed a hover-click self-activates here; that stopped being true when the menus went 1:1 keyboard-first, and nothing re-drove them until this FULL run."
+        }
+      ],
+      "verify": {
+        "scene": "records"
+      },
+      "timeout": 12
+    },
+    {
+      "app": "raves",
+      "from": "records",
+      "to": "title",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "Escape",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "node": "title"
+      },
+      "timeout": 12
+    },
+    {
+      "app": "raves",
+      "from": "title",
+      "to": "options",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "click_text": "Options",
+          "window": "Raves of Qud"
+        },
+        {
+          "key": "space",
+          "window": "Raves of Qud",
+          "note": "ACTIVATE. Raves' title menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted the item and stopped there — the recipe then failed its own assert while sitting on the title. Only the in_game edge carried this, which is why that one worked and every other title edge did not. An older note claimed a hover-click self-activates here; that stopped being true when the menus went 1:1 keyboard-first, and nothing re-drove them until this FULL run."
+        }
+      ],
+      "verify": {
+        "scene": "options"
+      },
+      "timeout": 12
+    },
+    {
+      "app": "raves",
+      "from": "options",
+      "to": "title",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "Escape",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "node": "title"
+      },
+      "timeout": 12
+    },
+    {
+      "app": "raves",
+      "from": "title",
+      "to": "mods",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "click_text": "Mods",
+          "window": "Raves of Qud"
+        },
+        {
+          "key": "space",
+          "window": "Raves of Qud",
+          "note": "ACTIVATE. Raves' title menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted the item and stopped there — the recipe then failed its own assert while sitting on the title. Only the in_game edge carried this, which is why that one worked and every other title edge did not. An older note claimed a hover-click self-activates here; that stopped being true when the menus went 1:1 keyboard-first, and nothing re-drove them until this FULL run."
+        }
+      ],
+      "verify": {
+        "scene": "mods"
+      },
+      "timeout": 12
+    },
+    {
+      "app": "raves",
+      "from": "mods",
+      "to": "title",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "Escape",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "node": "title"
+      },
+      "timeout": 12
+    },
+    {
+      "app": "raves",
+      "from": "quit_dialog",
+      "to": "title",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "Escape",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "node": "title"
+      },
+      "timeout": 10
+    },
+    {
+      "app": "raves",
+      "from": "title",
+      "to": "game_mode",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "click_text": "New Game",
+          "window": "Raves of Qud"
+        },
+        {
+          "key": "space",
+          "window": "Raves of Qud",
+          "note": "ACTIVATE. Raves' title menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted the item and stopped there — the recipe then failed its own assert while sitting on the title. Only the in_game edge carried this, which is why that one worked and every other title edge did not. An older note claimed a hover-click self-activates here; that stopped being true when the menus went 1:1 keyboard-first, and nothing re-drove them until this FULL run."
+        }
+      ],
+      "verify": {
+        "scene": "chargen_game_mode"
+      },
+      "timeout": 12
+    },
+    {
+      "app": "raves",
+      "from": "game_mode",
+      "to": "genotype",
+      "steps": [
+        {
+          "key": "enter",
+          "window": "Raves of Qud",
+          "note": "confirm the default card (Classic)"
+        }
+      ],
+      "verify": {
+        "scene": "chargen_genotype"
+      },
+      "timeout": 10
+    },
+    {
+      "app": "raves",
+      "from": "genotype",
+      "to": "calling",
+      "steps": [
+        {
+          "key": "enter",
+          "window": "Raves of Qud",
+          "note": "confirm the default genotype"
+        }
+      ],
+      "verify": {
+        "scene": "chargen_subtype"
+      },
+      "timeout": 10
+    },
+    {
+      "app": "raves",
+      "from": "in_game",
+      "to": "status_skills",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "k",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "status_skills",
+        "app": "raves"
+      },
+      "timeout": 8,
+      "note": "Qud's Commands.xml default binding for this screen."
+    },
+    {
+      "app": "raves",
+      "from": "in_game",
+      "to": "status_attributes",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "x",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "status_attributes",
+        "app": "raves"
+      },
+      "timeout": 8,
+      "note": "Qud's Commands.xml default binding for this screen."
+    },
+    {
+      "app": "raves",
+      "from": "in_game",
+      "to": "status_equipment",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "e",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "status_equipment",
+        "app": "raves"
+      },
+      "timeout": 8,
+      "note": "Qud's Commands.xml default binding for this screen."
+    },
+    {
+      "app": "raves",
+      "from": "in_game",
+      "to": "status_tinkering",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "n",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "status_tinkering",
+        "app": "raves"
+      },
+      "timeout": 8,
+      "note": "Qud's Commands.xml default binding for this screen."
+    },
+    {
+      "app": "raves",
+      "from": "in_game",
+      "to": "status_journal",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "j",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "status_journal",
+        "app": "raves"
+      },
+      "timeout": 8,
+      "note": "Qud's Commands.xml default binding for this screen."
+    },
+    {
+      "app": "raves",
+      "from": "in_game",
+      "to": "status_quests",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "q",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "status_quests",
+        "app": "raves"
+      },
+      "timeout": 8,
+      "note": "Qud's Commands.xml default binding for this screen."
+    },
+    {
+      "app": "raves",
+      "from": "in_game",
+      "to": "status_reputation",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "ctrl+f",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "status_reputation",
+        "app": "raves"
+      },
+      "timeout": 8,
+      "note": "Qud's Commands.xml default binding for this screen."
+    },
+    {
+      "app": "raves",
+      "from": "in_game",
+      "to": "status_messagelog",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "f2",
+          "window": "Raves of Qud"
+        },
+        {
+          "sleep": 0.6
+        },
+        {
+          "click": [
+            1615,
+            136
+          ],
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "status_messagelog",
+        "app": "raves"
+      },
+      "timeout": 8
+    },
+    {
+      "app": "raves",
+      "from": "in_game",
+      "to": "control_mapping",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "sleep": 2.0,
+          "note": "post-restart settle — the bridge client needs a beat before Esc lands as CmdSystemMenu"
+        },
+        {
+          "key": "escape",
+          "window": "Raves of Qud",
+          "note": "1:1 Esc = CmdSystemMenu; the popup mirrors back"
+        },
+        {
+          "assert": {
+            "popup": "menu",
+            "app": "raves"
+          },
+          "timeout": 8
+        },
+        {
+          "click_text": "Control Mapping",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "control_mapping",
+        "app": "raves"
+      },
+      "timeout": 10
+    },
+    {
+      "app": "qud",
+      "from": "title",
+      "to": "game_mode",
+      "steps": [
+        {
+          "activate": "CavesOfQud"
+        },
+        {
+          "click_text": "New Game",
+          "window": "CavesOfQud"
+        },
+        {
+          "sleep": 1.0
+        }
+      ],
+      "verify": {
+        "ocr_contains": "game mode"
+      },
+      "timeout": 15,
+      "note": "Qud shows game mode and the rest of character creation as ONE screen, so this is the same move as title->new_game. Spelled out rather than aliased: an edge whose steps you have to look somewhere else to read is how recipes drifted."
+    },
+    {
+      "app": "raves",
+      "from": "title",
+      "to": "new_game",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "click_text": "New Game",
+          "window": "Raves of Qud"
+        },
+        {
+          "key": "space",
+          "window": "Raves of Qud",
+          "note": "ACTIVATE. Raves' title menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted the item and stopped there — the recipe then failed its own assert while sitting on the title. Only the in_game edge carried this, which is why that one worked and every other title edge did not. An older note claimed a hover-click self-activates here; that stopped being true when the menus went 1:1 keyboard-first, and nothing re-drove them until this FULL run."
+        }
+      ],
+      "verify": {
+        "node": "new_game"
+      },
+      "timeout": 12,
+      "note": "new_game is the chargen CONTAINER; detection reports the deepest match (game_mode), and assert passes a node that is on the current path, so landing on the first card satisfies this."
+    },
+    {
+      "app": "qud",
+      "from": "title",
+      "to": "modding_toolkit",
+      "steps": [
+        {
+          "activate": "CavesOfQud"
+        },
+        {
+          "click_hover": [
+            156,
+            902
+          ],
+          "window": "CavesOfQud",
+          "note": "Modding Toolkit link, lower-left secondary list"
+        },
+        {
+          "click_hover": [
+            156,
+            902
+          ],
+          "window": "CavesOfQud",
+          "note": "repeat — first click may be eaten by activation; lands in empty space if already open"
+        }
+      ],
+      "verify": {
+        "node": "modding_toolkit"
+      },
+      "timeout": 10,
+      "note": "Converted from the legacy goto recipe (2026-08-07). Coordinates are window points at the standard 1920x1080 slot, carried over verbatim — re-measure if the layout moves."
+    },
+    {
+      "app": "qud",
+      "from": "modding_toolkit",
+      "to": "map_editor",
+      "steps": [
+        {
+          "click_hover": [
+            862,
+            489
+          ],
+          "window": "CavesOfQud"
+        }
+      ],
+      "verify": {
+        "node": "map_editor"
+      },
+      "timeout": 15,
+      "note": "Converted 2026-08-07 after re-measuring. The coordinates were never the problem — they were within 2px — and the clicks always worked; the earlier conversion attempt was driven from a Qud stuck on a stale 'Stage' scene, which invalidated the whole run. map_editor's DETECTOR was the real defect: it named the UI sampler's window ('MapEditorWindow') while the mod reports the legacy view ('MapEditor'), which is the more specific of the two and therefore wins."
+    },
+    {
+      "app": "qud",
+      "from": "map_editor",
+      "to": "me_menu_file",
+      "steps": [
+        {
+          "click_hover": [
+            46,
+            16
+          ],
+          "window": "CavesOfQud"
+        }
+      ],
+      "verify": {
+        "node": "me_menu_file"
+      },
+      "timeout": 12,
+      "note": "Converted 2026-08-07. `from` is the EDITOR ONLY, not `within map_editor`, and that is a MEASURED constraint rather than a stylistic one. MenuBarButton.onMouseEnter looks like it makes menu->menu one hop (it cancels the open dropdown and opens its own), so the first cut used `within` — and driving File->Edit closed File and opened NOTHING. The click's mouse-DOWN lands on the menu BAR, which is outside the just-opened dropdown's rect, and Menu.Update cancels any top menu clicked outside itself. From a closed bar the same click is harmless (the button opens the menu on mouse-UP, after that check). So a dropdown must be ESCAPED before the next one opens: File -> map_editor -> Edit, which the escape edge gives for cost 1. The planner found this by re-planning; pinning `from` means it no longer has to spend a failed click to learn it."
+    },
+    {
+      "app": "qud",
+      "from": "map_editor",
+      "to": "me_menu_edit",
+      "steps": [
+        {
+          "click_hover": [
+            112,
+            16
+          ],
+          "window": "CavesOfQud"
+        }
+      ],
+      "verify": {
+        "node": "me_menu_edit"
+      },
+      "timeout": 12,
+      "note": "Converted 2026-08-07. `from` is the EDITOR ONLY, not `within map_editor`, and that is a MEASURED constraint rather than a stylistic one. MenuBarButton.onMouseEnter looks like it makes menu->menu one hop (it cancels the open dropdown and opens its own), so the first cut used `within` — and driving File->Edit closed File and opened NOTHING. The click's mouse-DOWN lands on the menu BAR, which is outside the just-opened dropdown's rect, and Menu.Update cancels any top menu clicked outside itself. From a closed bar the same click is harmless (the button opens the menu on mouse-UP, after that check). So a dropdown must be ESCAPED before the next one opens: File -> map_editor -> Edit, which the escape edge gives for cost 1. The planner found this by re-planning; pinning `from` means it no longer has to spend a failed click to learn it."
+    },
+    {
+      "app": "qud",
+      "from": "map_editor",
+      "to": "me_menu_transform",
+      "steps": [
+        {
+          "click_hover": [
+            203,
+            16
+          ],
+          "window": "CavesOfQud"
+        }
+      ],
+      "verify": {
+        "node": "me_menu_transform"
+      },
+      "timeout": 12,
+      "note": "Converted 2026-08-07. `from` is the EDITOR ONLY, not `within map_editor`, and that is a MEASURED constraint rather than a stylistic one. MenuBarButton.onMouseEnter looks like it makes menu->menu one hop (it cancels the open dropdown and opens its own), so the first cut used `within` — and driving File->Edit closed File and opened NOTHING. The click's mouse-DOWN lands on the menu BAR, which is outside the just-opened dropdown's rect, and Menu.Update cancels any top menu clicked outside itself. From a closed bar the same click is harmless (the button opens the menu on mouse-UP, after that check). So a dropdown must be ESCAPED before the next one opens: File -> map_editor -> Edit, which the escape edge gives for cost 1. The planner found this by re-planning; pinning `from` means it no longer has to spend a failed click to learn it."
+    },
+    {
+      "app": "qud",
+      "from": "map_editor",
+      "to": "me_menu_view",
+      "steps": [
+        {
+          "click_hover": [
+            293,
+            16
+          ],
+          "window": "CavesOfQud"
+        }
+      ],
+      "verify": {
+        "node": "me_menu_view"
+      },
+      "timeout": 12,
+      "note": "Converted 2026-08-07. `from` is the EDITOR ONLY, not `within map_editor`, and that is a MEASURED constraint rather than a stylistic one. MenuBarButton.onMouseEnter looks like it makes menu->menu one hop (it cancels the open dropdown and opens its own), so the first cut used `within` — and driving File->Edit closed File and opened NOTHING. The click's mouse-DOWN lands on the menu BAR, which is outside the just-opened dropdown's rect, and Menu.Update cancels any top menu clicked outside itself. From a closed bar the same click is harmless (the button opens the menu on mouse-UP, after that check). So a dropdown must be ESCAPED before the next one opens: File -> map_editor -> Edit, which the escape edge gives for cost 1. The planner found this by re-planning; pinning `from` means it no longer has to spend a failed click to learn it."
+    },
+    {
+      "app": "qud",
+      "from": "map_editor",
+      "to": "me_menu_recent",
+      "steps": [
+        {
+          "click_hover": [
+            369,
+            16
+          ],
+          "window": "CavesOfQud"
+        }
+      ],
+      "verify": {
+        "node": "me_menu_recent"
+      },
+      "timeout": 12,
+      "note": "Converted 2026-08-07. `from` is the EDITOR ONLY, not `within map_editor`, and that is a MEASURED constraint rather than a stylistic one. MenuBarButton.onMouseEnter looks like it makes menu->menu one hop (it cancels the open dropdown and opens its own), so the first cut used `within` — and driving File->Edit closed File and opened NOTHING. The click's mouse-DOWN lands on the menu BAR, which is outside the just-opened dropdown's rect, and Menu.Update cancels any top menu clicked outside itself. From a closed bar the same click is harmless (the button opens the menu on mouse-UP, after that check). So a dropdown must be ESCAPED before the next one opens: File -> map_editor -> Edit, which the escape edge gives for cost 1. The planner found this by re-planning; pinning `from` means it no longer has to spend a failed click to learn it."
+    },
+    {
+      "app": "qud",
+      "from": "modding_toolkit",
+      "to": "mod_manager",
+      "steps": [
+        {
+          "click_hover": [
+            862,
+            437
+          ],
+          "window": "CavesOfQud"
+        }
+      ],
+      "verify": {
+        "node": "mod_manager"
+      },
+      "timeout": 15,
+      "note": "Converted 2026-08-07 after re-measuring. The coordinates were never the problem — they were within 2px — and the clicks always worked; the earlier conversion attempt was driven from a Qud stuck on a stale 'Stage' scene, which invalidated the whole run. map_editor's DETECTOR was the real defect: it named the UI sampler's window ('MapEditorWindow') while the mod reports the legacy view ('MapEditor'), which is the more specific of the two and therefore wins."
+    },
+    {
+      "app": "qud",
+      "from": "modding_toolkit",
+      "to": "histographicnomicon",
+      "steps": [
+        {
+          "click_hover": [
+            862,
+            619
+          ],
+          "window": "CavesOfQud"
+        }
+      ],
+      "verify": {
+        "node": "histographicnomicon"
+      },
+      "timeout": 15,
+      "note": "Converted 2026-08-07 after re-measuring. The coordinates were never the problem — they were within 2px — and the clicks always worked; the earlier conversion attempt was driven from a Qud stuck on a stale 'Stage' scene, which invalidated the whole run. map_editor's DETECTOR was the real defect: it named the UI sampler's window ('MapEditorWindow') while the mod reports the legacy view ('MapEditor'), which is the more specific of the two and therefore wins."
+    },
+    {
+      "app": "qud",
+      "from": "modding_toolkit",
+      "to": "wfc_generator",
+      "steps": [
+        {
+          "click_hover": [
+            862,
+            646
+          ],
+          "window": "CavesOfQud"
+        }
+      ],
+      "verify": {
+        "node": "wfc_generator"
+      },
+      "timeout": 15,
+      "note": "Converted 2026-08-07 after re-measuring. The coordinates were never the problem — they were within 2px — and the clicks always worked; the earlier conversion attempt was driven from a Qud stuck on a stale 'Stage' scene, which invalidated the whole run. map_editor's DETECTOR was the real defect: it named the UI sampler's window ('MapEditorWindow') while the mod reports the legacy view ('MapEditor'), which is the more specific of the two and therefore wins."
+    },
+    {
+      "app": "qud",
+      "from": "modding_toolkit",
+      "to": "workshop_uploader",
+      "steps": [
+        {
+          "click_hover": [
+            862,
+            463
+          ],
+          "window": "CavesOfQud"
+        }
+      ],
+      "verify": {
+        "node": "workshop_uploader"
+      },
+      "timeout": 15,
+      "note": "Converted 2026-08-07 after re-measuring. The coordinates were never the problem — they were within 2px — and the clicks always worked; the earlier conversion attempt was driven from a Qud stuck on a stale 'Stage' scene, which invalidated the whole run. map_editor's DETECTOR was the real defect: it named the UI sampler's window ('MapEditorWindow') while the mod reports the legacy view ('MapEditor'), which is the more specific of the two and therefore wins."
+    }
+  ],
+  "tests": [
+    {
+      "id": "plan",
+      "tier": "spot",
+      "cwd": "highvisor",
+      "cmd": "python3 tools/selftest_plan.py",
+      "note": "The transition graph: every endpoint is a real node, and every target is reachable from every state we might be found in. Under the recipe model that question could only be answered by driving both apps and watching."
+    },
+    {
+      "id": "evaluate",
+      "tier": "spot",
+      "cwd": "highvisor",
+      "cmd": "python3 tools/selftest_evaluate.py",
+      "note": "Which node wins a detection tie. `title` and `in_game` are both depth 1 and a busy Qud can miss the game_live probe, so this pins first-party scene over inference."
+    },
+    {
+      "id": "state_read",
+      "tier": "spot",
+      "cwd": "highvisor",
+      "cmd": "python3 tools/selftest_state_read.py",
+      "note": "pid-keyed state reads — the fix for three live Raves all writing one report file."
+    },
+    {
+      "id": "state_graph_render",
+      "tier": "spot",
+      "cwd": "raves-of-qud",
+      "cmd": "/Users/homefolder/Downloads/Godot.app/Contents/MacOS/Godot --headless --path godot/ --script res://tests/state_graph_render.gd",
+      "note": "This panel's own text builders, against a fixture AND the real gametree.json. Found the GDScript `or`-is-boolean bug on its first run."
+    },
+    {
+      "id": "cli",
+      "tier": "spot",
+      "cwd": "highvisor",
+      "cmd": "python3 tools/selftest_cli.py",
+      "note": "Every hv subcommand resolves to a callable handler. A merge dropped one while leaving it registered; ast.parse and import both passed and `hv state` then died with NameError on the next call."
+    }
+  ]
 }
