@@ -178,6 +178,17 @@ popup (exit 0) or dumps the actual state (exit 1). Conditions: `--node`, `--scen
 action instead of screenshot-guess loops:
 `hv goto qud in_game && hv assert --app qud --node in_game && <the actual test>`.
 
+**`--node` tolerates landing DEEPER, and that tolerance is DIRECTIONAL.** Detection reports
+the deepest match, so an edge aiming at a container legitimately lands on a child
+(`title -> new_game` arrives on `game_mode`) — demanding the exact node would fail a drive
+that worked. Going the other way the same tolerance is poison: `assert node=map_editor` is
+satisfied by `me_menu_file`, the very state an escape edge exists to LEAVE, so that edge's
+verify could not fail and `hv goto` reported success having moved nothing. Two ways to say
+"and it actually moved": **`exact`** (the node, not a descendant) and **`not_within: X`**
+(fail if we are at X or inside it). `_drive_route` attaches `not_within` by itself to any
+edge whose target CONTAINS its origin, so climbing edges are honest without being authored
+that way. Guarded by `tools/selftest_evaluate.py`.
+
 ## Gotchas
 
 - `hv move` verifies by READBACK (CG window frame) — raw AX error codes lie for Godot's

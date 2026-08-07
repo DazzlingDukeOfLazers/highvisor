@@ -135,8 +135,64 @@ def main():
         os.remove(backup)
         gametree.load_tree(force=True)
 
+    assert_tolerance()
+
     print("\n%s (%d checks failed)" % ("all good" if not FAILED else "FAILED", len(FAILED)))
     return 1 if FAILED else 0
+
+
+def assert_tolerance():
+    """`assert node=X` tolerates landing DEEPER than X, and must not tolerate not moving.
+
+    THE BUG (measured live 2026-08-07). A `me_menu_file -> map_editor` edge — steps
+    `[{key: escape}]`, verify `{node: map_editor}` — passed while the File dropdown was
+    still open and the state file still read `tab='File'`, because map_editor is on
+    me_menu_file's path. The route continued, the next click landed on the menu bar with a
+    dropdown down (which cancels it and opens nothing), and `hv goto` returned ok=True
+    having arrived nowhere.
+
+    The tolerance itself is RIGHT and must survive: detection reports the deepest match, so
+    an edge aiming at a container legitimately lands on a child (raves title->new_game
+    arrives on game_mode). What was missing is that the tolerance is DIRECTIONAL — it may
+    not swallow "I never left". _drive_route supplies `not_within` for any climbing edge;
+    `exact` is the manual form.
+    """
+    from highvisor.engine import Engine
+    holds = Engine._assert_holds        # pure over (want, state); no backend, no daemon
+
+    IN_MENU = {"node": "me_menu_file", "path": ["title", "modding_toolkit", "map_editor",
+                                                "me_menu_file"]}
+    IN_EDITOR = {"node": "map_editor", "path": ["title", "modding_toolkit", "map_editor"]}
+    IN_CHARGEN = {"node": "game_mode", "path": ["title", "new_game", "game_mode"]}
+
+    print("\nassert tolerance (directional)")
+    check("landing DEEPER than the asked-for node still passes",
+          holds(None, {"node": "new_game"}, IN_CHARGEN))
+    check("the exact node passes",
+          holds(None, {"node": "map_editor"}, IN_EDITOR))
+
+    check("an ancestor alone still passes without a direction",
+          holds(None, {"node": "map_editor"}, IN_MENU))
+    check("`exact` REJECTS the still-open dropdown",
+          not holds(None, {"node": "map_editor", "exact": True}, IN_MENU))
+    check("`exact` accepts the editor itself",
+          holds(None, {"node": "map_editor", "exact": True}, IN_EDITOR))
+
+    # what _drive_route now attaches to a climbing edge
+    climb = {"node": "map_editor", "not_within": "me_menu_file"}
+    check("a CLIMBING edge's verify fails while we are still where we started",
+          not holds(None, climb, IN_MENU))
+    check("the same verify passes once the dropdown is gone",
+          holds(None, climb, IN_EDITOR))
+    check("not_within rejects DESCENDANTS of the named node too",
+          not holds(None, {"node": "title", "not_within": "map_editor"}, IN_MENU))
+    check("not_within leaves an unrelated branch alone",
+          holds(None, {"node": "new_game", "not_within": "map_editor"}, IN_CHARGEN))
+
+    # `exact` must not be mistaken for a condition — asserting it ALONE is not an assertion
+    eng = Engine.__new__(Engine)
+    r = Engine._assert_state(eng, None, {"app": "qud", "exact": True})
+    check("`exact` alone is not a condition", r.get("ok") is False, str(r))
 
 
 if __name__ == "__main__":
