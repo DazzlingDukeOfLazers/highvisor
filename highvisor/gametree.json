@@ -264,7 +264,7 @@
                     }
                   ]
                 },
-                "note": "QUD DETECTION GAP, same shape as control_mapping's: ModernHighScores does not update _ActiveGameView, so the mod's first-party scene report stays 'MainMenu' while the screen is plainly up — navigation works and DETECTION is what fails. Measured 2026-08-07: OCR read 'ENDED RUNS' off the screen while `hv state` said Title Screen. The scene signature is kept first (it did report correctly before the mod merge, and first-party beats OCR when available); the OCR fallback is what makes the node detectable either way. `game_live: false` on the fallback so an in-game screen mentioning those words cannot match."
+                "note": "The OCR signature below is a SAFETY NET, not the primary path — Qud reports ModernHighScores first-party again as of raves fa9fc3f. It was added on 2026-08-07 when a merged UI sampler was overwriting that correct report with \"MainMenu\", which made this node undetectable and stranded Qud here. Kept because it costs nothing (scene is tried first) and it is the one screen where we have now been burned; drop it if the OCR poll ever becomes a cost."
               },
               {
                 "id": "options",
@@ -1830,9 +1830,9 @@
         }
       ],
       "verify": {
-        "ocr_contains": "ended runs"
+        "scene": "ModernHighScores"
       },
-      "timeout": 20
+      "timeout": 15
     },
     {
       "app": "qud",
