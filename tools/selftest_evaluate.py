@@ -112,6 +112,29 @@ def main():
     check("REAL tree: raves status tab resolves to its leaf", r["node"] == "status_journal",
           "%s via %s" % (r["node"], r["via"]))
 
+    # A TORN READ must not take the daemon down. The tree hot-reloads on mtime, so any
+    # non-atomic writer (an editor, a script that dumps then appends) leaves a window where the
+    # file is half a document — and every op goes through the tree, so a raise there answered
+    # JSONDecodeError to everything until someone touched the file again.
+    import os, shutil, tempfile, time
+    good = gametree.load_tree(force=True)
+    n = len(good.get("transitions") or [])
+    path = gametree._PATH
+    backup = tempfile.mktemp(suffix=".json")
+    shutil.copy(path, backup)
+    try:
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write('{"root": {"id": "root"')      # a half-written save
+        os.utime(path, None)
+        time.sleep(0.01)
+        served = gametree.load_tree()
+        check("a torn read keeps serving the last good tree",
+              len(served.get("transitions") or []) == n)
+    finally:
+        shutil.copy(backup, path)
+        os.remove(backup)
+        gametree.load_tree(force=True)
+
     print("\n%s (%d checks failed)" % ("all good" if not FAILED else "FAILED", len(FAILED)))
     return 1 if FAILED else 0
 

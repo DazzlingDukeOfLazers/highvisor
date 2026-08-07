@@ -45,16 +45,33 @@ _cache_mtime = None
 
 
 def load_tree(force=False):
-    """Load (and cache) the tree JSON, reloading automatically when the file changes."""
+    """Load (and cache) the tree JSON, reloading automatically when the file changes.
+
+    A TORN READ KEEPS THE LAST GOOD TREE. The reload is mtime-driven, so whoever writes this
+    file races us: an editor saving non-atomically, or a script that dumps JSON and then
+    appends a trailing newline, leaves a window in which the file on disk is half a document.
+    Reading it there used to raise straight out of `load_tree` — and because every op goes
+    through the tree, the whole daemon answered JSONDecodeError until something touched the
+    file again. Observed live: "gamestate fail JSONDecodeError: Expecting value: line 1431".
+
+    Refusing to update is the right failure. The previous tree is stale by at most one save and
+    is certainly parseable; a half-written one is worth nothing. The mtime is deliberately NOT
+    recorded on a failed parse, so the next call retries rather than caching the failure.
+    """
     global _cache, _cache_mtime
     try:
         mtime = os.path.getmtime(_PATH)
     except OSError:
         mtime = None
     if force or _cache is None or mtime != _cache_mtime:
-        with open(_PATH, "r", encoding="utf-8") as fh:
-            _cache = json.load(fh)
-        _cache_mtime = mtime
+        try:
+            with open(_PATH, "r", encoding="utf-8") as fh:
+                loaded = json.load(fh)
+        except (ValueError, OSError):
+            if _cache is None:
+                raise            # nothing to fall back to: a broken tree at startup is fatal
+            return _cache        # keep serving the last good one; retry on the next call
+        _cache, _cache_mtime = loaded, mtime
     return _cache
 
 
