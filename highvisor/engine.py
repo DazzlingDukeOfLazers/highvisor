@@ -156,7 +156,13 @@ class Engine:
         b = self.backend
 
         if op == P.OP_PING:
-            return {"ok": True, "backend": b.name, "version": __version__}
+            resp = {"ok": True, "backend": b.name, "version": __version__}
+            try:                       # windows: DPI awareness the daemon runs under
+                from .backends import windows as _w
+                resp["dpi_status"] = _w.DPI_STATUS
+            except Exception:
+                pass
+            return resp
 
         if op == P.OP_LIST:
             return {"ok": True, "targets": [t.to_dict() for t in b.list_targets()]}
@@ -652,8 +658,15 @@ class Engine:
         Row order = mtime desc, matching the picker (verified against it)."""
         import json as _json
         import os as _os
-        root = _os.path.expanduser(
-            "~/Library/Application Support/com.FreeholdGames.CavesOfQud/Synced/Saves")
+        # Qud's data dir differs per OS (Unity persistentDataPath): the Mac uses
+        # the bundle-id Library path, Windows uses AppData/LocalLow/<company>.
+        if _os.name == "nt":
+            qroot = _os.path.join(_os.path.expanduser("~"), "AppData", "LocalLow",
+                                  "Freehold Games", "CavesOfQud")
+        else:
+            qroot = _os.path.expanduser(
+                "~/Library/Application Support/com.FreeholdGames.CavesOfQud")
+        root = _os.path.join(qroot, "Synced", "Saves")
         out = []
         try:
             for guid in _os.listdir(root):
@@ -688,7 +701,13 @@ class Engine:
         proc, launcher, win = prof.get("proc"), prof.get("launcher"), prof.get("window", "")
         if not proc or not launcher:
             return {"ok": False, "error": "no proc/launcher profile for app %r" % app}
-        _sp.run(["pkill", "-9", "-f", proc], capture_output=True)
+        import os as _os
+        if _os.name == "nt":
+            # taskkill matches the IMAGE NAME, not a command-line pattern —
+            # profiles carry the pkill -f stem, so append .exe (CoQ -> CoQ.exe).
+            _sp.run(["taskkill", "/F", "/IM", proc + ".exe"], capture_output=True)
+        else:
+            _sp.run(["pkill", "-9", "-f", proc], capture_output=True)
         deadline = _t.time() + 10
         while _t.time() < deadline:
             if not any(win in (t.to_dict().get("title") or "") for t in b.list_targets()):

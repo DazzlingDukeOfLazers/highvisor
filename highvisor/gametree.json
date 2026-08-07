@@ -417,6 +417,16 @@
             "detect": {}
           },
           {
+            "id": "world_map",
+            "label": "World Map (parasang overview)",
+            "note": "zone.z < 0 on the wire; renders inside the gameplay frame but is a distinct screen: worldTerrain tiles, landmarks, standing cards, 'you are here' player card. Unverified — see raves docs/pc-zone-plan.md  MERGE NOTE (2026-08-07): scoreboard-only — detect{} and no inbound transition, so the planner cannot drive here and the panel/cockpit draw it dim with no click target. That is correct for now; give it a `detect` and a transition when it becomes drivable.",
+            "done": {
+              "qud": 1.0,
+              "raves": 0.4
+            },
+            "detect": {}
+          },
+          {
             "id": "top_bar",
             "label": "Top Status Bar",
             "done": {
