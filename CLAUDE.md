@@ -16,7 +16,8 @@ fix compounds. Concretely:
 | `open <app>.app` / steam URL | `hv launch raves` (pair), `hv launch raves_solo` / `qud_solo`, or the cockpit ▶ buttons |
 | AppleScript / manual window moves | `hv move` (readback-verified), cockpit slot buttons |
 | screenshot-then-guess "what screen is it on?" | `hv state` (first-party scene reports), `hv probe` |
-| click-drive to a known screen by hand | `hv goto <app> <node>` (gametree recipes) |
+| click-drive to a known screen by hand | `hv goto <app> <node>` (planned route over the transition graph) |
+| guessing what a goto will do | `hv plan <app> <node> [--from <state>]` — the route, driving nothing |
 | sleep-and-hope waiting for a state | `hv assert --app qud --node in_game --timeout 20` |
 | pkill/osascript restart seances | `hv restart qud` / `hv restart raves` (kills ALL instances incl. duplicates, relaunches, waits for the app to REPORT) |
 | blind top-row Continue clicks | `hv loadsave <name>` (row computed from DISK metadata — `hv saves` lists them, no game launch) |
@@ -47,8 +48,9 @@ for unattended runs: `touch ~/.config/highvisor/guard_off`.
 |---|---|
 | `highvisor/engine.py` | op dispatch + gamestate/gamego/assert logic |
 | `highvisor/backends/darwin.py` | macOS backend (AX move/click/key, ScreenCaptureKit shots, OCR) |
-| `highvisor/gametree.json` | THE canonical game state tree: per-node `detect` (how we know we're there), `goto` (how to get there), `done` (1:1 score). Hot-reloads. |
+| `highvisor/gametree.json` | THE canonical game state tree: per-node `detect` (how we know we're there) and `done` (1:1 score), plus the `transitions` graph, `costs` and `preflight`. Hot-reloads. |
 | `highvisor/gametree.py` | tree loader + state evaluator (deepest match wins; detect OR-lists) |
+| `highvisor/plan.py` | the route planner over `transitions` — pure data + search, no backend |
 | `highvisor/cli.py` | the `hv` CLI (`~/bin/hv` wrapper runs it from any cwd) |
 | `highvisor/webui/` | the cockpit (vanilla JS; served from disk, reload to pick up) |
 | `~/.config/highvisor/launch.json` | machine-local launchers (`qud`, `qud_solo`, `raves`, `raves_solo`) |
@@ -75,14 +77,40 @@ drive while duplicates exist; `hv restart <app>` is the cure. Guarded by
 `python3 tools/selftest_state_read.py` (stdlib only, no daemon, no apps — run it with any change
 to the reader).
 
-## gametree `goto` recipes (hv goto / cockpit click-to-state)
+## gametree TRANSITIONS — routes are planned, not scripted (2026-08-06)
 
-A node's `goto[app]` is a step list: `{"goto": node}` (chain), `{"launch": name,
-"unless_running": true}`, `{"wait_window": label}`, `{"activate": label}`,
-`{"click_hover": [x,y], "window": label}` (Unity menus need hover), `{"key": keys}`,
-`{"sleep": s}`, `{"assert": {...}, "timeout": s}`. First failure stops the run; progress
-streams to the cockpit log. Idempotent — already-there returns immediately. Coordinates are
-window points at the standard 1920×1080 slots; re-measure if the layout changes.
+Nodes no longer store how to reach them. `gametree.json` carries a `transitions` list —
+`{app, from, to, steps, cost?, verify?, timeout?}` — and `hv goto` SEARCHES a route from the
+state the app is actually detected in (`plan.py`; A* with a zero heuristic, i.e. Dijkstra —
+the obvious tree-distance heuristic is inadmissible, see the module docstring).
+
+- `from` = a node id · a list · `{"within": node}` (that node **or any descendant**) · `"*"`.
+  Two non-node states exist so "get me out of here" always has a start: **`off`** (no window)
+  and **`unknown`** (window up, nothing matched).
+- `verify` (default `{"node": to}`) runs after every edge. Non-negotiable: an edge that does
+  not check its own arrival lets the route continue from a state it only assumes.
+- `costs` prices a step by how much we want to AVOID it — bridge ~free, `click_text` dear
+  (OCR is the flaky class, and a miss clicks the WRONG thing rather than failing), launch
+  slow, **restart 120**. A `"*" → title` restart edge guarantees there is always a route; the
+  planner PICKING it is the signal that a real exit edge is missing.
+- **`preflight`** clears ghost modals before planning. A pooled `PopupMessage` is a condition
+  on top of a state, not a state — as a node it doubles the graph, as an edge it needs a
+  self-loop. One declaration replaced sixteen copy-pasted dismiss steps.
+- On a failed edge the engine re-reads and **re-plans if the app moved** (twice, then gives
+  up — if it did not move, the same route comes back and loops).
+
+Steps (one vocabulary, shared with the legacy recipes): `{"launch": name}`, `{"restart":
+app}`, `{"wait_window": label}`, `{"activate": label}`, `{"click_hover": [x,y], "window":
+label}` (Unity menus need hover), `{"click_text": label, "window": label}`, `{"key": keys}`,
+`{"command": name, "answers": [btn]}`, `{"bridge": name, "args": {...}}`, `{"dock": label}`,
+`{"dismiss": {...}}`, `{"sleep": s}`, `{"assert": {...}}`. Coordinates are window points at
+the standard 1920×1080 slots; re-measure if the layout changes.
+
+- `hv plan <app> <node> [--from <state>]` — the route `hv goto` would take, driving NOTHING.
+- `python3 tools/selftest_plan.py` — stdlib only, no daemon, no apps. Proves every target is
+  reachable from every state we might be found in. Run it with any transition edit.
+- Legacy `goto[app]` recipes still run for nodes the graph cannot reach, and the result says
+  which driver was used. Full write-up: `docs/05-driving-input.md`.
 
 ## hv assert — the TDD primitive
 

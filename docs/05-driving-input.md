@@ -242,3 +242,91 @@ screen was usually already open and no recipe asserted afterwards. The goto trac
 one line: `error: no window None`.
 
 Verified from a clean in-game state: closed -> open on the Equipment tab, 7 steps, no failures.
+
+## The graph refactor: routes are DERIVED now (2026-08-06)
+
+Every section above this one is written in the language of *recipes* — a node's `goto[app]` step
+list, driven from a known base. That model is gone. A node no longer stores how to reach it;
+the tree stores **transitions**, and the route is searched at call time.
+
+A transition says: *from* these states, doing these steps, you arrive at *this* state, at *this*
+cost.
+
+```json
+{"app": "qud", "from": {"within": "status_screens"}, "to": "in_game",
+ "steps": [{"bridge": "uiback"}], "verify": {"node": "in_game"}, "timeout": 12}
+```
+
+`from` is a node id, a list of them, `{"within": <node>}` (that node or any descendant), or `"*"`
+(anywhere). `to` is where you end up. `verify` defaults to `{"node": to}` and is not optional in
+spirit: an edge that does not check its own arrival lets a route continue from a state it merely
+assumes, and the failure then surfaces several steps later somewhere unrelated.
+
+### What this fixed that the recipes could not
+
+**Routes from anywhere.** Every recipe opened with `{"goto": "title"}` or `{"goto": "in_game"}`,
+so a start the author had not anticipated was not re-routed — it drove the base's recipe from the
+wrong screen and failed a step that was never wrong. That is the whole "goto needs retries"
+folklore. The planner starts from the state the app is *detected* in. `off` and `unknown` are
+real planner states for exactly this reason: "the window is up and nothing matched" now has a way
+out instead of being a dead end.
+
+**Shared prefixes.** All eight Qud status tabs repeated two ghost-modal dismisses plus a chain
+step; all eight Raves tabs repeated an eight-scene dismiss. Fixing one meant fixing eight, and
+they drifted. Both are now one edge each — `{"within": "status_screens"} → in_game` — inserted by
+the planner when, and only when, the route needs it. **Raves tab-to-tab used to alternate
+pass/fail** (the chain step routed through `title`, which from a status screen dismissed it,
+landed in the game, and failed its own assert); it is now two edges, Escape then the tab key.
+
+**Cost is a number.** `costs` in gametree.json prices a step by how much we want to AVOID it, not
+by how long it takes: bridge commands are near-free and never miss, `click_text` is dear because
+OCR is the one class that goes flaky *and a miss does not fail cleanly — it clicks the wrong
+thing*, launch is slow, restart is 120 and therefore last. The planner minimises that sum, so it
+prefers first-party moves without anyone remembering to.
+
+**Impossible targets fail before anything is touched.** `plan.route` returns a reason that names
+which way the graph is broken — nothing ENTERS the goal, nothing LEAVES the start, or the two are
+in different components — instead of discovering it halfway through a driven run.
+
+**Re-planning.** When an edge fails, the engine re-reads the state; if the app MOVED somewhere
+unexpected it plans again from there (twice, then it gives up — if it did not move, re-planning
+would return the same route and loop). A fixed sequence had no way to express this.
+
+**The tombstone became reachable.** `summary` (death → GameSummaryScreen) had no recipe at all;
+its note said "injected Esc is IGNORED here — a restart is the reliable exit", which was true and
+unusable. With a universal `"from": "*"` restart edge at cost 120, `summary → in_game` is a
+route. That edge is also the guarantee that **there is always a route**, and the fact that the
+planner *picks* it is the signal that a real exit edge is missing.
+
+### Why A* with a zero heuristic
+
+`plan.route` is A*; its default heuristic is zero, which makes it exactly Dijkstra. That is
+considered, not a stub. The obvious heuristic — hops in the containment tree — is **inadmissible**
+here: `status_skills → status_journal` is two tree hops but ONE transition (a `statustab` bridge
+call), so it overestimates, and A* would return a costlier route while looking like it worked.
+At ~66 states and ~49 edges the search is microseconds either way, so optimality is worth more
+than pruning.
+
+### Ghost modals are a guard, not an edge
+
+A pooled `PopupMessage` that reports live with nothing on screen is not a place you can BE — it
+is a condition that can be true anywhere, and it eats every key while it is. As a node it would
+double the graph; as an edge it would need a self-loop, which shortest-path search cannot use. So
+it is `preflight`: check, clear, re-read, *then* plan. One declaration replaced sixteen
+copy-pasted dismiss steps.
+
+### Surfaces
+
+- `hv plan <app> <node> [--from <state>]` — the route `hv goto` would take, **without driving
+  anything**. `--from` takes a node id, `off` or `unknown`, so a route can be checked for a
+  screen we are not on, with nothing running.
+- `hv goto` prints the route it chose before the step detail.
+- `python3 tools/selftest_plan.py` — stdlib only, no daemon, no apps. Checks the planner against
+  a synthetic tree, then checks the REAL graph: every endpoint is a real node, and **every target
+  is reachable from every state we might be found in**. Under the recipe model that question was
+  answerable only by driving both apps and watching, which is how a broken route survived until a
+  capture run tripped over it.
+
+Legacy `goto[app]` recipes still run for any node the graph cannot reach, and the result says
+which driver was used — a node driven by a recipe is a node whose transitions nobody has written
+yet, and that should be visible rather than silent.

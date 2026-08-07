@@ -206,10 +206,35 @@ def _cmd_assert(a):
 
 
 def _cmd_goto(a):
-    """Drive an app to a state-tree node via its goto recipe."""
+    """Drive an app to a state-tree node along a planned route."""
     res = _call({"op": P.OP_GAMEGO, "app": a.app, "node": a.node})
+    if res.get("route"):
+        print("route: %s" % res["route"])
     _print_json(res)
     raise SystemExit(0 if res.get("ok") else 1)
+
+
+def _cmd_plan(a):
+    """Show the route `hv goto` WOULD take — nothing is driven.
+
+    Use it before a long run, and to check a route for a screen you are not on:
+    `hv plan raves status_skills --from off` answers "what happens if I ask for this
+    with nothing running", without launching anything.
+    """
+    req = {"op": P.OP_PLAN, "app": a.app, "node": a.node}
+    if a.frm:
+        req["from"] = a.frm
+    res = _call(req)
+    if not res.get("ok"):
+        print("no route: %s" % res.get("error"))
+        raise SystemExit(1)
+    print("%s" % res.get("summary"))
+    for i, e in enumerate(res.get("steps") or [], 1):
+        print("  %d. -> %-22s cost %-4s %s" % (
+            i, e.get("to"), e.get("cost"),
+            " ".join(sorted(k for s in (e.get("steps") or []) for k in s
+                            if k not in ("window", "note", "args")))))
+    raise SystemExit(0)
 
 
 def _cmd_wish(a):
@@ -827,10 +852,18 @@ def build_parser():
     s.add_argument("--timeout", type=float, default=10.0)
     s.set_defaults(fn=_cmd_assert)
 
-    s = sub.add_parser("goto", help="drive an app to a state-tree node (its goto recipe), e.g. hv goto qud in_game")
+    s = sub.add_parser("goto", help="drive an app to a state-tree node along a planned route, e.g. hv goto qud in_game")
     s.add_argument("app", help="qud | raves")
     s.add_argument("node", help="tree node id, e.g. title | in_game")
     s.set_defaults(fn=_cmd_goto)
+
+    s = sub.add_parser("plan", help="show the route `hv goto` would take, WITHOUT driving anything")
+    s.add_argument("app", help="qud | raves")
+    s.add_argument("node", help="tree node id, e.g. title | in_game")
+    s.add_argument("--from", dest="frm", default=None,
+                   help="plan from this state instead of the detected one (a node id, "
+                        "'off' or 'unknown')")
+    s.set_defaults(fn=_cmd_plan)
 
     s = sub.add_parser("wish", help="run a Caves of Qud wish via the Raves bridge, e.g. hv wish godmode")
     s.add_argument("text", nargs="+", help="the wish text (godmode | item:<Blueprint> | xp:<n> | ...)")

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "Canonical game state-machine tree (one source, three views). done[app] = 0..1, how finished our 1:1 work is on that screen for that app (Qud = reference/how well we detect+drive it; Raves = render/impl fidelity). Edit freely; the cockpit reloads on file change. detect[app] recognises 'we are here' from live signals: game_live (Qud's 48710 bridge pushes a snapshot on connect ONLY when a game is actually running \u2014 the true menu-vs-in-game signal; the raw port is open even at the main menu, so it can't tell them apart), port (raw listener open = modded Qud alive), and ocr_any (case-insensitive substrings in an OCR of the window). A node matches when all its conditions hold; the DEEPEST match wins. Conditions needing OCR only match on an OCR-enabled poll, so cheap polls fall back to the coarsest ancestor.",
+  "note": "Canonical game state-machine tree (one source, three views). done[app] = 0..1, how finished our 1:1 work is on that screen for that app (Qud = reference/how well we detect+drive it; Raves = render/impl fidelity). Edit freely; the cockpit reloads on file change. detect[app] recognises 'we are here' from live signals: game_live (Qud's 48710 bridge pushes a snapshot on connect ONLY when a game is actually running — the true menu-vs-in-game signal; the raw port is open even at the main menu, so it can't tell them apart), port (raw listener open = modded Qud alive), and ocr_any (case-insensitive substrings in an OCR of the window). A node matches when all its conditions hold; the DEEPEST match wins. Conditions needing OCR only match on an OCR-enabled poll, so cheap polls fall back to the coarsest ancestor.",
   "apps": {
     "qud": {
       "label": "Qud",
@@ -23,7 +23,7 @@
       {
         "id": "freehold",
         "label": "Freehold Games splash",
-        "note": "transient boot splash \u2014 no reliable detector yet",
+        "note": "transient boot splash — no reliable detector yet",
         "done": {
           "qud": 1.0,
           "raves": 0.0
@@ -274,7 +274,7 @@
             "children": [
               {
                 "id": "new_game",
-                "label": "New Game \u2192 Character Creation",
+                "label": "New Game → Character Creation",
                 "done": {
                   "qud": 0.6,
                   "raves": 0.4
@@ -482,7 +482,7 @@
               },
               {
                 "id": "continue",
-                "label": "Continue \u2192 Load Game",
+                "label": "Continue → Load Game",
                 "done": {
                   "qud": 0.9,
                   "raves": 0.6
@@ -754,7 +754,7 @@
           },
           {
             "id": "secondary_links",
-            "label": "Secondary List (Redeem Code \u2026 Help)",
+            "label": "Secondary List (Redeem Code … Help)",
             "done": {
               "qud": 1.0,
               "raves": 1.0
@@ -1002,7 +1002,7 @@
           {
             "id": "status_screens",
             "label": "Status screens (8-tab in-game menu)",
-            "note": "Qud: ONE scene (StatusScreensScreen) for all tabs; per-tab detection needs the planned heartbeat statusTab export. Tab clicks REQUIRE hover-first (hv click --hover) \u2014 plain clicks only hover-select. Plan: raves docs/status-screens-plan.md Qud opener: hover-click the person icon (1729,70). Raves opener keys = Qud's Commands.xml defaults (k/x/e/i/n/j/q, ctrl+f).",
+            "note": "Qud: ONE scene (StatusScreensScreen) for all tabs; per-tab detection needs the planned heartbeat statusTab export. Tab clicks REQUIRE hover-first (hv click --hover) — plain clicks only hover-select. Plan: raves docs/status-screens-plan.md Qud opener: hover-click the person icon (1729,70). Raves opener keys = Qud's Commands.xml defaults (k/x/e/i/n/j/q, ctrl+f).",
             "done": {
               "qud": 0.5,
               "raves": 0.0
@@ -1303,12 +1303,12 @@
                     }
                   ]
                 },
-                "note": "Leaf scores come from raves-of-qud tools/capture/parity.py with reports/2026-08-04-status-screens/parity-equipment.json \u2014 region-scoped, masked diffs (image = sprite ink with the chrome masked out, frame = chrome with the interior masked, composite = both). Whole-frame means are too noisy to adjudicate these: the live playfield behind the scrim shifts the average by ~0.7 between identical builds.",
+                "note": "Leaf scores come from raves-of-qud tools/capture/parity.py with reports/2026-08-04-status-screens/parity-equipment.json — region-scoped, masked diffs (image = sprite ink with the chrome masked out, frame = chrome with the interior masked, composite = both). Whole-frame means are too noisy to adjudicate these: the live playfield behind the scrim shifts the average by ~0.7 between identical builds.",
                 "children": [
                   {
                     "id": "equipment_doll_image",
                     "label": "Doll: item images",
-                    "note": "parity leaf doll_image[*] \u2014 equipped sprite ink only.",
+                    "note": "parity leaf doll_image[*] — equipped sprite ink only.",
                     "done": {
                       "qud": 1.0,
                       "raves": 0.3
@@ -1318,7 +1318,7 @@
                   {
                     "id": "equipment_doll_frame",
                     "label": "Doll: slot frames",
-                    "note": "parity leaf doll_frame[*] \u2014 slot chrome only.",
+                    "note": "parity leaf doll_frame[*] — slot chrome only.",
                     "done": {
                       "qud": 1.0,
                       "raves": 0.7
@@ -1328,7 +1328,7 @@
                   {
                     "id": "equipment_doll_cell",
                     "label": "Doll: slot (image+frame)",
-                    "note": "parity leaf doll_cell[*] \u2014 what the eye sees.",
+                    "note": "parity leaf doll_cell[*] — what the eye sees.",
                     "done": {
                       "qud": 1.0,
                       "raves": 0.5
@@ -1338,7 +1338,7 @@
                   {
                     "id": "equipment_filter_image",
                     "label": "Filter: category icons",
-                    "note": "parity leaf filter_image[*] \u2014 icon ink only.",
+                    "note": "parity leaf filter_image[*] — icon ink only.",
                     "done": {
                       "qud": 1.0,
                       "raves": 0.3
@@ -1348,7 +1348,7 @@
                   {
                     "id": "equipment_filter_frame",
                     "label": "Filter: cell frames",
-                    "note": "parity leaf filter_frame[*] \u2014 corner-loop chrome, ported 2026-08-04.",
+                    "note": "parity leaf filter_frame[*] — corner-loop chrome, ported 2026-08-04.",
                     "done": {
                       "qud": 1.0,
                       "raves": 0.8
@@ -1368,7 +1368,7 @@
                   {
                     "id": "equipment_category_image",
                     "label": "Category cell: image",
-                    "note": "parity leaf filter_image[*] \u2014 Qud's categoryImageMap sprite, tan two-tone.",
+                    "note": "parity leaf filter_image[*] — Qud's categoryImageMap sprite, tan two-tone.",
                     "done": {
                       "qud": 1.0,
                       "raves": 0.5
@@ -1378,7 +1378,7 @@
                   {
                     "id": "equipment_category_frame",
                     "label": "Category cell: frame",
-                    "note": "parity leaf filter_frame[*] \u2014 corner-loop chrome (ported 2026-08-04).",
+                    "note": "parity leaf filter_frame[*] — corner-loop chrome (ported 2026-08-04).",
                     "done": {
                       "qud": 1.0,
                       "raves": 0.8
@@ -2086,7 +2086,7 @@
                 },
                 {
                   "sleep": 2.0,
-                  "note": "post-restart settle \u2014 the bridge client needs a beat before Esc lands as CmdSystemMenu"
+                  "note": "post-restart settle — the bridge client needs a beat before Esc lands as CmdSystemMenu"
                 },
                 {
                   "key": "escape",
@@ -2128,7 +2128,7 @@
       {
         "id": "summary",
         "label": "Game over / summary",
-        "note": "the tombstone + GameSummaryScreen after a death (Wander mode returns to the picker afterwards). Injected Esc is IGNORED here \u2014 a restart is the reliable exit.",
+        "note": "the tombstone + GameSummaryScreen after a death (Wander mode returns to the picker afterwards). Injected Esc is IGNORED here — a restart is the reliable exit.",
         "done": {
           "qud": 1.0,
           "raves": 0.0
@@ -2145,5 +2145,1030 @@
         }
       }
     ]
-  }
+  },
+  "costs": {
+    "_note": "What a step costs us -- not seconds, but how much we want to AVOID it. Overlays plan.DEFAULT_COSTS. Bridge commands are near-free and never miss; click_text is dear because OCR is the one class that goes flaky, and a missed match does not fail cleanly, it clicks the wrong thing; launch is slow; restart always works and is therefore the last thing the planner should reach for."
+  },
+  "preflight": [
+    {
+      "app": "qud",
+      "when": {
+        "scene": [
+          "PopupMessage",
+          "DynamicPopupMessage"
+        ]
+      },
+      "steps": [
+        {
+          "bridge": "uiback"
+        }
+      ],
+      "note": "GHOST MODAL self-heal. UIManager.popupMessages is a free pool and a RELEASED copy still looks live, so the mod can report scene=PopupMessage with nothing on screen -- and Qud swallows every key while it thinks a modal is up. That is what made the equipment key look broken for a whole session. It is a CONDITION sitting on top of a state, not a state: modelling it as a node would double the graph and as an edge it would need a self-loop, which a shortest-path search cannot use. So it runs before planning, and the plan is made against what is actually there. This one declaration replaced sixteen copy-pasted dismiss steps across the status-tab recipes."
+    }
+  ],
+  "transitions": [
+    {
+      "app": "qud",
+      "from": "off",
+      "to": "title",
+      "steps": [
+        {
+          "launch": "qud_solo"
+        },
+        {
+          "wait_window": "CavesOfQud",
+          "timeout": 60
+        }
+      ],
+      "verify": {
+        "scene": "MainMenu"
+      },
+      "timeout": 25,
+      "note": "COLD START. No `unless_running` guard any more: the planner only picks this edge from `off`, which is exactly what that flag was hand-checking on every run."
+    },
+    {
+      "app": "qud",
+      "from": "*",
+      "to": "title",
+      "steps": [
+        {
+          "restart": "qud"
+        }
+      ],
+      "verify": {
+        "scene": "MainMenu"
+      },
+      "timeout": 120,
+      "cost": 120,
+      "note": "THE UNIVERSAL ESCAPE HATCH, and the reason there is always a route. Every state that has no modelled exit -- the tombstone (injected Esc is ignored there), an unmodelled modern screen, or `unknown` after a cheap poll -- can still reach the title by restarting. Cost 120 keeps it last: the planner takes any chain of first-party moves over it, and picking it AT ALL is the signal that a real exit edge is missing."
+    },
+    {
+      "app": "qud",
+      "from": "in_game",
+      "to": "title",
+      "steps": [
+        {
+          "command": "CmdQuit",
+          "answers": [
+            "Yes",
+            "No"
+          ]
+        }
+      ],
+      "verify": {
+        "scene": "MainMenu"
+      },
+      "timeout": 25,
+      "note": "LEAVE A LIVE GAME, first-party throughout: CmdQuit goes through Qud's own command path and the confirms are answered BY BUTTON via the mod, so nothing here depends on synthesized keys -- which Qud's modern UI ignores outright. Yes to 'are you sure you want to quit', then NO to 'do you want to save first': Yes would overwrite the fixture save with whatever state the harness drove the character into, destroying the reference every parity capture is measured against."
+    },
+    {
+      "app": "qud",
+      "from": {
+        "within": "status_screens"
+      },
+      "to": "in_game",
+      "steps": [
+        {
+          "bridge": "uiback"
+        }
+      ],
+      "verify": {
+        "node": "in_game"
+      },
+      "timeout": 12,
+      "note": "uiback routes StatusScreensScreen to its unguarded Exit(). Written ONCE against the whole subtree; in the recipe model this was a copy-pasted dismiss step at the head of every recipe that might follow a status screen, and the copies drifted."
+    },
+    {
+      "app": "qud",
+      "from": "in_game",
+      "to": "status_screens",
+      "steps": [
+        {
+          "activate": "CavesOfQud"
+        },
+        {
+          "click_hover": [
+            1729,
+            70
+          ],
+          "window": "CavesOfQud"
+        },
+        {
+          "sleep": 1.2
+        }
+      ],
+      "verify": {
+        "scene": "StatusScreensScreen"
+      },
+      "timeout": 12,
+      "note": "the person icon in the top bar. Unity menus need the HOVER-first click."
+    },
+    {
+      "app": "qud",
+      "from": {
+        "within": "status_screens"
+      },
+      "to": "status_skills",
+      "steps": [
+        {
+          "bridge": "statustab",
+          "args": {
+            "tab": "SkillsAndPowers"
+          }
+        }
+      ],
+      "verify": {
+        "node": "status_skills"
+      },
+      "timeout": 8,
+      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab. From OUTSIDE the status screens the planner routes in_game -> status_screens -> here on its own."
+    },
+    {
+      "app": "qud",
+      "from": {
+        "within": "status_screens"
+      },
+      "to": "status_attributes",
+      "steps": [
+        {
+          "bridge": "statustab",
+          "args": {
+            "tab": "Character"
+          }
+        }
+      ],
+      "verify": {
+        "node": "status_attributes"
+      },
+      "timeout": 8,
+      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab. From OUTSIDE the status screens the planner routes in_game -> status_screens -> here on its own."
+    },
+    {
+      "app": "qud",
+      "from": {
+        "within": "status_screens"
+      },
+      "to": "status_equipment",
+      "steps": [
+        {
+          "bridge": "statustab",
+          "args": {
+            "tab": "InventoryAndEquipment"
+          }
+        }
+      ],
+      "verify": {
+        "node": "status_equipment"
+      },
+      "timeout": 8,
+      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab. From OUTSIDE the status screens the planner routes in_game -> status_screens -> here on its own."
+    },
+    {
+      "app": "qud",
+      "from": {
+        "within": "status_screens"
+      },
+      "to": "status_tinkering",
+      "steps": [
+        {
+          "bridge": "statustab",
+          "args": {
+            "tab": "Tinkering"
+          }
+        }
+      ],
+      "verify": {
+        "node": "status_tinkering"
+      },
+      "timeout": 8,
+      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab. From OUTSIDE the status screens the planner routes in_game -> status_screens -> here on its own."
+    },
+    {
+      "app": "qud",
+      "from": {
+        "within": "status_screens"
+      },
+      "to": "status_journal",
+      "steps": [
+        {
+          "bridge": "statustab",
+          "args": {
+            "tab": "Journal"
+          }
+        }
+      ],
+      "verify": {
+        "node": "status_journal"
+      },
+      "timeout": 8,
+      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab. From OUTSIDE the status screens the planner routes in_game -> status_screens -> here on its own."
+    },
+    {
+      "app": "qud",
+      "from": {
+        "within": "status_screens"
+      },
+      "to": "status_quests",
+      "steps": [
+        {
+          "bridge": "statustab",
+          "args": {
+            "tab": "Quests"
+          }
+        }
+      ],
+      "verify": {
+        "node": "status_quests"
+      },
+      "timeout": 8,
+      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab. From OUTSIDE the status screens the planner routes in_game -> status_screens -> here on its own."
+    },
+    {
+      "app": "qud",
+      "from": {
+        "within": "status_screens"
+      },
+      "to": "status_reputation",
+      "steps": [
+        {
+          "bridge": "statustab",
+          "args": {
+            "tab": "Factions"
+          }
+        }
+      ],
+      "verify": {
+        "node": "status_reputation"
+      },
+      "timeout": 8,
+      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab. From OUTSIDE the status screens the planner routes in_game -> status_screens -> here on its own."
+    },
+    {
+      "app": "qud",
+      "from": {
+        "within": "status_screens"
+      },
+      "to": "status_messagelog",
+      "steps": [
+        {
+          "bridge": "statustab",
+          "args": {
+            "tab": "MessageLog"
+          }
+        }
+      ],
+      "verify": {
+        "node": "status_messagelog"
+      },
+      "timeout": 8,
+      "note": "first-party tab switch (StatusScreensScreen.SetPage). Clicking the tab bar at a fixed coordinate missed often enough that a capture could land on the wrong tab. From OUTSIDE the status screens the planner routes in_game -> status_screens -> here on its own."
+    },
+    {
+      "app": "qud",
+      "from": "title",
+      "to": "in_game",
+      "steps": [
+        {
+          "activate": "CavesOfQud"
+        },
+        {
+          "click_text": "Continue",
+          "window": "CavesOfQud"
+        },
+        {
+          "sleep": 1.0
+        },
+        {
+          "click_hover": [
+            900,
+            190
+          ],
+          "window": "CavesOfQud",
+          "note": "top save row in the Load Game picker"
+        }
+      ],
+      "verify": {
+        "node": "in_game"
+      },
+      "timeout": 35
+    },
+    {
+      "app": "qud",
+      "from": "title",
+      "to": "continue",
+      "steps": [
+        {
+          "activate": "CavesOfQud"
+        },
+        {
+          "click_text": "Continue",
+          "window": "CavesOfQud"
+        },
+        {
+          "sleep": 1.0
+        }
+      ],
+      "verify": {
+        "scene": "ModernSaveManagement"
+      },
+      "timeout": 15
+    },
+    {
+      "app": "qud",
+      "from": "title",
+      "to": "records",
+      "steps": [
+        {
+          "activate": "CavesOfQud"
+        },
+        {
+          "click_text": "Records",
+          "window": "CavesOfQud"
+        },
+        {
+          "sleep": 1.0
+        }
+      ],
+      "verify": {
+        "scene": "ModernHighScores"
+      },
+      "timeout": 15
+    },
+    {
+      "app": "qud",
+      "from": "title",
+      "to": "options",
+      "steps": [
+        {
+          "activate": "CavesOfQud"
+        },
+        {
+          "click_text": "Options",
+          "window": "CavesOfQud"
+        },
+        {
+          "sleep": 1.0
+        }
+      ],
+      "verify": {
+        "scene": "ModernOptionsMenu"
+      },
+      "timeout": 15
+    },
+    {
+      "app": "qud",
+      "from": "title",
+      "to": "mods",
+      "steps": [
+        {
+          "activate": "CavesOfQud"
+        },
+        {
+          "click_text": "Mods",
+          "window": "CavesOfQud"
+        },
+        {
+          "sleep": 1.0
+        }
+      ],
+      "verify": {
+        "scene": "ModManager"
+      },
+      "timeout": 15
+    },
+    {
+      "app": "qud",
+      "from": "title",
+      "to": "new_game",
+      "steps": [
+        {
+          "activate": "CavesOfQud"
+        },
+        {
+          "click_text": "New Game",
+          "window": "CavesOfQud"
+        },
+        {
+          "sleep": 1.0
+        }
+      ],
+      "verify": {
+        "ocr_contains": "game mode"
+      },
+      "timeout": 15
+    },
+    {
+      "app": "qud",
+      "from": "continue",
+      "to": "title",
+      "steps": [
+        {
+          "bridge": "uiback"
+        }
+      ],
+      "verify": {
+        "scene": "MainMenu"
+      },
+      "timeout": 12,
+      "note": "Qud's modern menus ignore ALL OS-synthesized keys; uiback is the mod's first-party back command and is the only thing that closes them."
+    },
+    {
+      "app": "qud",
+      "from": "options",
+      "to": "title",
+      "steps": [
+        {
+          "bridge": "uiback"
+        }
+      ],
+      "verify": {
+        "scene": "MainMenu"
+      },
+      "timeout": 12,
+      "note": "Qud's modern menus ignore ALL OS-synthesized keys; uiback is the mod's first-party back command and is the only thing that closes them."
+    },
+    {
+      "app": "qud",
+      "from": "mods",
+      "to": "title",
+      "steps": [
+        {
+          "bridge": "uiback"
+        }
+      ],
+      "verify": {
+        "scene": "MainMenu"
+      },
+      "timeout": 12,
+      "note": "Qud's modern menus ignore ALL OS-synthesized keys; uiback is the mod's first-party back command and is the only thing that closes them."
+    },
+    {
+      "app": "qud",
+      "from": "records",
+      "to": "title",
+      "steps": [
+        {
+          "bridge": "uiback"
+        }
+      ],
+      "verify": {
+        "scene": "MainMenu"
+      },
+      "timeout": 12,
+      "cost": 12,
+      "note": "MEASURED FLAKY, priced accordingly. uiback reaches the active window's own OnCancel/Exit, which covers the other modern menus -- but ModernHighScores did NOT budge when this was measured directly (2026-08-06, both from the daemon and from a raw socket, so it is the screen and not the transport). The edge stays because it sometimes works and it verifies its own arrival; the explicit cost keeps the planner from routing THROUGH Records, and a failure re-plans onto restart instead of stranding on a screen with no exit."
+    },
+    {
+      "app": "raves",
+      "from": "off",
+      "to": "title",
+      "steps": [
+        {
+          "launch": "raves_solo"
+        },
+        {
+          "wait_window": "Raves of Qud",
+          "timeout": 30
+        },
+        {
+          "dock": "Raves of Qud",
+          "note": "stack into the standard slot above Qud (fresh launches land off-slot)"
+        }
+      ],
+      "verify": {
+        "node": "title"
+      },
+      "timeout": 25
+    },
+    {
+      "app": "raves",
+      "from": "*",
+      "to": "title",
+      "steps": [
+        {
+          "restart": "raves"
+        }
+      ],
+      "verify": {
+        "node": "title"
+      },
+      "timeout": 90,
+      "cost": 120,
+      "note": "the universal escape hatch — see the qud twin. Also the only modelled way out of character creation, which has no verified back-out yet."
+    },
+    {
+      "app": "raves",
+      "from": "in_game",
+      "to": "title",
+      "steps": [
+        {
+          "dismiss": {
+            "popup": "message",
+            "key": "Escape"
+          },
+          "note": "CANCEL a stray modal first. A popup left over from an earlier run blocks CmdQuit entirely -- the command goes nowhere and the step then fails for lack of any change. Escape is Cancel on these confirms, so this clears the way without ANSWERING anything."
+        },
+        {
+          "dismiss": {
+            "scene": "in_game",
+            "command": "CmdQuit"
+          },
+          "note": "CmdQuit runs Qud's own quit, whose UI mirrors into Raves, so the confirms below are answered on the Raves window."
+        },
+        {
+          "dismiss": {
+            "popup": "message",
+            "key": "space"
+          },
+          "note": "'Are you sure you want to quit?' -> [Space] Yes"
+        },
+        {
+          "dismiss": {
+            "popup": "message",
+            "keys": [
+              "Right",
+              "space"
+            ]
+          },
+          "note": "'Do you want to save first?' -> Right moves off Yes, Space answers NO. Deliberate: Yes would overwrite the fixture save. One step, because Right alone changes nothing observable."
+        }
+      ],
+      "verify": {
+        "node": "title"
+      },
+      "timeout": 25,
+      "note": "Kept as conditional `dismiss` steps rather than flattened to plain keys: each one verifies that the thing it pressed actually moved, and a blind Space on a screen with no confirm up does something else entirely."
+    },
+    {
+      "app": "raves",
+      "from": {
+        "within": "status_screens"
+      },
+      "to": "in_game",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "Escape",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "node": "in_game"
+      },
+      "timeout": 10,
+      "note": "THE EDGE THAT FIXES TAB-TO-TAB. Raves reaches each tab by pressing its key from in_game, so switching tabs means leaving the current one first. In the recipe model each tab recipe carried its own eight-scene dismiss AND a chain step to in_game whose own recipe routed through `title` -- which from a status screen dismissed it, landed in the game and failed its own assert. Tab-to-tab alternated pass/fail. Here it is one edge the planner inserts when, and only when, it is needed."
+    },
+    {
+      "app": "raves",
+      "from": "title",
+      "to": "in_game",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "sleep": 2.5,
+          "note": "let Continue enable (heartbeat poll) after a fresh launch"
+        },
+        {
+          "click_text": "Continue",
+          "window": "Raves of Qud"
+        },
+        {
+          "key": "space",
+          "window": "Raves of Qud",
+          "note": "ACTIVATE. Raves' main menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted Continue and stopped there."
+        },
+        {
+          "dismiss": {
+            "scene": "loadgame",
+            "key": "space"
+          },
+          "note": "CONDITIONAL: Continue opens the LOAD GAME picker when there is a choice to make and goes straight in-game when there is not, so this presses the picker's [Space] select only if we actually landed there."
+        }
+      ],
+      "verify": {
+        "node": "in_game"
+      },
+      "timeout": 60
+    },
+    {
+      "app": "raves",
+      "from": "title",
+      "to": "continue",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "click_text": "Continue",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "loadgame"
+      },
+      "timeout": 12
+    },
+    {
+      "app": "raves",
+      "from": "continue",
+      "to": "title",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "Escape",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "node": "title"
+      },
+      "timeout": 12
+    },
+    {
+      "app": "raves",
+      "from": "title",
+      "to": "records",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "click_text": "Records",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "records"
+      },
+      "timeout": 12
+    },
+    {
+      "app": "raves",
+      "from": "records",
+      "to": "title",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "Escape",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "node": "title"
+      },
+      "timeout": 12
+    },
+    {
+      "app": "raves",
+      "from": "title",
+      "to": "options",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "click_text": "Options",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "options"
+      },
+      "timeout": 12
+    },
+    {
+      "app": "raves",
+      "from": "options",
+      "to": "title",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "Escape",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "node": "title"
+      },
+      "timeout": 12
+    },
+    {
+      "app": "raves",
+      "from": "title",
+      "to": "mods",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "click_text": "Mods",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "mods"
+      },
+      "timeout": 12
+    },
+    {
+      "app": "raves",
+      "from": "mods",
+      "to": "title",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "Escape",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "node": "title"
+      },
+      "timeout": 12
+    },
+    {
+      "app": "raves",
+      "from": "quit_dialog",
+      "to": "title",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "Escape",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "node": "title"
+      },
+      "timeout": 10
+    },
+    {
+      "app": "raves",
+      "from": "title",
+      "to": "game_mode",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "click_text": "New Game",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "chargen_game_mode"
+      },
+      "timeout": 12
+    },
+    {
+      "app": "raves",
+      "from": "game_mode",
+      "to": "genotype",
+      "steps": [
+        {
+          "key": "enter",
+          "window": "Raves of Qud",
+          "note": "confirm the default card (Classic)"
+        }
+      ],
+      "verify": {
+        "scene": "chargen_genotype"
+      },
+      "timeout": 10
+    },
+    {
+      "app": "raves",
+      "from": "genotype",
+      "to": "calling",
+      "steps": [
+        {
+          "key": "enter",
+          "window": "Raves of Qud",
+          "note": "confirm the default genotype"
+        }
+      ],
+      "verify": {
+        "scene": "chargen_subtype"
+      },
+      "timeout": 10
+    },
+    {
+      "app": "raves",
+      "from": "in_game",
+      "to": "status_skills",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "k",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "status_skills",
+        "app": "raves"
+      },
+      "timeout": 8,
+      "note": "Qud's Commands.xml default binding for this screen."
+    },
+    {
+      "app": "raves",
+      "from": "in_game",
+      "to": "status_attributes",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "x",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "status_attributes",
+        "app": "raves"
+      },
+      "timeout": 8,
+      "note": "Qud's Commands.xml default binding for this screen."
+    },
+    {
+      "app": "raves",
+      "from": "in_game",
+      "to": "status_equipment",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "e",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "status_equipment",
+        "app": "raves"
+      },
+      "timeout": 8,
+      "note": "Qud's Commands.xml default binding for this screen."
+    },
+    {
+      "app": "raves",
+      "from": "in_game",
+      "to": "status_tinkering",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "n",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "status_tinkering",
+        "app": "raves"
+      },
+      "timeout": 8,
+      "note": "Qud's Commands.xml default binding for this screen."
+    },
+    {
+      "app": "raves",
+      "from": "in_game",
+      "to": "status_journal",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "j",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "status_journal",
+        "app": "raves"
+      },
+      "timeout": 8,
+      "note": "Qud's Commands.xml default binding for this screen."
+    },
+    {
+      "app": "raves",
+      "from": "in_game",
+      "to": "status_quests",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "q",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "status_quests",
+        "app": "raves"
+      },
+      "timeout": 8,
+      "note": "Qud's Commands.xml default binding for this screen."
+    },
+    {
+      "app": "raves",
+      "from": "in_game",
+      "to": "status_reputation",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "ctrl+f",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "status_reputation",
+        "app": "raves"
+      },
+      "timeout": 8,
+      "note": "Qud's Commands.xml default binding for this screen."
+    },
+    {
+      "app": "raves",
+      "from": "in_game",
+      "to": "status_messagelog",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "f2",
+          "window": "Raves of Qud"
+        },
+        {
+          "sleep": 0.6
+        },
+        {
+          "click": [
+            1615,
+            136
+          ],
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "status_messagelog",
+        "app": "raves"
+      },
+      "timeout": 8
+    },
+    {
+      "app": "raves",
+      "from": "in_game",
+      "to": "control_mapping",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "sleep": 2.0,
+          "note": "post-restart settle — the bridge client needs a beat before Esc lands as CmdSystemMenu"
+        },
+        {
+          "key": "escape",
+          "window": "Raves of Qud",
+          "note": "1:1 Esc = CmdSystemMenu; the popup mirrors back"
+        },
+        {
+          "assert": {
+            "popup": "menu",
+            "app": "raves"
+          },
+          "timeout": 8
+        },
+        {
+          "click_text": "Control Mapping",
+          "window": "Raves of Qud"
+        }
+      ],
+      "verify": {
+        "scene": "control_mapping",
+        "app": "raves"
+      },
+      "timeout": 10
+    }
+  ]
 }
