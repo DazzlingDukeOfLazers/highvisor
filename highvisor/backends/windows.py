@@ -167,7 +167,11 @@ class WindowsBackend(PlatformBackend):
             raise BackendError("no window for pid %d" % pid)
         low = ref.lower()
         for w in self._toplevels():
-            if low in (w.Name or "").lower():
+            # Match the REAL Win32 caption first (what `ls` shows since the title
+            # fix — Godot's UIA Name says "Godot Engine" while the caption says
+            # "Raves of Qud (DEBUG)"), with the UIA Name as fallback.
+            title = self._win32_title(w.NativeWindowHandle) or w.Name or ""
+            if low in title.lower():
                 return w.NativeWindowHandle
         raise BackendError("no window matching title ~ %r" % ref)
 

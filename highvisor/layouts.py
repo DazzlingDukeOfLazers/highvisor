@@ -104,6 +104,9 @@ def placement_rect(pl: dict, sw: int, sh: int, displays=None):
             mon = mons[i] if 0 <= i < len(mons) else None
         if mon is None:
             return (0, 0, sw, sh)
+        if "rect" in pl:   # a sub-rect WITHIN that monitor: [dx, dy, w, h] from its origin
+            dx, dy, w, h = (int(v) for v in pl["rect"])
+            return (int(mon["x"]) + dx, int(mon["y"]) + dy, w, h)
         return (int(mon["x"]), int(mon["y"]), int(mon["w"]), int(mon["h"]))
     if "zone" in pl:
         return zone_rect(pl["zone"], sw, sh)
