@@ -118,6 +118,53 @@ def toy():
           all(e["verify"] for e in plan.transitions(TOY, "a")))
 
 
+def exclusion():
+    """An EXCLUDED edge is invisible to the search, and saying so is honest when it strands us.
+
+    Exists for re-planning after an edge REFUSED — a definite "this cannot work in this
+    state", as opposed to a generic failure. On a Classic (non-checkpointing) Qud save the
+    quit edge refuses (it would have to type ABANDON and end a permadeath run), and before
+    this the drive simply gave up: `_drive_route` re-plans only when the app MOVED, and the
+    refusal deliberately leaves it put. Excluding the refused edge lets the search find the
+    restart route the graph already had.
+
+    Excluded, not merely expensive: a cost bump still gets picked when it is the only option,
+    which is the exact case being routed around.
+    """
+    print("\nplanner: excluding a refused edge")
+    direct = [e for e in plan.transitions(TOY, "a") if e["from"] == "home" and e["to"] == "deep"
+              and e["cost"] == 999]
+    cheap = [e for e in plan.transitions(TOY, "a") if e["from"] == "home" and e["to"] == "menu"]
+    check("fixture: the toy has both a cheap chain and a dear direct edge", direct and cheap)
+
+    r = plan.route(TOY, "a", "home", "deep")
+    check("unexcluded, the cheap CHAIN wins over the dear direct edge",
+          r["ok"] and len(r["route"]) == 2, str(r.get("route")))
+
+    # exclude the first hop of the cheap chain -> the dear direct edge is all that is left
+    hop = [e for e in plan.transitions(TOY, "a") if e["from"] == "home" and e["to"] == "menu"][0]
+    r = plan.route(TOY, "a", "home", "deep", exclude={hop["id"]})
+    check("an excluded edge is NOT chosen",
+          r["ok"] and all(e["id"] != hop["id"] for e in r["route"]), str(r))
+    check("...and the alternative route is found instead",
+          r["ok"] and len(r["route"]) == 1 and r["route"][0]["cost"] == 999, str(r.get("route")))
+
+    # exclude EVERY edge into the goal -> unreachable, and the diagnosis must own the exclusion
+    into = {e["id"] for e in plan.transitions(TOY, "a") if e["to"] == "deep"}
+    r = plan.route(TOY, "a", "home", "deep", exclude=into)
+    check("excluding the only routes reports UNREACHABLE, not an empty route",
+          not r["ok"] and not r.get("route"), str(r))
+    check("the diagnosis says the exclusion did it, not the graph",
+          "EXCLUD" in (r.get("error") or "").upper(), (r.get("error") or "")[:120])
+    check("and it lists which edges were excluded", sorted(r.get("excluded") or []) == sorted(into),
+          str(r.get("excluded")))
+
+    # exclusion must not leak into an unrelated search
+    r = plan.route(TOY, "a", "home", "deep")
+    check("a later route with no exclusion is unaffected",
+          r["ok"] and len(r["route"]) == 2, str(r.get("route")))
+
+
 # ------------------------------------------------------------------- real tree
 def _detectable(tree, app):
     """Every node id the tree can RECOGNISE for `app` — i.e. every state we can be found in.
@@ -256,6 +303,7 @@ def _spec_nodes(spec):
 
 if __name__ == "__main__":
     toy()
+    exclusion()
     real()
     print("\n%s (%d checks failed)" % ("FAILED" if FAILED else "all good", len(FAILED)))
     sys.exit(1 if FAILED else 0)

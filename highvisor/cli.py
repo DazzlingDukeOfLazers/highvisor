@@ -233,9 +233,14 @@ def _cmd_assert(a):
 
 def _cmd_goto(a):
     """Drive an app to a state-tree node along a planned route."""
-    res = _call({"op": P.OP_GAMEGO, "app": a.app, "node": a.node})
+    res = _call({"op": P.OP_GAMEGO, "app": a.app, "node": a.node,
+                 "no_restart": bool(getattr(a, "no_restart", False))})
     if res.get("route"):
         print("route: %s" % res["route"])
+    # A restart is loud on the way past, not something to find later in the JSON.
+    for st in res.get("steps") or []:
+        if "restart_planned" in (st.get("step") or {}):
+            print("!! %s" % st.get("detail"))
     _print_json(res)
     raise SystemExit(0 if res.get("ok") else 1)
 
@@ -1032,6 +1037,10 @@ def build_parser():
     s = sub.add_parser("goto", help="drive an app to a state-tree node along a planned route, e.g. hv goto qud in_game")
     s.add_argument("app", help="qud | raves")
     s.add_argument("node", help="tree node id, e.g. title | in_game")
+    s.add_argument("--no-restart", action="store_true",
+                   help="fail rather than reach the node by RESTARTING the app. A restart "
+                        "discards unsaved progress (the save file is untouched); it becomes "
+                        "reachable when an edge refuses, e.g. Qud's quit on a Classic save.")
     s.set_defaults(fn=_cmd_goto)
 
     s = sub.add_parser("plan", help="show the route `hv goto` would take, WITHOUT driving anything")

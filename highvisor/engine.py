@@ -283,7 +283,8 @@ class Engine:
             return self._gamestate(b, ocr=bool(req.get("ocr", False)))
 
         if op == P.OP_GAMEGO:
-            return self._gamego(b, req.get("app"), req.get("node"))
+            return self._gamego(b, req.get("app"), req.get("node"),
+                                no_restart=bool(req.get("no_restart")))
 
         if op == P.OP_PLAN:
             return self._plan_route(b, req.get("app"), req.get("node"), req.get("from"))
@@ -732,7 +733,7 @@ class Engine:
                             # so the game is left live and intact, and say why we stopped.
                             _send(s, {"type": "command", "name": "popup",
                                       "action": "button", "btn": "Cancel"})
-                            return {"ok": False, "answered": answered,
+                            return {"ok": False, "answered": answered, "refused": True,
                                     "error": "%s raised a TEXT-INPUT confirmation this edge "
                                              "must not answer: %r. Qud asks that only when the "
                                              "save has no checkpointing (a Classic character), "
@@ -1445,7 +1446,12 @@ class Engine:
                 steps.append({"step": step, "ok": bool(r.get("ok")), "edge": edge.get("id"),
                               "detail": r.get("detail", ""), "error": r.get("error")})
                 if not r.get("ok"):
-                    return {"ok": False, "error": "%s: %s" % (edge.get("id"), r.get("error"))}
+                    # `refused` travels as a FLAG with the edge id attached. The tour script
+                    # already had to string-match this once and broke on letter case; nothing
+                    # downstream should ever parse an error message to learn it happened.
+                    return {"ok": False, "refused": bool(r.get("refused")),
+                            "refused_edge": edge.get("id") if r.get("refused") else None,
+                            "error": "%s: %s" % (edge.get("id"), r.get("error"))}
             a = dict(edge.get("verify") or {"node": edge.get("to")})
             a.setdefault("app", app)
             a["timeout"] = edge.get("timeout", 15)
@@ -1550,7 +1556,7 @@ class Engine:
         return rt
 
     # ------------------------------------------------------- gamego (drive-to-state)
-    def _gamego(self, b, app, node_id, _depth=0, _replans=0):
+    def _gamego(self, b, app, node_id, _depth=0, _replans=0, _exclude=(), no_restart=False):
         """Drive ``app`` to tree state ``node_id``.
 
         PLANNED, not scripted. The route is searched at call time from the state the app is
@@ -1643,9 +1649,27 @@ class Engine:
         # and planning from the pre-clear reading is planning from a state we just left.
         st = self._gamestate(b).get("states", {}).get(app) or st
         start = self._planner_state(st)
-        rt = plan.route(tree, app, start, node_id, signals=st.get("signals"))
+        rt = plan.route(tree, app, start, node_id, signals=st.get("signals"),
+                        exclude=_exclude)
         if rt.get("ok"):
             route_label = plan.summarize(rt)
+            # A RESTART is never silent. Reaching a state by killing the app discards
+            # unsaved progress -- which is what quitting would discard anyway, so it is
+            # defensible, but a `goto` that restarts the game because a confirm was refused
+            # is a surprise, and surprises get named here. Callers who would rather fail can
+            # say so.
+            restarts = [e.get("id") for e in rt["route"]
+                        if any("restart" in stp for stp in (e.get("steps") or []))]
+            if restarts:
+                why = ("after %d refused edge(s): %s" % (len(_exclude), ", ".join(sorted(_exclude)))
+                       if _exclude else "it is the cheapest route")
+                if no_restart:
+                    err = ("the only route to %s RESTARTS %s (%s) and no_restart was set"
+                           % (node_id, app, why))
+                    return fail({"restart_refused": restarts}, err)
+                steps.append({"step": {"restart_planned": restarts}, "ok": True,
+                              "detail": "this route RESTARTS %s -- %s. Unsaved progress is "
+                                        "discarded; the save file is untouched." % (app, why)})
             self.bus.publish("gamego", app=app, node=node_id, step={"plan": route_label})
             r = self._drive_route(b, app, tree, rt["route"], steps, _depth, start=start)
             if r.get("ok"):
@@ -1657,14 +1681,32 @@ class Engine:
             # thought — a confirm we did not expect, a screen that ignored a key. If it
             # MOVED, the honest response is to plan again from where it actually is; if it
             # did not, planning again would produce the same route and loop.
+            #
+            # A REFUSAL is different in kind and gets its own arm. "This edge cannot work in
+            # this state" is definite, so excluding that edge id and planning again CANNOT
+            # reproduce the same route — the loop the moved-guard protects against is not
+            # reachable, which is precisely what makes re-planning safe here without it.
+            # On a Classic save that is the difference between "goto title gives up" and
+            # "goto title takes the restart route the graph already had".
             st2 = self._gamestate(b).get("states", {}).get(app) or {}
             moved = self._planner_state(st2)
+            if r.get("refused") and r.get("refused_edge") and _replans < 4:
+                nxt_ex = tuple(sorted(set(_exclude) | {r["refused_edge"]}))
+                steps.append({"step": {"replan": True, "excluding": r["refused_edge"]}, "ok": True,
+                              "detail": "%s REFUSED at %s; excluding that edge and re-planning"
+                                        % (r["refused_edge"], start)})
+                _finish(False, r.get("error"))
+                again = self._gamego(b, app, node_id, _depth, _replans + 1,
+                                     _exclude=nxt_ex, no_restart=no_restart)
+                again["steps"] = steps + (again.get("steps") or [])
+                return again
             if _replans < 2 and moved != start:
                 steps.append({"step": {"replan": True}, "ok": True,
                               "detail": "%s failed at %s; re-planning from %s"
                                         % (route_label, start, moved)})
                 _finish(False, r.get("error"))
-                again = self._gamego(b, app, node_id, _depth, _replans + 1)
+                again = self._gamego(b, app, node_id, _depth, _replans + 1,
+                                     _exclude=_exclude, no_restart=no_restart)
                 again["steps"] = steps + (again.get("steps") or [])
                 return again
             _finish(False, r.get("error"))
@@ -1861,7 +1903,7 @@ class Engine:
                 r = self._qud_command_chain(step["command"], answers,
                                             timeout=float(step.get("answer_timeout", 25)))
                 if not r.get("ok"):
-                    return {"ok": False,
+                    return {"ok": False, "refused": bool(r.get("refused")),
                             "error": "command %s: %s" % (step["command"], r.get("error"))}
                 return {"ok": True,
                         "detail": "%s + %d answer(s)" % (step["command"],
@@ -1981,7 +2023,7 @@ class Engine:
                     cancelled = True
                 except Exception:
                     cancelled = False
-            return {"ok": False,
+            return {"ok": False, "refused": True,
                     "error": "refusing to continue: a %r modal is up -- %s. %s"
                              % (have_popup or scene, cond["refuse"],
                                 "Cancelled it; the app is left clean." if cancelled
@@ -2042,7 +2084,8 @@ class Engine:
             r = self._qud_command_chain(cond["command"], cond.get("answers") or [],
                                         timeout=float(cond.get("answer_timeout", 25)))
             if not r.get("ok"):
-                return {"ok": False, "error": "dismiss command: %s" % r.get("error")}
+                return {"ok": False, "refused": bool(r.get("refused")),
+                        "error": "dismiss command: %s" % r.get("error")}
         elif cond.get("bridge"):
             # first-party dismissal -- no OCR, no coords, no focus steal
             r = self._qud_bridge(cond["bridge"])

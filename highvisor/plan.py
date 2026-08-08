@@ -186,17 +186,26 @@ def _spec_label(spec):
     return str(spec)
 
 
-def graph(tree, app, signals=None):
+def graph(tree, app, signals=None, exclude=None):
     """Adjacency: {state: [(cost, edge), ...]} over every planner state.
 
     ``signals`` (optional) filters out edges whose ``requires`` block does not hold right
     now — a precondition, not a runtime failure. An edge that needs the mod's bridge is not
     a route option while the port is shut, and the planner should route AROUND it rather
     than pick it and die on the first step.
+
+    ``exclude`` (optional) is a set of edge IDS the search may not use at all. It exists for
+    re-planning after an edge REFUSED — a definite "this cannot work here", as opposed to a
+    generic failure. Excluded edges are INVISIBLE, not merely expensive: pricing them high
+    would still let the search pick one when it is the only option, which is exactly the
+    case we are trying to route around.
     """
     universe = node_ids(tree) + [OFF, UNKNOWN]
     adj = {s: [] for s in universe}
+    skip = set(exclude or ())
     for e in transitions(tree, app):
+        if e["id"] in skip:
+            continue
         if not _requires_hold(e.get("requires"), signals):
             continue
         for src in _sources(e.get("from"), tree, universe):
@@ -222,7 +231,7 @@ def _requires_hold(req, signals):
     return True
 
 
-def route(tree, app, start, goal, signals=None, heuristic=None):
+def route(tree, app, start, goal, signals=None, heuristic=None, exclude=None):
     """Cheapest route of transitions from ``start`` to ``goal``.
 
     Returns ``{ok: True, route: [edge...], cost, from, to}`` — ``route`` is empty when we
@@ -232,7 +241,7 @@ def route(tree, app, start, goal, signals=None, heuristic=None):
     if start == goal:
         return {"ok": True, "route": [], "cost": 0, "from": start, "to": goal,
                 "detail": "already at %s" % goal}
-    adj = graph(tree, app, signals)
+    adj = graph(tree, app, signals, exclude)
     if goal not in adj:
         return {"ok": False, "error": "unknown state %r for %s" % (goal, app)}
     h = heuristic or (lambda _s: 0)
@@ -265,12 +274,16 @@ def route(tree, app, start, goal, signals=None, heuristic=None):
             seq += 1
             heapq.heappush(pq, (ng + h(nxt), seq, nxt, path + [edge]))
 
-    return {"ok": False, "from": start, "to": goal,
-            "error": _why_unreachable(tree, app, start, goal, adj, seen),
-            "reached": sorted(seen)}
+    why = _why_unreachable(tree, app, start, goal, adj, seen)
+    if exclude:
+        why += (" — with %d edge(s) EXCLUDED after they refused: %s. Without the exclusion "
+                "a route may well exist; it is the refusal that blocks it, not the graph."
+                % (len(exclude), ", ".join(sorted(exclude))))
+    return {"ok": False, "from": start, "to": goal, "error": why,
+            "excluded": sorted(exclude or ()), "reached": sorted(seen)}
 
 
-def reachable(tree, app, start, signals=None):
+def reachable(tree, app, start, signals=None, exclude=None):
     """{state: cheapest cost} for EVERY state reachable from ``start``. ``start`` maps to 0.
 
     Same search as ``route``, without a goal — Dijkstra settles every node on the way to any
@@ -280,7 +293,7 @@ def reachable(tree, app, start, signals=None):
     what a click would cost; asking ``route`` per node would be one round trip per node per app
     (132 on the current tree) to learn something one search already knows.
     """
-    adj = graph(tree, app, signals)
+    adj = graph(tree, app, signals, exclude)
     best = {start: 0}
     seen = set()
     seq = 0
