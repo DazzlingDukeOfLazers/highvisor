@@ -1974,14 +1974,31 @@
         },
         {
           "key": "Escape",
-          "window": "Raves of Qud"
+          "window": "Raves of Qud",
+          "note": "UNVERIFIED on purpose. If the screen's SEARCH FIELD has focus this Escape only defocuses it -- Godot's LineEdit takes it first, and the screen's own handler is suppressed while typing anyway, which is the typing guard working as designed. So this press may or may not leave the screen, and the conditional below is what actually guarantees it."
+        },
+        {
+          "dismiss": {
+            "scene": [
+              "status_skills",
+              "status_attributes",
+              "status_equipment",
+              "status_tinkering",
+              "status_journal",
+              "status_quests",
+              "status_reputation",
+              "status_messagelog"
+            ],
+            "key": "Escape"
+          },
+          "note": "THE SECOND ESCAPE, CONDITIONALLY. Never send it blind: from in_game Escape opens the system menu (measured -- popup=menu), so a fixed two-press chain would leave a modal up exactly when the first press had already worked. Conditioned on still being on a status screen, it is a no-op when the first press was enough and the fix when it was not."
         }
       ],
       "verify": {
         "node": "in_game"
       },
       "timeout": 10,
-      "note": "THE EDGE THAT FIXES TAB-TO-TAB. Raves reaches each tab by pressing its key from in_game, so switching tabs means leaving the current one first. In the recipe model each tab recipe carried its own eight-scene dismiss AND a chain step to in_game whose own recipe routed through `title` -- which from a status screen dismissed it, landed in the game and failed its own assert. Tab-to-tab alternated pass/fail. Here it is one edge the planner inserts when, and only when, it is needed."
+      "note": "LEAVE A STATUS SCREEN. Escape is sent TWICE, the second press conditional, because how many presses it takes depends on whether a text field has focus. Measured 2026-08-07, two arms, deterministic: enter the screen and touch nothing -> one Escape leaves it; click the search field first -> the first Escape only defocuses the field and the edge failed, the second left. The old single-press version reported both its steps ok and died at the verify, naming nothing -- `key` cannot fail, it only posts an event."
     },
     {
       "app": "raves",
