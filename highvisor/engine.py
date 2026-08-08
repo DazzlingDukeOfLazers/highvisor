@@ -1017,8 +1017,25 @@ class Engine:
         # Kept because the postcondition is strictly better and costs ~0.7s, not
         # because it is a proven fix.
         reporting = self._await_report(app, launched_at)
+        # RESTORE THE STAGE. A relaunched app does not come back where it was -- a Godot
+        # dev-run Raves opens at the display default (4267x2400 here), which then reaches
+        # a capture as a 2400-tall PNG scored against a 1080-tall spec. The stage owns
+        # window geometry, so re-apply the layout rather than teach the app a size.
+        # Best-effort and after readiness: a window that exists can still be resized, but
+        # placing one mid-load has it move again when the app finishes settling.
+        relaid = None
+        try:
+            from .layouts import last_layout
+            _lay = last_layout()
+            if _lay:
+                _r = self._apply_layout(b, _lay)
+                relaid = {"layout": _lay, "applied": _r.get("applied"),
+                          "ok": bool(_r.get("ok"))}
+        except Exception as e:
+            relaid = {"error": str(e)}
         return {"ok": True, "launched": spec, "window": win,
                 "reporting": reporting,
+                "relaid": relaid,
                 "error": None if reporting
                          else "window up but the app never reported a scene; "
                               "driving it now would steer by the previous process"}
@@ -2323,6 +2340,11 @@ class Engine:
                             "title": win.title, "ok": r.ok,
                             "rect": [x, y, w, h], "error": r.error})
         applied = sum(1 for x in results if x["ok"])
+        if applied > 0:
+            # Remember it as the standing stage, so a restart can put the windows back
+            # without anyone having to remember to re-run this by hand.
+            from .layouts import remember_layout
+            remember_layout(name)
         return {"ok": applied > 0, "applied": applied, "results": results,
                 "detail": "%s: %d/%d placed" % (name, applied, len(results))}
 
