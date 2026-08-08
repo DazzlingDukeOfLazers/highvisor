@@ -177,7 +177,7 @@ class Engine:
         if op == P.OP_SHOT:
             settled = None
             if req.get("live"):
-                settled = self._settle_for_capture(
+                settled = self._settle_rendering(
                     b, req.get("target"),
                     max_age=float(req.get("live_age") or 2),
                     timeout=float(req.get("live_timeout") or 30))
@@ -807,21 +807,26 @@ class Engine:
         from .apps import PROFILES
         win = PROFILES.get("qud", {}).get("window", "CavesOfQud")
         if focus:
+            # WAIT FOR THE QUEUE TO BE DRAINING, don't guess at it. This used to check
+            # "is Qud frontmost" and, if not, activate and sleep a flat 2s. Both halves
+            # were wrong in the same direction. `activate` frequently does not take
+            # (three attempts in a row measured before one landed), and frontmost is not
+            # the condition that matters -- a Qud that IS frontmost but has stopped
+            # rendering drains nothing, and that case paid no settle at all because the
+            # front check passed.
+            #
+            # The failure is silent by construction: a TCP write to the mod cannot fail
+            # just because the queue is parked, so the command reports ok and simply
+            # never happens. A FULL 2 sweep across the status tabs failed six of eight
+            # this way, each tab reporting the PREVIOUS tab -- the statustab frames were
+            # sitting in an undrained queue, applying one step late when the next
+            # capture's activate happened to land.
+            #
+            # ui_age settles that directly: it is only low if the UI actually ran.
             try:
-                # Only pay the settle when Qud isn't already frontmost — list_targets is
-                # front-to-back, so the first entry is the active window.
-                tops = self.backend.list_targets()
-                front = (tops[0].to_dict().get("title") or "") if tops else ""
-                if win not in front:
-                    self.backend.activate(win)
-                    import time as _t
-                    # 2s, measured. Unity needs a beat AFTER regaining focus before it drains
-                    # the mod's uiQueue again: at 0.35s the command still landed in a queue that
-                    # wasn't running yet and did nothing. Shorter is not safer here, it is just
-                    # a failure that looks like success.
-                    _t.sleep(2.0)
+                self._settle_rendering(self.backend, win, max_age=2, timeout=20)
             except Exception:
-                pass                # not fatal: a focused Qud is the common case anyway
+                pass                # not fatal: a rendering Qud is the common case anyway
         port = PROFILES.get("qud", {}).get("port", 48710)
         frame = {"type": "command", "name": name}
         # Extra fields ride ALONGSIDE name — the mod reads its arguments off the same flat
@@ -1207,7 +1212,7 @@ class Engine:
     # last write must not pin the tree to a stale screen.
     STATE_FILE_TTL = 6.0
 
-    def _settle_for_capture(self, b, target, max_age=2.0, timeout=30.0):
+    def _settle_rendering(self, b, target, max_age=2.0, timeout=30.0):
         """Wait until the target app is actually RENDERING, re-activating as needed.
 
         A Unity app that is not rendering still screenshots -- it hands back its last
