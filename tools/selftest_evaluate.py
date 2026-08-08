@@ -39,7 +39,7 @@ def check(name, cond, detail=""):
 
 def sig(**kw):
     s = {"present": True, "port_open": None, "game_live": None, "ocr_text": None,
-         "scene": None, "tab": None}
+         "scene": None, "report": "fresh", "tab": None}
     s.update(kw)
     return s
 
@@ -196,6 +196,7 @@ def assert_tolerance():
 
     popup_conditions()
     stranded_stage()
+    dead_reporter()
 
 
 def stranded_stage():
@@ -252,6 +253,69 @@ def stranded_stage():
     from highvisor import plan
     r = plan.route(real, "qud", "stranded_stage", "title")
     check("there is a route OUT of a stranded stage", bool(r.get("ok")), str(r)[:160])
+
+
+def dead_reporter():
+    """A dead or stale first-party report must not be downgraded into a named screen.
+
+    THE BUG, measured twice on 2026-08-07/08. `title`'s qud detector carried
+    `{"game_live": false}` as an alternative. That is the absence of bytes on a 0.35s socket
+    probe, and it is satisfied by EVERY menu screen — so whenever the report was stale or
+    missing, `hv state` confidently named the title:
+
+      * the mod failed to compile on a mid-tour restart, the heartbeat stopped, and the state
+        read "Title Screen  via=live" for 7 minutes while Qud sat on the Modding Toolkit;
+      * Qud parked on its Keybinds screen with a LIVE game behind it read the same way — a
+        parked turn thread publishes no snapshot, so the probe is wrong about liveness itself.
+
+    `gamego` PLANS from that answer, which is what made it expensive rather than cosmetic.
+
+    Signals in, state out, so it belongs in SPOT. The `report` signal (fresh|stale|foreign|
+    absent) is what carries the reason the file was refused, which previously vanished into a
+    bare None and made "refused report" indistinguishable from "matched no scene".
+    """
+    real = gametree.load_tree()
+    print("\ndead/stale reporter (no first-party state)")
+
+    # 1. FRESH report -> unchanged behaviour, both directions
+    r = gametree.evaluate(real, "qud", sig(scene="MainMenu", report="fresh", game_live=False))
+    check("a fresh report still resolves the title by SCENE",
+          r["node"] == "title" and r["via"] == "scene", "%s via %s" % (r["node"], r["via"]))
+    r = gametree.evaluate(real, "qud", sig(scene="play", report="fresh", game_live=True))
+    check("a fresh report still resolves in-game", r["node"] == "in_game", str(r["node"]))
+
+    # 2. THE BUG: no scene + no live game must NOT name the title
+    for rep in ("stale", "absent", "foreign"):
+        r = gametree.evaluate(real, "qud", sig(report=rep, game_live=False))
+        check("report=%s + game_live false does NOT claim the title" % rep,
+              r["node"] != "title", "read as %s via %s" % (r["node"], r["via"]))
+        check("report=%s + game_live false is 'running, screen unknown'" % rep,
+              r["node"] is None and r["running"] and not r["off"], str(r))
+
+    # 3. the POSITIVE inference is deliberately kept: bytes imply a running game, and if the
+    #    reporter is dead while a game runs this is the one signal still telling the truth
+    r = gametree.evaluate(real, "qud", sig(report="stale", game_live=True))
+    check("report=stale + game_live TRUE still resolves in-game",
+          r["node"] == "in_game" and r["via"] == "live", "%s via %s" % (r["node"], r["via"]))
+
+    # 4. a window with nothing to say at all is still off/unknown, not a screen
+    r = gametree.evaluate(real, "qud", sig(present=False, report="absent"))
+    check("no window -> off", r["off"] and not r["running"], str(r))
+
+    # 5. the tree must not grow another inference-only detector
+    INFER = {"game_live", "port", "present"}
+    bad = []
+    def walk(n):
+        for app, cond in (n.get("detect") or {}).items():
+            for c in (cond if isinstance(cond, list) else [cond]):
+                keys = set(c) - {"note"}
+                if keys and keys <= INFER and c.get("game_live") is not True:
+                    bad.append("%s/%s %s" % (n.get("id"), app, c))
+        for ch in n.get("children") or []:
+            walk(ch)
+    walk(real["root"])
+    check("no detector rests on an inference alone (bar in_game's positive game_live)",
+          not bad, "; ".join(bad))
 
 
 def popup_conditions():

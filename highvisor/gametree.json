@@ -33,7 +33,7 @@
       {
         "id": "title",
         "label": "Title Screen",
-        "note": "children are the SCENE CONTAINERS (each scored individually for 1:1 fidelity); the menu options nest under menu_box (they're both its contents and the nav edges to other scenes).",
+        "note": "`{game_live: false}` was an alternative here and is GONE (2026-08-08). It is the absence of bytes on a 0.35s probe, and absence of evidence is not evidence: it is satisfied by every menu screen, so whenever the first-party report was stale or missing this node claimed the title on an inference. Measured twice -- \"Title Screen via=live\" for 7 minutes while Qud sat on the Modding Toolkit with the mod unloaded, and again on a parked Keybinds screen that had a LIVE game behind it (a parked turn thread publishes no snapshot, so the probe reads false about liveness itself). `gamego` PLANS from that answer, which is what made it expensive.\n\nThe asymmetry with in_game's `{game_live: true}` is deliberate, not an oversight. The mod force-publishes a snapshot on connect ONLY when a game is live, so BYTES imply a running game -- a positive, near-sound inference whose worst case is naming in_game while we are on one of its own children. No bytes implies nothing. The positive stays; the negative goes.\n\nWith the report stale and no game live, nothing matches and the state is `unknown` -- 'running, screen unknown', which is the honest answer and one the planner can route out of. If an app is ever added with no reporter at all, give it one (the standing rule) rather than restoring this fallback.",
         "done": {
           "qud": 1.0,
           "raves": 0.9
@@ -45,9 +45,6 @@
                 "MainMenu",
                 "title"
               ]
-            },
-            {
-              "game_live": false
             }
           ],
           "raves": [
@@ -739,7 +736,8 @@
               "note": "`Stage` is NOT here, and that is load-bearing. The mod folds liveness into this field (StartupHook heartbeat: `live && view in (Stage, \"\", MainMenu) -> \"play\"`), so a LIVE game always reports `play` and the bare view name `Stage` can only mean the opposite -- the view never left the stage after the game ENDED. Measured across 913 recorded observations: scene=play was live 251/251, scene=Stage was not-live 49/49, never once the other way. See the `stranded_stage` node."
             },
             {
-              "game_live": true
+              "game_live": true,
+              "note": "KEPT, unlike title's negative twin. The mod publishes a snapshot on connect only when a game is live, so bytes imply one is -- and if the reporter is dead while a game runs, this is the one signal still telling the truth."
             }
           ],
           "raves": [
