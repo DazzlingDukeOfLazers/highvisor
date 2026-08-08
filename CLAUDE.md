@@ -99,12 +99,33 @@ scene** (add a `UiState.set_scene` call / extend the mod heartbeat) rather than 
 substrings.
 
 **On a DEPTH TIE the more trustworthy signal wins, not tree order** (`gametree.TRUST`: tab >
-scene > ocr > live > port). `title` and `in_game` are both depth 1; `title` carries a
+scene > ocr > live > port). `title` and `in_game` are both depth 1; `title` used to carry a
 `{"game_live": false}` fallback and the game_live probe is a 0.35s read on Qud's bridge, so a
 busy Qud made `hv state` report "Title Screen  scene=play  via=live" while it was plainly
 in-game. That was cosmetic until `gamego` began PLANNING from the detected state — a stray
 "title" plans title->in_game, whose edge is `load_save`, i.e. reload the save over a running
 game. Guarded by `python3 tools/selftest_evaluate.py`.
+
+**A DEAD REPORTER MUST LOOK DEAD — no detector may rest on an inference alone** (2026-08-08).
+That `{"game_live": false}` fallback is now GONE, because absence of bytes is not evidence: it is
+satisfied by every menu screen, so any time the first-party report was stale or missing the tree
+named the title on a guess. Measured twice — "Title Screen via=live" for 7 minutes while Qud sat
+on the Modding Toolkit with the mod unloaded, and again on a parked Keybinds screen with a **live**
+game behind it (a parked turn thread publishes no snapshot, so the probe is wrong about liveness
+itself). Both confident, both wrong, and `gamego` plans from them.
+
+- `signals["report"]` is `fresh | stale | foreign | absent` — the reason `_read_state_file`
+  refused a file, which used to vanish into a bare `None` and made "refused report"
+  indistinguishable from "matched no scene". Trees can condition on it; `hv state` shouts
+  `!! report=stale (no first-party state; not guessing a screen)`.
+- With no report and no live game the state is **`unknown` — "running, screen unknown"**, which
+  the planner can route out of (`unknown -> title` via restart). That is the recovery the
+  7-minute episode never got.
+- **in_game keeps its `{"game_live": true}`, and the asymmetry is the point.** The mod publishes
+  a snapshot on connect ONLY when a game is live, so BYTES imply a running game — a positive,
+  near-sound inference whose worst case is naming `in_game` while we sit on one of its children.
+  No bytes imply nothing. Keep positives, drop negatives.
+- If an app ever ships without a reporter, **give it one** rather than restoring the fallback.
 
 **Reports are PER-PROCESS.** A shared path has one writer per running instance: three live Raves
 had `raves_state.json` cycling `in_game → status_tinkering → title` every 2s, so every read was a

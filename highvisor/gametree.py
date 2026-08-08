@@ -109,6 +109,12 @@ def _matches(detect, app, signals):
         po = signals.get("port_open")
         if po is None or bool(po) != bool(cond["port"]):
             return False
+    if "report" in cond:
+        have = signals.get("report")
+        want = cond["report"]
+        want = want if isinstance(want, list) else [want]
+        if str(have or "").lower() not in [str(w).lower() for w in want]:
+            return False
     if "game_live" in cond:
         gl = signals.get("game_live")
         if gl is None or bool(gl) != bool(cond["game_live"]):

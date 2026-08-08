@@ -228,6 +228,12 @@ def _cmd_state(a):
         if extra.get("mode"):
             bits.append("mode=%s" % extra["mode"])
         bits.append("via=%s" % st.get("via"))
+        # A REFUSED report is said out loud. It used to vanish, and the fallback inference
+        # then named a screen we had no evidence for -- the operator saw a confident answer
+        # with nothing marking it as a guess.
+        rep = sig.get("report")
+        if rep and rep != "fresh":
+            bits.append("!! report=%s (no first-party state; not guessing a screen)" % rep)
         # A leaked second instance is the one condition that makes every OTHER field
         # here untrustworthy (we may drive one window and read another), so it is shouted
         # rather than tucked into --json.

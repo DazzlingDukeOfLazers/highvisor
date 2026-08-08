@@ -1169,6 +1169,7 @@ class Engine:
             signals = {"present": win is not None, "port_open": None,
                        "game_live": None, "ocr_text": None,
                        "scene": self._read_scene(cfg.get("state_file"), wpid),
+                       "report": self._report_health(cfg.get("state_file"), wpid),
                        "tab": self._read_tab(cfg.get("state_file"), wpid)}
             port = cfg.get("port")
             if port:
@@ -1199,7 +1200,8 @@ class Engine:
             st["window"] = win.to_dict() if win else None
             st["signals"] = {"present": signals["present"], "port_open": signals["port_open"],
                              "game_live": signals["game_live"],
-                             "scene": signals["scene"], "tab": signals["tab"],
+                             "scene": signals["scene"], "report": signals["report"],
+                             "tab": signals["tab"],
                              "pid": wpid, "instances": dupes,
                              "ocr_used": signals["ocr_text"] is not None}
             st["extra"] = self._read_state_extra(cfg.get("state_file"), wpid)
@@ -1317,6 +1319,54 @@ class Engine:
                 continue     # another instance's report — refuse rather than guess
             return d
         return None
+
+    def _report_health(self, path, pid=None):
+        """Why the first-party report was or was not usable: fresh | stale | foreign | absent.
+
+        `_read_state_file` already decides this and then throws the reason away, returning a
+        bare None — so a refused report and an app that simply matched no scene looked
+        identical downstream, and `title`'s `{game_live: false}` alternative quietly claimed a
+        screen on the strength of an inference. Measured twice: "Title Screen via=live" for 7
+        minutes while Qud sat on the Modding Toolkit with the mod unloaded, and again on a
+        parked Keybinds screen that had a LIVE game behind it. Both confident, both wrong.
+
+        Keeping the reason as a SIGNAL (rather than a log line or a `via` string) is what makes
+        it decidable statically: signals in, state out, so selftest_evaluate can drive it with
+        no daemon and no apps.
+        """
+        import os as _os
+        import time as _time
+        import json as _json
+        if not path:
+            return "absent"
+        base = _os.path.expanduser(path)
+        cands = [base]
+        if pid:
+            stem, ext = _os.path.splitext(base)
+            cands.insert(0, "%s.%d%s" % (stem, int(pid), ext))
+        worst = "absent"
+        for p2 in cands:
+            try:
+                age = _time.time() - _os.path.getmtime(p2)
+            except OSError:
+                continue
+            if age > self.STATE_FILE_TTL:
+                worst = "stale"
+                continue
+            try:
+                with open(p2, "r", encoding="utf-8") as fh:
+                    d = _json.load(fh)
+            except (OSError, ValueError):
+                worst = "stale"
+                continue
+            if not isinstance(d, dict):
+                worst = "stale"
+                continue
+            if pid and d.get("pid") and int(d["pid"]) != int(pid):
+                worst = "foreign"
+                continue
+            return "fresh"
+        return worst
 
     def _read_scene(self, path, pid=None):
         d = self._read_state_file(path, pid)
@@ -1873,8 +1923,13 @@ class Engine:
                 again["steps"] = steps + (again.get("steps") or [])
                 return again
             _finish(False, r.get("error"))
+            # Surface the refusal FLAG on the result too. Callers were otherwise left
+            # grepping the error text to tell "declined on purpose" from "broke", and a tour
+            # script doing exactly that mis-labelled a run that refused one edge, re-planned
+            # past it, and then failed on a LATER edge for an unrelated reason.
             return {"ok": False, "app": app, "node": node_id, "steps": steps,
-                    "route": route_label, "error": r.get("error")}
+                    "refused": bool(r.get("refused")), "route": route_label,
+                    "error": r.get("error")}
 
         # No route in the graph — fall back to the node's legacy recipe if it still has
         # one. Reported either way: a node driven by a recipe is a node whose transitions
