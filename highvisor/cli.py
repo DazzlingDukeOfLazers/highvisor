@@ -100,7 +100,10 @@ def _cmd_ls(a):
 
 
 def _cmd_shot(a):
-    resp = _call({"op": P.OP_SHOT, "target": a.target, "native": a.native})
+    resp = _call({"op": P.OP_SHOT, "target": a.target, "native": a.native,
+                  "live": getattr(a, "live", False),
+                  "live_age": getattr(a, "live_age", None),
+                  "live_timeout": getattr(a, "live_timeout", None)})
     if not resp.get("ok"):
         _print_json(resp)
         return 1
@@ -115,7 +118,20 @@ def _cmd_shot(a):
         # read off the PNG must be halved before you click it (see the
         # click-coordinate note in the ops quickref).
         dims = " %dx%d px%s" % (w, h, " (native/backing)" if a.native else "")
-    print("wrote %s (%d bytes)%s" % (out, resp.get("bytes", 0), dims))
+    live = ""
+    if resp.get("live_checked"):
+        live = "  [live ui_age=%s%s]" % (
+            resp.get("ui_age"),
+            "" if resp.get("live_tries") in (0, None) else ", %d activate(s)" % resp["live_tries"])
+    elif getattr(a, "live", False) and resp.get("live_reason"):
+        live = "  [--live skipped: %s]" % resp["live_reason"]
+    print("wrote %s (%d bytes)%s%s" % (out, resp.get("bytes", 0), dims, live))
+    # A capture the app was not rendering is worse than no capture, because it looks
+    # fine: Qud hands back its last frame, which for a status screen is the bare
+    # playfield. Write it anyway so it can be inspected, but fail so a script stops.
+    if resp.get("live_checked") and not resp.get("live"):
+        sys.stderr.write("STALE CAPTURE: %s\n" % resp.get("live_reason", "app not rendering"))
+        return 1
 
 
 def _cmd_text(a):
@@ -949,6 +965,17 @@ def build_parser():
     s.add_argument("--native", action="store_true",
                    help="capture via ScreenCaptureKit at true backing scale "
                         "(2x on a Retina display); non-deprecated engine")
+    s.add_argument("--live", action="store_true",
+                   help="wait until the app is actually RENDERING before capturing, "
+                        "re-activating it as needed (polls the app's ui_age). A Unity "
+                        "app that is not rendering still screenshots -- it returns its "
+                        "last frame, which for Qud is the playfield with no UI overlay, "
+                        "so a status-screen shot comes back looking like the map. "
+                        "Exits 1 if it cannot settle, having still written the file.")
+    s.add_argument("--live-age", type=float, default=None, metavar="N",
+                   help="ui_age that counts as rendering (default 2)")
+    s.add_argument("--live-timeout", type=float, default=None, metavar="S",
+                   help="how long to keep retrying the activate (default 30)")
     s.set_defaults(fn=_cmd_shot)
 
     s = sub.add_parser("text")

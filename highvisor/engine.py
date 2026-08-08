@@ -175,12 +175,20 @@ class Engine:
             return {"ok": True, "targets": rows}
 
         if op == P.OP_SHOT:
+            settled = None
+            if req.get("live"):
+                settled = self._settle_for_capture(
+                    b, req.get("target"),
+                    max_age=float(req.get("live_age") or 2),
+                    timeout=float(req.get("live_timeout") or 30))
             png = b.screenshot(req.get("target"), native=bool(req.get("native")))
             resp = {"ok": True, "bytes": len(png),
                     "png_b64": base64.b64encode(png).decode("ascii")}
             dims = _png_dims(png)
             if dims:
                 resp["w"], resp["h"] = dims
+            if settled is not None:
+                resp.update(settled)
             return resp
 
         # For actions, the response IS the ActionResult dict: its ``ok`` reports
@@ -1181,6 +1189,72 @@ class Engine:
     # A report is trusted only while FRESH (mtime within STATE_FILE_TTL): a crashed app's
     # last write must not pin the tree to a stale screen.
     STATE_FILE_TTL = 6.0
+
+    def _settle_for_capture(self, b, target, max_age=2.0, timeout=30.0):
+        """Wait until the target app is actually RENDERING, re-activating as needed.
+
+        A Unity app that is not rendering still screenshots -- it hands back its last
+        frame, and for Qud that frame is the playfield WITHOUT the UI overlay, so a
+        status-screen capture comes back looking like the plain map. The heartbeat is
+        not lying when this happens; it correctly reports the status screen. The
+        capture is the thing that is stale, which is why this survived so long: every
+        state check agreed with what we wanted while the PNG on disk did not.
+
+        `ui_age` is the tell, and it has to be read AT the capture, not around it.
+        Measured 2026-08-08: at ui_age 1 the file holds the real screen, at 5..23 it
+        holds a stale UI-less frame -- and runs that sampled ui_age before or after
+        the shot happily logged 1 while the shot itself was stale.
+
+        Re-activating matters as much as waiting: `activate` frequently does not take
+        when another window is contending (three attempts in a row measured before one
+        landed), so this retries it rather than trusting one call and sleeping.
+
+        Returns a dict merged into the shot response: whether it settled and the age
+        it settled at. Never raises and never blocks the capture -- a stale shot that
+        is LABELLED stale is still better than no shot, and the caller decides.
+        """
+        import os as _os
+        import time as _t
+        from . import gametree
+        try:
+            apps = gametree.apps(gametree.load_tree())
+        except Exception:
+            return {"live_checked": False, "live_reason": "no tree"}
+        # Match the target against each app's window name; the shot target is a window.
+        want = str(target or "").strip().lower()
+        cfg = None
+        for _name, _cfg in apps.items():
+            win = str(_cfg.get("window") or "").strip().lower()
+            if win and (win == want or win in want or want in win):
+                cfg = _cfg
+                break
+        path = (cfg or {}).get("state_file")
+        if not path:
+            return {"live_checked": False, "live_reason": "app authors no state file"}
+        p = _os.path.expanduser(path)
+
+        deadline = _t.time() + timeout
+        last = None
+        tries = 0
+        while _t.time() < deadline:
+            d = self._read_state_file(p)
+            age = (d or {}).get("ui_age")
+            if age is None:
+                return {"live_checked": False, "live_reason": "state file has no ui_age"}
+            last = age
+            if float(age) <= max_age:
+                return {"live_checked": True, "live": True,
+                        "ui_age": age, "live_tries": tries}
+            tries += 1
+            try:
+                b.activate(target)
+            except Exception:
+                pass
+            _t.sleep(1.2)
+        return {"live_checked": True, "live": False, "ui_age": last,
+                "live_tries": tries,
+                "live_reason": "ui_age stayed above %s for %ss -- this capture is "
+                               "probably a stale frame" % (max_age, timeout)}
 
     def _read_state_file(self, path, pid=None):
         """Parsed JSON dict of a fresh state file, else None.
