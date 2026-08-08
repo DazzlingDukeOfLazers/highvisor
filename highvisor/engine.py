@@ -1710,8 +1710,13 @@ class Engine:
                 again["steps"] = steps + (again.get("steps") or [])
                 return again
             _finish(False, r.get("error"))
+            # Surface the refusal FLAG on the result too. Callers were otherwise left
+            # grepping the error text to tell "declined on purpose" from "broke", and a tour
+            # script doing exactly that mis-labelled a run that refused one edge, re-planned
+            # past it, and then failed on a LATER edge for an unrelated reason.
             return {"ok": False, "app": app, "node": node_id, "steps": steps,
-                    "route": route_label, "error": r.get("error")}
+                    "refused": bool(r.get("refused")), "route": route_label,
+                    "error": r.get("error")}
 
         # No route in the graph — fall back to the node's legacy recipe if it still has
         # one. Reported either way: a node driven by a recipe is a node whose transitions
