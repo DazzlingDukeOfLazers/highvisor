@@ -1128,60 +1128,80 @@
                   {
                     "id": "equipment_item_popup",
                     "label": "Item interaction popup",
-                    "note": "Qud's own menu, raised by EquipmentAPI.TwiddleObject and mirrored over the popup channel. Parity spec: raves-of-qud/reports/2026-08-05-item-popup/parity-item-popup.json. Qud's popup carries a HEADER above the commands (item tile + name + notched divider) that Raves does not draw yet -- the leaves below measure that gap, so their scores are the size of the work remaining, not a misalignment.",
+                    "note": "Qud's own menu, raised by EquipmentAPI.TwiddleObject and mirrored over the popup channel. Parity spec: raves-of-qud/reports/2026-08-05-item-popup/parity-item-popup.json. 2026-08-08: Qud's POPUP BOX MODEL is now ported whole from the live RectTransforms (uiprobe target=PopupMessage) -- the centred MenuControll, its spacing/padding, the 138.12 context block, the content-sized command area and the MenuCrome bar, with the chrome hung OFF that box (top rule 16 above it, bottom rule 15.5 inside it). Verified on six popups across four kinds: the fill, top rule, divider and bottom rule land on Qud's own pixel rows in every one.",
                     "done": {
                       "qud": 1.0,
-                      "raves": 0.5
+                      "raves": 1.0
                     },
                     "detect": {},
                     "children": [
                       {
                         "id": "item_popup_image_frame",
                         "label": "Image frame (above the commands)",
-                        "note": "parity leaf popup_image_frame - the framed header block, Qud x825-1079 y334-486. 16.48.",
+                        "note": "parity leaf popup_image_frame - the framed header block, Qud x825-1079 y334-486. 2.28.",
                         "done": {
                           "qud": 1.0,
-                          "raves": 0.0
+                          "raves": 0.95
                         },
                         "detect": {}
                       },
                       {
                         "id": "item_popup_frame_text_content",
                         "label": "Image frame: text content",
-                        "note": "parity leaf popup_frame_text_content - the item name line inside the block. 32.21.",
+                        "note": "parity leaf popup_frame_text_content - the item name line inside the block. 4.98 (was 15.40; the residual is small-text antialiasing, a documented parity floor).",
                         "done": {
                           "qud": 1.0,
-                          "raves": 0.0
+                          "raves": 0.9
                         },
                         "detect": {}
                       },
                       {
                         "id": "item_popup_frame_text_color",
                         "label": "Image frame: text colour",
-                        "note": "parity leaf popup_frame_text_color (kind ink_color - palette only, position ignored). 25.80.",
+                        "note": "parity leaf popup_frame_text_color (kind ink_color - palette only, position ignored). 2.30.",
                         "done": {
                           "qud": 1.0,
-                          "raves": 0.0
+                          "raves": 0.95
                         },
                         "detect": {}
                       },
                       {
                         "id": "item_popup_image_geometry",
                         "label": "Image: size / position",
-                        "note": "parity leaf popup_image_geometry (kind geometry - ink bbox only, colour ignored). Qud 42x54 at x939 y369; 47.00px mean.",
+                        "note": "parity leaf popup_image_geometry (kind geometry - ink bbox only, colour ignored). Qud 42x54 at x939 y369; 0.00 -- identical bbox.",
                         "done": {
                           "qud": 1.0,
-                          "raves": 0.0
+                          "raves": 1.0
                         },
                         "detect": {}
                       },
                       {
                         "id": "item_popup_image_color",
                         "label": "Image: colour",
-                        "note": "parity leaf popup_image_color (kind ink_color). 106.33.",
+                        "note": "parity leaf popup_image_color (kind ink_color). 0.00.",
                         "done": {
                           "qud": 1.0,
-                          "raves": 0.0
+                          "raves": 1.0
+                        },
+                        "detect": {}
+                      },
+                      {
+                        "id": "item_popup_frame_text_geometry",
+                        "label": "Image frame: text geometry",
+                        "note": "parity leaf popup_frame_text_geometry (kind geometry - the item-name line's ink box, colour ignored). 0.25: same x, same y, same width as Qud, 1px of ink height from the rasteriser. The 1px LEFT shift this leaf was added to isolate was downstream of the box width and resolved when the box model landed.",
+                        "done": {
+                          "qud": 1.0,
+                          "raves": 1.0
+                        },
+                        "detect": {}
+                      },
+                      {
+                        "id": "item_popup_placement",
+                        "label": "Popup placement (the box itself)",
+                        "note": "parity leaf popup_placement - the popup's own top-line placement, absolute. 0.00 (was 6.75). Qud CENTRES MenuControll and hangs the chrome off it; Raves used to centre the panel and draw the top rule inside it, which read as 'the popup sits 16px low'.",
+                        "done": {
+                          "qud": 1.0,
+                          "raves": 1.0
                         },
                         "detect": {}
                       }
