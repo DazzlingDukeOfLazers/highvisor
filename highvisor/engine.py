@@ -1048,9 +1048,26 @@ class Engine:
                 return {"ok": True, "passed": True, "app": app, "want": want,
                         "elapsed": round(time.monotonic() - t0, 2), "actual": _slim_state(st)}
             if time.monotonic() - t0 >= timeout:
-                return {"ok": True, "passed": False, "app": app, "want": want,
-                        "elapsed": round(time.monotonic() - t0, 2), "actual": _slim_state(st),
-                        "error": "assert timed out"}
+                res = {"ok": True, "passed": False, "app": app, "want": want,
+                       "elapsed": round(time.monotonic() - t0, 2), "actual": _slim_state(st),
+                       "error": "assert timed out"}
+                # SURFACE ui_age. It was already in the payload — twenty lines down inside
+                # actual.extra — which is not where anyone looks when an assert fails, and
+                # that is not hypothetical: a stalled Qud uiQueue was misdiagnosed as a bad
+                # recipe TWICE on this branch in one day, the second time by the person who
+                # had written the gotcha that morning. A stale UI and a wrong recipe are
+                # indistinguishable from the destination state; only this number separates
+                # them, so it gets promoted to the top level and says what it means.
+                age = ((st or {}).get("extra") or {}).get("ui_age")
+                if age is not None:
+                    res["ui_age"] = age
+                    if isinstance(age, (int, float)) and age > 10:
+                        res["error"] = (
+                            "assert timed out — but the app's UI is STALE (ui_age %s). Its "
+                            "queue has stopped draining, so mod-driven steps no-op silently "
+                            "and the state never moves. Restart the app before suspecting "
+                            "the recipe." % age)
+                return res
             time.sleep(interval)
 
     def _assert_holds(self, want, st):
