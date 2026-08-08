@@ -15,3 +15,8 @@ env/
 # Local automation transcript dropped by desktop-automation runs
 @AutomationLog.txt
 .DS_Store
+
+# Ageing/measurement run output (tools/age_qud_quit.py) — data, not source
+age_*.log
+age_qud_quit.jsonl
+age_fail_*.png

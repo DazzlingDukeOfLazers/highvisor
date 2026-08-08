@@ -283,7 +283,8 @@ class Engine:
             return self._gamestate(b, ocr=bool(req.get("ocr", False)))
 
         if op == P.OP_GAMEGO:
-            return self._gamego(b, req.get("app"), req.get("node"))
+            return self._gamego(b, req.get("app"), req.get("node"),
+                                no_restart=bool(req.get("no_restart")))
 
         if op == P.OP_PLAN:
             return self._plan_route(b, req.get("app"), req.get("node"), req.get("from"))
@@ -308,6 +309,9 @@ class Engine:
 
         if op == P.OP_TRACE:
             return self._read_trace(req.get("limit", 20))
+
+        if op == P.OP_QUIT:
+            return self._quit_app(b, req.get("app"), force=bool(req.get("force")))
 
         if op == P.OP_RESTART:
             return self._restart_app(b, req.get("app", ""))
@@ -607,6 +611,171 @@ class Engine:
         except OSError as e:
             return {"ok": False, "error": "qud bridge: %s" % e}
 
+    def _qud_command_chain(self, command, answers, timeout=25.0):
+        """Run a Qud command and answer the modals it raises AS THEY ARRIVE.
+
+        This replaces a blind `send, sleep 1.2, answer, sleep 1.2, answer` chain, and the
+        difference is not cosmetic. Both writes in the blind version succeeded whatever the
+        game did -- a TCP write to the mod cannot fail just because no popup was up -- so
+        every step reported ok and the only thing that could ever fail was the edge's verify,
+        45 seconds later, with no record of which prompt went unanswered. Three wrong
+        diagnoses came out of that gap ("stale save", "Raves contention", "process age");
+        what it actually hid is below.
+
+        **Qud's quit chain is not a fixed length.** Decompiled from the shipped assembly
+        (XRL.Core.XRLCore, case "CmdQuit"): after "Are you sure you want to quit?" -> Yes and
+        "Do you want to save first?", a THIRD prompt appears unless
+        `Options.DisablePermadeath || CheckpointingSystem.IsCheckpointingEnabled()` -- and
+        checkpointing is on only for **Wander/Roleplay** saves. On a **Classic** save Qud
+        raises `Popup.AskString(… Type 'ABANDON' to confirm)`, a TEXT-INPUT modal. Two blind
+        answers have nothing for it, so it sits there with the turn thread parked inside it,
+        the state file reads In-Game forever, and -- the part that made this look like
+        process ageing -- every later `goto in_game` is a NO-OP, because the tree still calls
+        that state in_game, so "retrying on a fresh load" never reloaded anything.
+
+        We answer that prompt by REFUSING it. Typing ABANDON is the quit-without-saving path
+        for a permadeath character: it sets a DeathReason and ends the run. A harness must not
+        destroy a character to satisfy a state transition, so the input modal is CANCELLED and
+        the edge fails with what happened. The planner's `"*" -> title` restart edge is the
+        non-destructive way out, and it will be re-planned onto automatically.
+
+        Matching is by CONTENT, never by the popup's id. The mod re-publishes the live popup
+        on every client connect, and highvisor's own state poller connects about twice a
+        second, so one prompt arrives over and over with a fresh id each time -- answering per
+        id sends the second answer to the first prompt (measured: it answered "Are you sure
+        you want to quit?" twice in 0.31s).
+        """
+        import json as _json
+        import socket as _socket
+        import struct as _struct
+        import time as _time
+        from .apps import PROFILES
+        port = PROFILES.get("qud", {}).get("port", 48710)
+
+        def _send(sock, obj):
+            p = _json.dumps(obj).encode("utf-8")
+            sock.sendall(_struct.pack(">I", len(p)) + p)
+
+        def _sig(f):
+            return ((f.get("message") or "")
+                    + "|" + ",".join(b.get("command", "") for b in f.get("buttons") or []))
+
+        pending = list(answers or [])
+        answered = []
+        try:
+            with _socket.create_connection(("127.0.0.1", port), timeout=5) as s:
+                # The mod re-broadcasts the live popup to a joining client, so a short drain
+                # here says whether a modal was ALREADY up. That is not our prompt and must
+                # not eat an answer -- record it as seen and let the edge's preflight own it.
+                buf = b""
+                seen = set()
+                deadline = _time.time() + 0.6
+                while _time.time() < deadline:
+                    s.settimeout(max(0.05, deadline - _time.time()))
+                    try:
+                        chunk = s.recv(65536)
+                    except (_socket.timeout, OSError):
+                        break
+                    if not chunk:
+                        break
+                    buf += chunk
+                    while len(buf) >= 4:
+                        n = _struct.unpack(">I", buf[:4])[0]
+                        if len(buf) < 4 + n:
+                            break
+                        body, buf = buf[4:4 + n], buf[4 + n:]
+                        try:
+                            f = _json.loads(body.decode("utf-8", "replace"))
+                        except ValueError:
+                            continue
+                        if f.get("type") == "popup" and f.get("active"):
+                            seen.add(_sig(f))
+
+                _send(s, {"type": "command", "name": "command", "command": command})
+                if not pending:
+                    return {"ok": True, "command": command, "answered": []}
+
+                # Keep reading until every answer has found its prompt, then a beat longer to
+                # catch a prompt we did NOT expect -- which is the whole point.
+                deadline = _time.time() + float(timeout)
+                grace = None
+                while _time.time() < deadline:
+                    s.settimeout(0.3)
+                    try:
+                        chunk = s.recv(65536)
+                    except _socket.timeout:
+                        if grace is not None and _time.time() > grace:
+                            return {"ok": True, "command": command, "answered": answered}
+                        continue
+                    except OSError as e:
+                        return {"ok": False, "error": "qud bridge: %s" % e}
+                    if not chunk:
+                        break
+                    buf += chunk
+                    while len(buf) >= 4:
+                        n = _struct.unpack(">I", buf[:4])[0]
+                        if len(buf) < 4 + n:
+                            break
+                        body, buf = buf[4:4 + n], buf[4 + n:]
+                        try:
+                            f = _json.loads(body.decode("utf-8", "replace"))
+                        except ValueError:
+                            continue
+                        if f.get("type") != "popup" or not f.get("active"):
+                            continue
+                        sig = _sig(f)
+                        if sig in seen:
+                            continue          # a re-announce of one we already handled
+                        seen.add(sig)
+                        msg = (f.get("message") or "").strip()
+                        if f.get("kind") == "input":
+                            # The ABANDON prompt (or any other typed confirmation). Cancel it
+                            # so the game is left live and intact, and say why we stopped.
+                            _send(s, {"type": "command", "name": "popup",
+                                      "action": "button", "btn": "Cancel"})
+                            return {"ok": False, "answered": answered, "refused": True,
+                                    "error": "%s raised a TEXT-INPUT confirmation this edge "
+                                             "must not answer: %r. Qud asks that only when the "
+                                             "save has no checkpointing (a Classic character), "
+                                             "and typing it quits WITHOUT SAVING, ending a "
+                                             "permadeath run. Cancelled it; the game is still "
+                                             "live. Use a Wander/Roleplay save, or reach the "
+                                             "title by restarting."
+                                             % (command, msg[:90])}
+                        if not pending:
+                            _send(s, {"type": "command", "name": "popup",
+                                      "action": "button", "btn": "Cancel"})
+                            return {"ok": False, "answered": answered,
+                                    "error": "%s raised an unexpected extra prompt %r after "
+                                             "%d answer(s); cancelled it rather than guessing"
+                                             % (command, msg[:90], len(answered))}
+                        btn = pending.pop(0)
+                        have = [b.get("command", "") for b in f.get("buttons") or []]
+                        if btn not in have:
+                            _send(s, {"type": "command", "name": "popup",
+                                      "action": "button", "btn": "Cancel"})
+                            return {"ok": False, "answered": answered,
+                                    "error": "%s: prompt %r offers %s, not %r -- cancelled "
+                                             "rather than pressing the wrong button"
+                                             % (command, msg[:60], have, btn)}
+                        _send(s, {"type": "command", "name": "popup",
+                                  "action": "button", "btn": btn})
+                        answered.append({"prompt": msg[:60], "btn": btn})
+                        if not pending:
+                            # Everything we planned for is answered. Watch a little longer:
+                            # a further prompt now is the Classic-save case above.
+                            grace = _time.time() + 3.0
+
+                if pending:
+                    return {"ok": False, "answered": answered,
+                            "error": "%s: no popup appeared to answer %r (waited %.0fs). The "
+                                     "command reached the mod, so the turn thread never got "
+                                     "to it -- a modal already up, or no live game."
+                                     % (command, pending[0], timeout)}
+                return {"ok": True, "command": command, "answered": answered}
+        except OSError as e:
+            return {"ok": False, "error": "qud bridge: %s" % e}
+
     def _qud_bridge(self, name, focus=True, args=None):
         """Send a bare {"type":"command","name":...} frame to the Qud mod bridge
         (listener is up from the main menu on — ModSensitiveCacheInit). First-party
@@ -708,6 +877,62 @@ class Engine:
         return {"ok": True, "saves": out}
 
     # ------------------------------------------------------- clean restart
+    def _quit_app(self, b, app, force=False):
+        """Stop EVERY instance of an app and leave it stopped.
+
+        The gap this fills: highvisor could launch and restart, but not simply STOP — so
+        "run this with only the other app up" had no expression here, and the only way to
+        get it was hand-driving the app's own quit menu, which is what the prime rule
+        exists to prevent. It came up chasing a quit-path failure that two apps mirroring
+        each other's modals could plausibly explain: testing that means running one alone.
+
+        TERM first, KILL only on `force` or after the grace period. A -9 skips the app's own
+        shutdown, and both of these apps write state on the way out (Raves' UiState report,
+        Qud's save) — losing that would make the next run's state file a lie, which is a
+        worse failure than a slow quit. `restart_app` still uses -9 because it relaunches
+        immediately and does not care what the dying instance was holding.
+
+        Verified by the WINDOW going away, not by the signal being sent: pkill reports
+        success for a process that ignores TERM.
+        """
+        import subprocess as _sp
+        import time as _t
+        from .apps import PROFILES
+        prof = PROFILES.get(app) or {}
+        proc, win = prof.get("proc"), prof.get("window", "")
+        if not proc:
+            return {"ok": False, "error": "no proc profile for app %r" % app}
+
+        def up():
+            return [t for t in b.list_targets()
+                    if win and win in (t.to_dict().get("title") or "")]
+
+        before = len(up())
+        if not before:
+            return {"ok": True, "app": app, "was_running": False, "detail": "not running"}
+
+        import os as _os
+        windows = _os.name == "nt"
+        if windows:
+            _sp.run(["taskkill"] + (["/F"] if force else []) + ["/IM", proc + ".exe"],
+                    capture_output=True)
+        else:
+            _sp.run(["pkill", "-9" if force else "-TERM", "-f", proc], capture_output=True)
+
+        deadline = _t.time() + (5 if force else 12)
+        while _t.time() < deadline:
+            if not up():
+                return {"ok": True, "app": app, "was_running": True, "instances": before,
+                        "forced": bool(force)}
+            _t.sleep(0.5)
+
+        if force:
+            return {"ok": False, "app": app,
+                    "error": "%s still has a window after a forced kill" % app}
+        # graceful quit ignored or blocked (a modal can hold it) — say so, and say the remedy
+        return {"ok": False, "app": app, "instances": before,
+                "error": "%s did not exit within 12s of TERM — retry with --force" % app}
+
     def _restart_app(self, b, app):
         """Kill EVERY instance of the app (duplicates included — the double-launch
         class), launch its solo launcher, wait for the window. The one true restart."""
@@ -1100,11 +1325,9 @@ class Engine:
             if (st.get("signals", {}).get("scene") or "") != want["scene"]:
                 return False
         if "popup" in want:
-            popup = (st.get("extra") or {}).get("popup")
-            if want["popup"] is True:
-                if not popup:
-                    return False
-            elif str(popup or "") != str(want["popup"]):
+            # Engine., not self. -- `_assert_holds` is deliberately pure over (want, state)
+            # so tools/selftest_evaluate.py can exercise it with no daemon and no instance.
+            if not Engine._popup_matches((st.get("extra") or {}).get("popup"), want["popup"]):
                 return False
         if "ocr_contains" in want:
             # _gamestate stored no raw text; re-derive from the evaluate input is overkill —
@@ -1191,6 +1414,58 @@ class Engine:
                 return False
         return True
 
+    @staticmethod
+    def _popup_matches(have, want):
+        """Does the app's reported modal KIND satisfy a `popup` condition?
+
+        One matcher for all three callers (`hv assert`, an `assert` step, a `dismiss`
+        condition) because they were drifting: the assert path already understood
+        `popup: true` = "any modal", the dismiss path compared strings only, so
+        `{"dismiss": {"popup": true}}` silently never matched.
+
+        Naming ONE kind is the trap this exists to make avoidable. Raves reports
+        `message` / `menu` / `input` / `itempicker` / `feedback`, so a condition that
+        says `message` is stepped past by any of the other four -- which is exactly how
+        Qud's ABANDON confirm (an AskString, mirrored as `input`) walked through all
+        four steps of `raves in_game -> title` while every one reported ok. Accepts:
+
+            true              any modal at all -- the kind-agnostic form, prefer it for
+                              "clear whatever is in the way" steps
+            "message"         that kind
+            ["message","menu"] any of these
+        """
+        have = str(have or "")
+        if want is True:
+            return bool(have)
+        if want is False:
+            return not have          # "and nothing is up" -- assertable, so a chain can
+                                     # end by proving it left no modal behind
+        if isinstance(want, (list, tuple)):
+            return have.lower() in [str(w).lower() for w in want]
+        return have.lower() == str(want).lower()
+
+    @staticmethod
+    def _dismiss_fingerprint(st, scene=None):
+        """What "the screen changed" MEANS for a dismiss step.
+
+        The kind of popup is not enough to tell one modal from the next of the same kind, and
+        the quit chain is exactly that: "are you sure you want to quit?" then "do you want to
+        save first?", both reported as `message`. Answering the first raises the second, the
+        (scene, popup) pair comes back identical, and the step reports "dismiss ran but popup
+        message is still up" about an answer that landed — measured 2026-08-07, and it failed
+        the whole route roughly every other attempt depending on which confirm was up when the
+        drive started.
+
+        `popup_n` is Raves' count of popups RAISED this run, so a replacement modal moves it.
+        Apps that do not report one degrade to the old pair, which is what Qud does (it reports
+        no popup state of its own, which is why its edges answer blind chains instead).
+        """
+        sig = st.get("signals") or {}
+        extra = st.get("extra") or {}
+        return (str(scene if scene is not None else (sig.get("scene") or "")).lower(),
+                str(extra.get("popup") or "").lower(),
+                str(extra.get("popup_n") or ""))
+
     def _preflight(self, b, app, tree):
         """Clear conditions that sit ON TOP of a state, before planning against it.
 
@@ -1238,7 +1513,12 @@ class Engine:
                 steps.append({"step": step, "ok": bool(r.get("ok")), "edge": edge.get("id"),
                               "detail": r.get("detail", ""), "error": r.get("error")})
                 if not r.get("ok"):
-                    return {"ok": False, "error": "%s: %s" % (edge.get("id"), r.get("error"))}
+                    # `refused` travels as a FLAG with the edge id attached. The tour script
+                    # already had to string-match this once and broke on letter case; nothing
+                    # downstream should ever parse an error message to learn it happened.
+                    return {"ok": False, "refused": bool(r.get("refused")),
+                            "refused_edge": edge.get("id") if r.get("refused") else None,
+                            "error": "%s: %s" % (edge.get("id"), r.get("error"))}
             a = dict(edge.get("verify") or {"node": edge.get("to")})
             a.setdefault("app", app)
             a["timeout"] = edge.get("timeout", 15)
@@ -1343,7 +1623,7 @@ class Engine:
         return rt
 
     # ------------------------------------------------------- gamego (drive-to-state)
-    def _gamego(self, b, app, node_id, _depth=0, _replans=0):
+    def _gamego(self, b, app, node_id, _depth=0, _replans=0, _exclude=(), no_restart=False):
         """Drive ``app`` to tree state ``node_id``.
 
         PLANNED, not scripted. The route is searched at call time from the state the app is
@@ -1436,9 +1716,27 @@ class Engine:
         # and planning from the pre-clear reading is planning from a state we just left.
         st = self._gamestate(b).get("states", {}).get(app) or st
         start = self._planner_state(st)
-        rt = plan.route(tree, app, start, node_id, signals=st.get("signals"))
+        rt = plan.route(tree, app, start, node_id, signals=st.get("signals"),
+                        exclude=_exclude)
         if rt.get("ok"):
             route_label = plan.summarize(rt)
+            # A RESTART is never silent. Reaching a state by killing the app discards
+            # unsaved progress -- which is what quitting would discard anyway, so it is
+            # defensible, but a `goto` that restarts the game because a confirm was refused
+            # is a surprise, and surprises get named here. Callers who would rather fail can
+            # say so.
+            restarts = [e.get("id") for e in rt["route"]
+                        if any("restart" in stp for stp in (e.get("steps") or []))]
+            if restarts:
+                why = ("after %d refused edge(s): %s" % (len(_exclude), ", ".join(sorted(_exclude)))
+                       if _exclude else "it is the cheapest route")
+                if no_restart:
+                    err = ("the only route to %s RESTARTS %s (%s) and no_restart was set"
+                           % (node_id, app, why))
+                    return fail({"restart_refused": restarts}, err)
+                steps.append({"step": {"restart_planned": restarts}, "ok": True,
+                              "detail": "this route RESTARTS %s -- %s. Unsaved progress is "
+                                        "discarded; the save file is untouched." % (app, why)})
             self.bus.publish("gamego", app=app, node=node_id, step={"plan": route_label})
             r = self._drive_route(b, app, tree, rt["route"], steps, _depth, start=start)
             if r.get("ok"):
@@ -1450,14 +1748,32 @@ class Engine:
             # thought — a confirm we did not expect, a screen that ignored a key. If it
             # MOVED, the honest response is to plan again from where it actually is; if it
             # did not, planning again would produce the same route and loop.
+            #
+            # A REFUSAL is different in kind and gets its own arm. "This edge cannot work in
+            # this state" is definite, so excluding that edge id and planning again CANNOT
+            # reproduce the same route — the loop the moved-guard protects against is not
+            # reachable, which is precisely what makes re-planning safe here without it.
+            # On a Classic save that is the difference between "goto title gives up" and
+            # "goto title takes the restart route the graph already had".
             st2 = self._gamestate(b).get("states", {}).get(app) or {}
             moved = self._planner_state(st2)
+            if r.get("refused") and r.get("refused_edge") and _replans < 4:
+                nxt_ex = tuple(sorted(set(_exclude) | {r["refused_edge"]}))
+                steps.append({"step": {"replan": True, "excluding": r["refused_edge"]}, "ok": True,
+                              "detail": "%s REFUSED at %s; excluding that edge and re-planning"
+                                        % (r["refused_edge"], start)})
+                _finish(False, r.get("error"))
+                again = self._gamego(b, app, node_id, _depth, _replans + 1,
+                                     _exclude=nxt_ex, no_restart=no_restart)
+                again["steps"] = steps + (again.get("steps") or [])
+                return again
             if _replans < 2 and moved != start:
                 steps.append({"step": {"replan": True}, "ok": True,
                               "detail": "%s failed at %s; re-planning from %s"
                                         % (route_label, start, moved)})
                 _finish(False, r.get("error"))
-                again = self._gamego(b, app, node_id, _depth, _replans + 1)
+                again = self._gamego(b, app, node_id, _depth, _replans + 1,
+                                     _exclude=_exclude, no_restart=no_restart)
                 again["steps"] = steps + (again.get("steps") or [])
                 return again
             _finish(False, r.get("error"))
@@ -1643,25 +1959,22 @@ class Engine:
                 # flow the game's own UI owns -- Qud's modern screens ignore synthesized keys.
                 # Unconditional here, because a transition already knows which state it is
                 # leaving; the `dismiss` form below is for when that has to be re-checked.
-                r = self._qud_command(step["command"])
-                if not r.get("ok"):
-                    return {"ok": False,
-                            "error": "command %s: %s" % (step["command"], r.get("error"))}
+                #
+                # The answers are delivered ON ARRIVAL over a held bridge connection, not on a
+                # 1.2s timer. The timer version could not fail -- a socket write succeeds
+                # whether or not a modal is up -- so an unanswered prompt surfaced only as the
+                # verify timing out 45s later, which is how a Classic save's third, TEXT-INPUT
+                # confirm got mistaken three times for the process ageing. See
+                # `_qud_command_chain`.
                 answers = step.get("answers") or []
-                for btn in answers:
-                    # BLIND, deliberately, and this was tried the other way. Gating each answer on
-                    # a reported popup looked like the obvious upgrade — the mod publishes the
-                    # active modal — but the CmdQuit confirms are not among the kinds it reports,
-                    # so the gate never opened and it broke a path that worked. An answer with
-                    # nothing to answer is a no-op, so sending on a timer is safe; what is NOT
-                    # safe is assuming the app has settled by the time the edge verifies, which is
-                    # handled by the dismiss step after this one.
-                    time.sleep(1.2)
-                    rr = self._qud_popup_answer(btn)
-                    if not rr.get("ok"):
-                        return {"ok": False, "error": "answer %r: %s" % (btn, rr.get("error"))}
+                r = self._qud_command_chain(step["command"], answers,
+                                            timeout=float(step.get("answer_timeout", 25)))
+                if not r.get("ok"):
+                    return {"ok": False, "refused": bool(r.get("refused")),
+                            "error": "command %s: %s" % (step["command"], r.get("error"))}
                 return {"ok": True,
-                        "detail": "%s + %d answer(s)" % (step["command"], len(answers))}
+                        "detail": "%s + %d answer(s)" % (step["command"],
+                                                         len(r.get("answered") or []))}
 
             if "load_save" in step:
                 # Load a save through the mod's own `loadsave {id}` bridge command: exact ID,
@@ -1706,8 +2019,14 @@ class Engine:
                 a["timeout"] = step.get("timeout", a.get("timeout", 15))
                 r = self._assert_state(b, a)
                 if not r.get("passed"):
-                    return {"ok": False, "error": "assert failed: wanted %s, got %s"
-                            % (a, (r.get("actual") or {}).get("label"))}
+                    act = r.get("actual") or {}
+                    # NAME the modal. The label alone reads "In-Game" for every stage of a
+                    # quit chain, so an assert that failed because a prompt was still up
+                    # said nothing about which prompt -- the same silence this whole edge
+                    # has been debugged through twice.
+                    up = ((act.get("extra") or {}).get("popup")) or ""
+                    return {"ok": False, "error": "assert failed: wanted %s, got %s%s"
+                            % (a, act.get("label"), (" with a %r modal up" % up) if up else "")}
                 return {"ok": True}
 
             if set(step) <= {"note"}:
@@ -1737,9 +2056,9 @@ class Engine:
         # Leaving a live game means answering a chain of confirms while the scene stays
         # "in_game" throughout, so scene alone cannot tell the steps apart.
         want_popup = cond.get("popup")
+        have_popup = str(((cur.get("extra") or {}).get("popup")) or "")
         if want_popup is not None:
-            have = str(((cur.get("extra") or {}).get("popup")) or "")
-            hit = have.lower() == str(want_popup).lower()
+            hit = self._popup_matches(have_popup, want_popup)
         else:
             # A LIST of scenes is one condition, not several steps: Raves reports its status
             # screens as eight distinct scenes that all clear the same way, and spelling out
@@ -1751,23 +2070,89 @@ class Engine:
         # branch serve all three shapes: closing a screen moves the scene, raising a confirm
         # moves the popup, and answering one moves the popup back -- CmdQuit does the middle,
         # and demanding a scene change failed it even though it had worked.
-        before = (str(scene).lower(),
-                  str(((cur.get("extra") or {}).get("popup")) or "").lower())
-        if not hit:
-            return {"ok": True, "detail": "not present"}
+        before = self._dismiss_fingerprint(cur, scene)
         cfg = gametree.apps(tree).get(app, {})
+
+        # A REFUSAL step: "if this is up, we cannot go on -- clear it and say why."
+        # An answer chain is a fixed length, so the thing it cannot express is a prompt it
+        # did not plan for; without a trailing refusal that prompt is simply left standing
+        # and the edge dies at its verify, blaming nothing. Cancelling (rather than only
+        # reporting) is what keeps the failure from poisoning the next attempt -- a modal
+        # left up eats every later keystroke and makes the NEXT run fail for a different,
+        # wrong-looking reason.
+        if hit and cond.get("refuse"):
+            win0 = self._find_win(b.list_targets(), cfg.get("window"))
+            cancelled = False
+            if win0 is not None:
+                try:
+                    b.key(win0.id, cond.get("key", "Escape"), focus=True)
+                    time.sleep(0.8)
+                    cancelled = True
+                except Exception:
+                    cancelled = False
+            return {"ok": False, "refused": True,
+                    "error": "refusing to continue: a %r modal is up -- %s. %s"
+                             % (have_popup or scene, cond["refuse"],
+                                "Cancelled it; the app is left clean." if cancelled
+                                else "Could not reach the window to cancel it.")}
+
+        if not hit:
+            # "Not the modal I name" is NOT the same as "no modal", and conflating them is
+            # how a step that cannot fail gets written. `{"popup": "message"}` matched none
+            # of Qud's ABANDON confirm (an AskString, mirrored by Raves as `input`), so all
+            # four steps of `raves in_game -> title` reported ok while the prompt sat there
+            # and the route died 25s later at its verify with nothing naming the cause --
+            # the same shape as the Qud-side bug this pattern already produced once.
+            #
+            # A condition that wants "whatever is in the way" should say `popup: true`; one
+            # that names a kind is claiming to answer THAT prompt, so another modal being up
+            # is a real error and is reported as one.
+            if want_popup is not None and have_popup:
+                detail = ("dismiss expects popup %r but a %r modal is up"
+                          % (want_popup, have_popup))
+                if str(have_popup).lower() == "input":
+                    # A TEXT-INPUT modal. Never send this step's keys at it: `space` types a
+                    # space into the box and `Right` moves the caret, so an answer chain aimed
+                    # at a button confirm silently edits someone's text field. For the quit
+                    # chain that field is Qud's "type ABANDON to confirm", whose completion
+                    # ends a permadeath run -- refuse it, cancel it so the app is left clean
+                    # and not poisoned for the next attempt, and say why.
+                    win0 = self._find_win(b.list_targets(), cfg.get("window"))
+                    cancelled = False
+                    if win0 is not None:
+                        try:
+                            b.key(win0.id, "Escape", focus=True)
+                            time.sleep(0.8)
+                            cancelled = True
+                        except Exception:
+                            cancelled = False
+                    return {"ok": False,
+                            "error": "%s. That is a text-input confirmation this step must "
+                                     "not type into -- Qud asks one ('type ABANDON to "
+                                     "confirm') when the save has no checkpointing, i.e. a "
+                                     "Classic character, and completing it quits WITHOUT "
+                                     "SAVING and ends a permadeath run. %s"
+                                     % (detail,
+                                        "Cancelled it; the game is still live."
+                                        if cancelled else
+                                        "Could not reach the window to cancel it.")}
+                return {"ok": False,
+                        "error": "%s -- refusing to press this step's affordance at a modal "
+                                 "it was not written for. Use `popup: true` if the step is "
+                                 "meant to clear whatever is up." % detail}
+            return {"ok": True, "detail": "not present"}
         win = self._find_win(b.list_targets(), cfg.get("window"))
         if win is None:
             return {"ok": False, "error": "dismiss: no window for %s" % app}
         if cond.get("command"):
-            r = self._qud_command(cond["command"])
+            # Same observed-arrival delivery as the `command` step above -- a dismiss that
+            # answers a chain must be able to report an unanswered prompt, not just that its
+            # writes left the machine. With no `answers` this is a plain command send.
+            r = self._qud_command_chain(cond["command"], cond.get("answers") or [],
+                                        timeout=float(cond.get("answer_timeout", 25)))
             if not r.get("ok"):
-                return {"ok": False, "error": "dismiss command: %s" % r.get("error")}
-            for btn in (cond.get("answers") or []):
-                time.sleep(1.2)
-                rr = self._qud_popup_answer(btn)
-                if not rr.get("ok"):
-                    return {"ok": False, "error": "dismiss answer: %s" % rr.get("error")}
+                return {"ok": False, "refused": bool(r.get("refused")),
+                        "error": "dismiss command: %s" % r.get("error")}
         elif cond.get("bridge"):
             # first-party dismissal -- no OCR, no coords, no focus steal
             r = self._qud_bridge(cond["bridge"])
@@ -1820,8 +2205,7 @@ class Engine:
         for _ in range(8):
             time.sleep(0.7)
             cur2 = (self._gamestate(b).get("states", {}).get(app) or {})
-            now = (str((cur2.get("signals") or {}).get("scene") or "").lower(),
-                   str(((cur2.get("extra") or {}).get("popup")) or "").lower())
+            now = self._dismiss_fingerprint(cur2)
             if now != before:
                 return {"ok": True, "detail": "dismissed %s" % what}
         return {"ok": False, "error": "dismiss ran but %s is still up" % what}

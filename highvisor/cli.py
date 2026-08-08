@@ -240,9 +240,14 @@ def _cmd_assert(a):
 
 def _cmd_goto(a):
     """Drive an app to a state-tree node along a planned route."""
-    res = _call({"op": P.OP_GAMEGO, "app": a.app, "node": a.node})
+    res = _call({"op": P.OP_GAMEGO, "app": a.app, "node": a.node,
+                 "no_restart": bool(getattr(a, "no_restart", False))})
     if res.get("route"):
         print("route: %s" % res["route"])
+    # A restart is loud on the way past, not something to find later in the JSON.
+    for st in res.get("steps") or []:
+        if "restart_planned" in (st.get("step") or {}):
+            print("!! %s" % st.get("detail"))
     _print_json(res)
     raise SystemExit(0 if res.get("ok") else 1)
 
@@ -304,6 +309,18 @@ def _cmd_saves(a):
 def _cmd_loadsave(a):
     """Load a NAMED save (row computed from disk metadata — no top-row roulette)."""
     res = _call({"op": P.OP_LOAD_SAVE, "name": " ".join(a.name)}, timeout=180.0)
+    _print_json(res)
+    raise SystemExit(0 if res.get("ok") else 1)
+
+
+def _cmd_quit(a):
+    """Stop an app and LEAVE it stopped — the gap between `launch` and `restart`.
+
+    Wanted whenever a test needs one app alone: these two mirror each other's modals over
+    the bridge, so "does this still fail with only Qud up?" is a real question, and before
+    this the only way to ask it was hand-driving the app's own quit menu.
+    """
+    res = _call({"op": P.OP_QUIT, "app": a.app, "force": bool(a.force)}, timeout=40.0)
     _print_json(res)
     raise SystemExit(0 if res.get("ok") else 1)
 
@@ -1030,6 +1047,10 @@ def build_parser():
     s = sub.add_parser("goto", help="drive an app to a state-tree node along a planned route, e.g. hv goto qud in_game")
     s.add_argument("app", help="qud | raves")
     s.add_argument("node", help="tree node id, e.g. title | in_game")
+    s.add_argument("--no-restart", action="store_true",
+                   help="fail rather than reach the node by RESTARTING the app. A restart "
+                        "discards unsaved progress (the save file is untouched); it becomes "
+                        "reachable when an edge refuses, e.g. Qud's quit on a Classic save.")
     s.set_defaults(fn=_cmd_goto)
 
     s = sub.add_parser("plan", help="show the route `hv goto` would take, WITHOUT driving anything")
@@ -1064,6 +1085,13 @@ def build_parser():
 
     s = sub.add_parser("back", help="close/back out of Qud's current modern menu (first-party uiback)")
     s.set_defaults(fn=lambda a: _print_json(_call({"op": P.OP_QUDBACK})))
+    s = sub.add_parser("quit", help="stop an app and leave it stopped (TERM; --force for KILL)")
+    s.add_argument("app", help="qud | raves")
+    s.add_argument("--force", action="store_true",
+                   help="SIGKILL instead of a graceful TERM — skips the app's own shutdown, "
+                        "so it can lose state the app writes on the way out")
+    s.set_defaults(fn=_cmd_quit)
+
     s = sub.add_parser("restart", help="clean restart: kill ALL instances, launch solo, wait for the window")
     s.add_argument("app", help="qud | raves")
     s.set_defaults(fn=_cmd_restart)

@@ -143,8 +143,14 @@
                         {
                           "scene": "chargen_game_mode"
                         }
+                      ],
+                      "qud": [
+                        {
+                          "scene": "QudGamemodeModuleWindow"
+                        }
                       ]
-                    }
+                    },
+                    "note": "Qud side had NO detector until the whole-tree FULL sweep 2026-08-07 exposed it: the chooser was open and `hv state` still said Title Screen (scene=QudGamemodeModuleWindow, via=live — an unmapped name falling back to title's game_live signal). Every consequence looked like a navigation bug: `goto new_game` reported landing on the title, and `goto game_mode` then tried to click 'New Game' on a screen already showing the chooser. The mod reports the window first-party, so take that rather than adding OCR substrings — Qud's title OCRs as 'New Kame' and 'Optlons' at this size anyway."
                   },
                   {
                     "id": "genotype",
@@ -726,12 +732,12 @@
             {
               "scene": [
                 "play",
-                "Stage",
                 "in_game",
                 "PopupMessage",
                 "PopupText",
                 "PopupYesNo"
-              ]
+              ],
+              "note": "`Stage` is NOT here, and that is load-bearing. The mod folds liveness into this field (StartupHook heartbeat: `live && view in (Stage, \"\", MainMenu) -> \"play\"`), so a LIVE game always reports `play` and the bare view name `Stage` can only mean the opposite -- the view never left the stage after the game ENDED. Measured across 913 recorded observations: scene=play was live 251/251, scene=Stage was not-live 49/49, never once the other way. See the `stranded_stage` node."
             },
             {
               "game_live": true
@@ -1295,7 +1301,7 @@
           {
             "id": "control_mapping",
             "label": "Control Mapping",
-            "note": "system menu -> Control Mapping. QUD DETECTION GAP: KeybindsScreen never updates _ActiveGameView (scene stays 'play'), so qud detect leans on OCR only.",
+            "note": "Qud reports this screen first-party as scene `Keybinds` (view) / `KeybindsScreen` (window), and until 2026-08-08 the tree only had an OCR detector for it -- so a Qud parked here matched no scene at all and fell through to `title`'s `{game_live: false}` alternative. `hv state` then said \"Title Screen via=live\" about a screen with a LIVE game behind it (the probe reads false because the turn thread is parked in the Keybinds UI and publishes no snapshot). Naming the screen is what makes it both legible and routable.",
             "done": {
               "qud": 0.8,
               "raves": 0.3
@@ -1307,6 +1313,12 @@
                 }
               ],
               "qud": [
+                {
+                  "scene": [
+                    "Keybinds",
+                    "KeybindsScreen"
+                  ]
+                },
                 {
                   "ocr_any": [
                     "control mapping",
@@ -1326,6 +1338,18 @@
             "note": "STATIC, ~0.2s, no apps. Fails if a keyboard hotkey is dispatched from _input without TypingGuard, and prints the text-field inventory so a NEW field shows in the diff. Live counterpart is the FULL case in docs/testing.md."
           }
         ]
+      },
+      {
+        "id": "stranded_stage",
+        "label": "Stranded stage (game over, view stuck)",
+        "detect": {
+          "qud": [
+            {
+              "scene": "Stage"
+            }
+          ]
+        },
+        "note": "A game that ENDED whose view never returned to the menu: The.Game is gone (`live: false`) while _ActiveGameView is still `Stage`. It used to read as In-Game, because in_game listed `Stage` among its scenes, and that mislabelling did the real damage: `hv goto qud in_game` from here planned ZERO steps and reported ok, so every 'retry on a fresh load' re-tested the same dead game. That is what disguised the Classic-save ABANDON bug as progressive process ageing for most of a session -- the retries were never reloading anything. Recorded evidence, 30 runs entered here: all 10 `goto in_game` calls planned 0 steps and returned ok; the other 20 failed and left the state exactly as they found it. It is ABSORBING -- 20/20 with no self-recovery -- which is why its only exit is a restart.\n\nTOP LEVEL, deliberately: as a child of in_game it would sit on in_game's path, and `assert node=in_game` tolerates landing deeper, so the edge that is supposed to catch 'the game never started' would pass here.\n\nNOT included: `StageWindow`, the other stage-ish scene the reporter can emit (view went vague, window still the stage). It is also always not-live, but it behaves differently in the record -- both runs that drove from it reached MainMenu, so it looks transient rather than absorbing, and naming it here would restart Qud for a state that settles on its own. Left as-is with the evidence written down rather than guessed at."
       },
       {
         "id": "summary",
@@ -1390,6 +1414,38 @@
     },
     {
       "app": "qud",
+      "from": "stranded_stage",
+      "to": "title",
+      "steps": [
+        {
+          "restart": "qud"
+        }
+      ],
+      "verify": {
+        "scene": "MainMenu"
+      },
+      "timeout": 120,
+      "cost": 120,
+      "note": "RESTART IS THE ONLY WAY OUT, and this edge exists to say so explicitly rather than let the route fall through to the universal `* -> title` hatch -- where picking it is supposed to mean 'a real exit edge is missing'. Here nothing is missing: the game object is gone, so no first-party command can rebuild it, and 20 recorded drive attempts from this state changed nothing. Priced the same as the hatch because it costs the same; nothing routes THROUGH a stranded stage, so the price only affects getting out."
+    },
+    {
+      "app": "qud",
+      "from": "control_mapping",
+      "to": "in_game",
+      "steps": [
+        {
+          "bridge": "uiback"
+        }
+      ],
+      "verify": {
+        "node": "in_game",
+        "exact": true
+      },
+      "timeout": 12,
+      "note": "uiback closes it -- measured. `exact` on the verify because control_mapping is a CHILD of in_game, so the default tolerance (landing deeper is fine) would be satisfied by the very screen this edge exists to LEAVE."
+    },
+    {
+      "app": "qud",
       "from": "*",
       "to": "title",
       "steps": [
@@ -1414,7 +1470,8 @@
           "answers": [
             "Yes",
             "No"
-          ]
+          ],
+          "note": "Answered ON ARRIVAL, not on a timer: the old blind version slept 1.2s between sends, and a socket write to the mod succeeds whether or not a modal is up, so the step could not fail and the real fault surfaced 45s later as the verify. See engine._qud_command_chain."
         },
         {
           "dismiss": {
@@ -1428,7 +1485,7 @@
         "scene": "MainMenu"
       },
       "timeout": 45,
-      "note": "LEAVE A LIVE GAME, first-party throughout: CmdQuit goes through Qud's own command path and the confirms are answered BY BUTTON via the mod, so nothing here depends on synthesized keys -- which Qud's modern UI ignores outright. Yes to 'are you sure you want to quit', then NO to 'do you want to save first': Yes would overwrite the fixture save with whatever state the harness drove the character into, destroying the reference every parity capture is measured against."
+      "note": "LEAVE A LIVE GAME, first-party throughout: CmdQuit goes through Qud's own command path and the confirms are answered BY BUTTON via the mod, so nothing here depends on synthesized keys -- which Qud's modern UI ignores outright. Yes to 'are you sure you want to quit', then NO to 'do you want to save first': Yes would overwrite the fixture save with whatever state the harness drove the character into, destroying the reference every parity capture is measured against. (Qud DISCARDS that second answer -- decompiled XRLCore assigns DialogResult.No and then ignores the prompt's return -- but answer it correctly anyway; the prompt is real and must be cleared.)\n\nTHE CHAIN IS ONLY TWO PROMPTS LONG FOR A CHECKPOINTING SAVE. Measured 2026-08-07 against the shipped assembly and live: CmdQuit raises a THIRD confirm unless Options.DisablePermadeath or CheckpointingSystem.IsCheckpointingEnabled(), and checkpointing is on only for GameMode Wander/Roleplay. On a CLASSIC save Qud raises Popup.AskString('… Type ABANDON to confirm'), a text-input modal. This edge REFUSES to type it -- that is the quit-without-saving path for a permadeath character -- so the engine cancels it and fails with that reason, leaving the game live and the character intact. Reaching the title from a Classic game means restarting.\n\nThat third prompt is the whole of the 'the quit edge breaks on a long-lived process' bug. It never was process age: a bare load/quit loop on the Wander fixture ran 40/40 clean in 9.2 minutes. The session that failed had a Classic character loaded, so the chain hung on the ABANDON prompt every time -- and because the tree still calls that state in_game, every 'retry on a fresh load' planned zero steps and re-tested the same stuck game. Answers are now delivered when the prompt ARRIVES, over a held bridge connection, so an unanswered prompt fails HERE with its text instead of surfacing as the verify timing out 45s later."
     },
     {
       "app": "qud",
@@ -1760,14 +1817,22 @@
       "to": "title",
       "steps": [
         {
-          "bridge": "uiback"
+          "activate": "CavesOfQud"
+        },
+        {
+          "click_text": "Back",
+          "window": "CavesOfQud",
+          "offset": [
+            0,
+            -40
+          ]
         }
       ],
       "verify": {
         "scene": "MainMenu"
       },
       "timeout": 12,
-      "note": "Qud's modern menus ignore ALL OS-synthesized keys; uiback is the mod's first-party back command and is the only thing that closes them."
+      "note": "CLICK, not uiback — the SECOND modern screen to ignore the mod's back command (ModernHighScores was the first). Found by the whole-tree FULL sweep 2026-08-07: uiback left Qud sitting on ModernSaveManagement, and because five other targets route through the title, one stuck screen failed all of them. Measured the same way Records was: the '[Esc] Back' caption OCRs at [33,570,92,13] and clicking it does nothing; clicking 40px ABOVE it returned scene=MainMenu on the first try. Two screens with the same 40px offset is a pattern, not a coincidence — assume any modern screen's caption sits below its hit area. Priced dear because click_text depends on OCR."
     },
     {
       "app": "qud",
@@ -1868,10 +1933,10 @@
       "steps": [
         {
           "dismiss": {
-            "popup": "message",
+            "popup": true,
             "key": "Escape"
           },
-          "note": "CANCEL a stray modal first. A popup left over from an earlier run blocks CmdQuit entirely -- the command goes nowhere and the step then fails for lack of any change. Escape is Cancel on these confirms, so this clears the way without ANSWERING anything."
+          "note": "CANCEL a stray modal first -- ANY kind. A popup left over from an earlier run blocks CmdQuit entirely: the command goes nowhere and the step then fails for lack of any change. Escape is Cancel on all of Raves' modals, so this clears the way without ANSWERING anything. It said `popup: message` until 2026-08-07, which meant a stray `input`/`menu`/`itempicker` modal -- four of the five kinds Raves reports -- read as 'not present' and was left sitting in the way."
         },
         {
           "dismiss": {
@@ -1896,6 +1961,22 @@
             ]
           },
           "note": "'Do you want to save first?' -> Right moves off Yes, Space answers NO. Deliberate: Yes would overwrite the fixture save. One step, because Right alone changes nothing observable."
+        },
+        {
+          "dismiss": {
+            "popup": "input",
+            "refuse": "Qud asks for a typed confirmation ('type ABANDON to confirm') when the save has no checkpointing -- a Classic character -- and completing it quits WITHOUT SAVING, ending a permadeath run. This edge will not type it",
+            "key": "Escape"
+          },
+          "note": "THE THIRD PROMPT. CmdQuit is two confirms for a Wander/Roleplay save and THREE for a Classic one (decompiled XRL.Core.XRLCore: the extra one is raised unless Options.DisablePermadeath or CheckpointingSystem.IsCheckpointingEnabled(), and checkpointing is on only for GameMode Wander/Roleplay). The third is Popup.AskString, mirrored into Raves as popup kind `input`, which the two `popup: message` steps above do not match -- so before this step every one of them reported ok and the edge died 25s later at its verify naming nothing. Measured live 2026-08-07 on the Classic save: message at 2.0s, message at 4.9s, input at 9.2s and still up at 40s."
+        },
+        {
+          "assert": {
+            "app": "qud",
+            "node": "title",
+            "timeout": 20
+          },
+          "note": "CROSS-APP, because this edge does not actually drive Raves -- it drives QUD's quit through the mirrored modals, and Raves returning to its title only means Raves noticed the game ended. Verifying Raves alone let the edge report SUCCESS with Qud stranded on a dead stage (observed 2026-08-07: `hv goto raves title` exit 0, qud_state.json {scene: Stage, live: false}). Qud is the app whose state this edge changes, so Qud is what it has to check.\n\nSafe to demand, and measured rather than assumed: on a healthy quit Qud reaches MainMenu at 8.8s and Raves reaches its title at 12.1s, so Qud LEADS by ~3s and this assert passes on its first poll. The 20s allowance is slack, not a race."
         }
       ],
       "verify": {
@@ -1916,14 +1997,31 @@
         },
         {
           "key": "Escape",
-          "window": "Raves of Qud"
+          "window": "Raves of Qud",
+          "note": "UNVERIFIED on purpose. If the screen's SEARCH FIELD has focus this Escape only defocuses it -- Godot's LineEdit takes it first, and the screen's own handler is suppressed while typing anyway, which is the typing guard working as designed. So this press may or may not leave the screen, and the conditional below is what actually guarantees it."
+        },
+        {
+          "dismiss": {
+            "scene": [
+              "status_skills",
+              "status_attributes",
+              "status_equipment",
+              "status_tinkering",
+              "status_journal",
+              "status_quests",
+              "status_reputation",
+              "status_messagelog"
+            ],
+            "key": "Escape"
+          },
+          "note": "THE SECOND ESCAPE, CONDITIONALLY. Never send it blind: from in_game Escape opens the system menu (measured -- popup=menu), so a fixed two-press chain would leave a modal up exactly when the first press had already worked. Conditioned on still being on a status screen, it is a no-op when the first press was enough and the fix when it was not."
         }
       ],
       "verify": {
         "node": "in_game"
       },
       "timeout": 10,
-      "note": "THE EDGE THAT FIXES TAB-TO-TAB. Raves reaches each tab by pressing its key from in_game, so switching tabs means leaving the current one first. In the recipe model each tab recipe carried its own eight-scene dismiss AND a chain step to in_game whose own recipe routed through `title` -- which from a status screen dismissed it, landed in the game and failed its own assert. Tab-to-tab alternated pass/fail. Here it is one edge the planner inserts when, and only when, it is needed."
+      "note": "LEAVE A STATUS SCREEN. Escape is sent TWICE, the second press conditional, because how many presses it takes depends on whether a text field has focus. Measured 2026-08-07, two arms, deterministic: enter the screen and touch nothing -> one Escape leaves it; click the search field first -> the first Escape only defocuses the field and the edge failed, the second left. The old single-press version reported both its steps ok and died at the verify, naming nothing -- `key` cannot fail, it only posts an event."
     },
     {
       "app": "raves",
@@ -1945,7 +2043,18 @@
           "window": "Raves of Qud"
         },
         {
-          "sleep": 1.5
+          "dismiss": {
+            "scene": "title",
+            "key": "space"
+          },
+          "note": "ACTIVATE, CONDITIONALLY. Raves' title menu is keyboard-first — a click on an UNSELECTED item only moves the selection ('[Space] select'), which is why these edges carry a space at all. But a click on an ALREADY-SELECTED item activates it outright, and the selection persists across a screen round-trip (MainMenu._close_overlay deliberately does not clear it). So the same steps activate once or twice depending on what the previous drive left selected — measured 2026-08-07 in the whole-tree FULL sweep: `goto game_mode` opened the mode card on the click and the unconditional space then confirmed Classic, landing on Choose Genotype. Reproduced from a fresh restart, so it is not drift. `dismiss` presses space ONLY if we are still on the title, which makes the edge idempotent under both behaviours — the same shape the in_game edge already used for the load picker."
+        },
+        {
+          "dismiss": {
+            "scene": "loadgame",
+            "key": "space"
+          },
+          "note": "CONDITIONAL: Continue opens the LOAD GAME picker when there is a choice to make and goes straight in-game when there is not, so this presses the picker's [Space] select only if we actually landed there."
         }
       ],
       "verify": {
@@ -1967,9 +2076,11 @@
           "window": "Raves of Qud"
         },
         {
-          "key": "space",
-          "window": "Raves of Qud",
-          "note": "ACTIVATE. Raves' title menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted the item and stopped there — the recipe then failed its own assert while sitting on the title. Only the in_game edge carried this, which is why that one worked and every other title edge did not. An older note claimed a hover-click self-activates here; that stopped being true when the menus went 1:1 keyboard-first, and nothing re-drove them until this FULL run."
+          "dismiss": {
+            "scene": "title",
+            "key": "space"
+          },
+          "note": "ACTIVATE, CONDITIONALLY. Raves' title menu is keyboard-first — a click on an UNSELECTED item only moves the selection ('[Space] select'), which is why these edges carry a space at all. But a click on an ALREADY-SELECTED item activates it outright, and the selection persists across a screen round-trip (MainMenu._close_overlay deliberately does not clear it). So the same steps activate once or twice depending on what the previous drive left selected — measured 2026-08-07 in the whole-tree FULL sweep: `goto game_mode` opened the mode card on the click and the unconditional space then confirmed Classic, landing on Choose Genotype. Reproduced from a fresh restart, so it is not drift. `dismiss` presses space ONLY if we are still on the title, which makes the edge idempotent under both behaviours — the same shape the in_game edge already used for the load picker."
         }
       ],
       "verify": {
@@ -2009,9 +2120,11 @@
           "window": "Raves of Qud"
         },
         {
-          "key": "space",
-          "window": "Raves of Qud",
-          "note": "ACTIVATE. Raves' title menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted the item and stopped there — the recipe then failed its own assert while sitting on the title. Only the in_game edge carried this, which is why that one worked and every other title edge did not. An older note claimed a hover-click self-activates here; that stopped being true when the menus went 1:1 keyboard-first, and nothing re-drove them until this FULL run."
+          "dismiss": {
+            "scene": "title",
+            "key": "space"
+          },
+          "note": "ACTIVATE, CONDITIONALLY. Raves' title menu is keyboard-first — a click on an UNSELECTED item only moves the selection ('[Space] select'), which is why these edges carry a space at all. But a click on an ALREADY-SELECTED item activates it outright, and the selection persists across a screen round-trip (MainMenu._close_overlay deliberately does not clear it). So the same steps activate once or twice depending on what the previous drive left selected — measured 2026-08-07 in the whole-tree FULL sweep: `goto game_mode` opened the mode card on the click and the unconditional space then confirmed Classic, landing on Choose Genotype. Reproduced from a fresh restart, so it is not drift. `dismiss` presses space ONLY if we are still on the title, which makes the edge idempotent under both behaviours — the same shape the in_game edge already used for the load picker."
         }
       ],
       "verify": {
@@ -2050,9 +2163,11 @@
           "window": "Raves of Qud"
         },
         {
-          "key": "space",
-          "window": "Raves of Qud",
-          "note": "ACTIVATE. Raves' title menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted the item and stopped there — the recipe then failed its own assert while sitting on the title. Only the in_game edge carried this, which is why that one worked and every other title edge did not. An older note claimed a hover-click self-activates here; that stopped being true when the menus went 1:1 keyboard-first, and nothing re-drove them until this FULL run."
+          "dismiss": {
+            "scene": "title",
+            "key": "space"
+          },
+          "note": "ACTIVATE, CONDITIONALLY. Raves' title menu is keyboard-first — a click on an UNSELECTED item only moves the selection ('[Space] select'), which is why these edges carry a space at all. But a click on an ALREADY-SELECTED item activates it outright, and the selection persists across a screen round-trip (MainMenu._close_overlay deliberately does not clear it). So the same steps activate once or twice depending on what the previous drive left selected — measured 2026-08-07 in the whole-tree FULL sweep: `goto game_mode` opened the mode card on the click and the unconditional space then confirmed Classic, landing on Choose Genotype. Reproduced from a fresh restart, so it is not drift. `dismiss` presses space ONLY if we are still on the title, which makes the edge idempotent under both behaviours — the same shape the in_game edge already used for the load picker."
         }
       ],
       "verify": {
@@ -2091,9 +2206,11 @@
           "window": "Raves of Qud"
         },
         {
-          "key": "space",
-          "window": "Raves of Qud",
-          "note": "ACTIVATE. Raves' title menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted the item and stopped there — the recipe then failed its own assert while sitting on the title. Only the in_game edge carried this, which is why that one worked and every other title edge did not. An older note claimed a hover-click self-activates here; that stopped being true when the menus went 1:1 keyboard-first, and nothing re-drove them until this FULL run."
+          "dismiss": {
+            "scene": "title",
+            "key": "space"
+          },
+          "note": "ACTIVATE, CONDITIONALLY. Raves' title menu is keyboard-first — a click on an UNSELECTED item only moves the selection ('[Space] select'), which is why these edges carry a space at all. But a click on an ALREADY-SELECTED item activates it outright, and the selection persists across a screen round-trip (MainMenu._close_overlay deliberately does not clear it). So the same steps activate once or twice depending on what the previous drive left selected — measured 2026-08-07 in the whole-tree FULL sweep: `goto game_mode` opened the mode card on the click and the unconditional space then confirmed Classic, landing on Choose Genotype. Reproduced from a fresh restart, so it is not drift. `dismiss` presses space ONLY if we are still on the title, which makes the edge idempotent under both behaviours — the same shape the in_game edge already used for the load picker."
         }
       ],
       "verify": {
@@ -2150,9 +2267,11 @@
           "window": "Raves of Qud"
         },
         {
-          "key": "space",
-          "window": "Raves of Qud",
-          "note": "ACTIVATE. Raves' title menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted the item and stopped there — the recipe then failed its own assert while sitting on the title. Only the in_game edge carried this, which is why that one worked and every other title edge did not. An older note claimed a hover-click self-activates here; that stopped being true when the menus went 1:1 keyboard-first, and nothing re-drove them until this FULL run."
+          "dismiss": {
+            "scene": "title",
+            "key": "space"
+          },
+          "note": "ACTIVATE, CONDITIONALLY. Raves' title menu is keyboard-first — a click on an UNSELECTED item only moves the selection ('[Space] select'), which is why these edges carry a space at all. But a click on an ALREADY-SELECTED item activates it outright, and the selection persists across a screen round-trip (MainMenu._close_overlay deliberately does not clear it). So the same steps activate once or twice depending on what the previous drive left selected — measured 2026-08-07 in the whole-tree FULL sweep: `goto game_mode` opened the mode card on the click and the unconditional space then confirmed Classic, landing on Choose Genotype. Reproduced from a fresh restart, so it is not drift. `dismiss` presses space ONLY if we are still on the title, which makes the edge idempotent under both behaviours — the same shape the in_game edge already used for the load picker."
         }
       ],
       "verify": {
@@ -2476,6 +2595,29 @@
       "timeout": 10
     },
     {
+      "app": "raves",
+      "from": "control_mapping",
+      "to": "in_game",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "Escape",
+          "window": "Raves of Qud"
+        },
+        {
+          "bridge": "uiback",
+          "note": "QUD's half. Opening Raves' control mapping drives Qud to its Keybinds screen, and Escape on the Raves window closes only Raves' copy -- Qud stays there with its turn thread parked in the UI, so every later CmdQuit goes nowhere. A `bridge` step always talks to Qud whatever app the edge is for, which is exactly what a paired screen needs."
+        }
+      ],
+      "verify": {
+        "node": "in_game"
+      },
+      "timeout": 20,
+      "note": "THERE WAS NO EXIT AT ALL until 2026-08-08, and the missing half was Qud's. Measured in the whole-tree raves tour: control_mapping arrived, Raves left it happily, and the next EIGHT targets failed with `dismiss ran but in_game is still up` because Qud was still sitting on Keybinds. One missing edge, eight reported failures."
+    },
+    {
       "app": "qud",
       "from": "title",
       "to": "game_mode",
@@ -2492,7 +2634,7 @@
         }
       ],
       "verify": {
-        "ocr_contains": "game mode"
+        "node": "game_mode"
       },
       "timeout": 15,
       "note": "Qud shows game mode and the rest of character creation as ONE screen, so this is the same move as title->new_game. Spelled out rather than aliased: an edge whose steps you have to look somewhere else to read is how recipes drifted."
@@ -2510,9 +2652,11 @@
           "window": "Raves of Qud"
         },
         {
-          "key": "space",
-          "window": "Raves of Qud",
-          "note": "ACTIVATE. Raves' title menu is keyboard-first: a click only MOVES THE SELECTION (its own hint bar says '[Space] select'), so click_text alone highlighted the item and stopped there — the recipe then failed its own assert while sitting on the title. Only the in_game edge carried this, which is why that one worked and every other title edge did not. An older note claimed a hover-click self-activates here; that stopped being true when the menus went 1:1 keyboard-first, and nothing re-drove them until this FULL run."
+          "dismiss": {
+            "scene": "title",
+            "key": "space"
+          },
+          "note": "ACTIVATE, CONDITIONALLY. Raves' title menu is keyboard-first — a click on an UNSELECTED item only moves the selection ('[Space] select'), which is why these edges carry a space at all. But a click on an ALREADY-SELECTED item activates it outright, and the selection persists across a screen round-trip (MainMenu._close_overlay deliberately does not clear it). So the same steps activate once or twice depending on what the previous drive left selected — measured 2026-08-07 in the whole-tree FULL sweep: `goto game_mode` opened the mode card on the click and the unconditional space then confirmed Classic, landing on Choose Genotype. Reproduced from a fresh restart, so it is not drift. `dismiss` presses space ONLY if we are still on the title, which makes the edge idempotent under both behaviours — the same shape the in_game edge already used for the load picker."
         }
       ],
       "verify": {
