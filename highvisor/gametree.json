@@ -1300,7 +1300,7 @@
           {
             "id": "control_mapping",
             "label": "Control Mapping",
-            "note": "system menu -> Control Mapping. QUD DETECTION GAP: KeybindsScreen never updates _ActiveGameView (scene stays 'play'), so qud detect leans on OCR only.",
+            "note": "Qud reports this screen first-party as scene `Keybinds` (view) / `KeybindsScreen` (window), and until 2026-08-08 the tree only had an OCR detector for it -- so a Qud parked here matched no scene at all and fell through to `title`'s `{game_live: false}` alternative. `hv state` then said \"Title Screen via=live\" about a screen with a LIVE game behind it (the probe reads false because the turn thread is parked in the Keybinds UI and publishes no snapshot). Naming the screen is what makes it both legible and routable.",
             "done": {
               "qud": 0.8,
               "raves": 0.3
@@ -1312,6 +1312,12 @@
                 }
               ],
               "qud": [
+                {
+                  "scene": [
+                    "Keybinds",
+                    "KeybindsScreen"
+                  ]
+                },
                 {
                   "ocr_any": [
                     "control mapping",
@@ -1420,6 +1426,22 @@
       "timeout": 120,
       "cost": 120,
       "note": "RESTART IS THE ONLY WAY OUT, and this edge exists to say so explicitly rather than let the route fall through to the universal `* -> title` hatch -- where picking it is supposed to mean 'a real exit edge is missing'. Here nothing is missing: the game object is gone, so no first-party command can rebuild it, and 20 recorded drive attempts from this state changed nothing. Priced the same as the hatch because it costs the same; nothing routes THROUGH a stranded stage, so the price only affects getting out."
+    },
+    {
+      "app": "qud",
+      "from": "control_mapping",
+      "to": "in_game",
+      "steps": [
+        {
+          "bridge": "uiback"
+        }
+      ],
+      "verify": {
+        "node": "in_game",
+        "exact": true
+      },
+      "timeout": 12,
+      "note": "uiback closes it -- measured. `exact` on the verify because control_mapping is a CHILD of in_game, so the default tolerance (landing deeper is fine) would be satisfied by the very screen this edge exists to LEAVE."
     },
     {
       "app": "qud",
@@ -2487,6 +2509,29 @@
         "app": "raves"
       },
       "timeout": 10
+    },
+    {
+      "app": "raves",
+      "from": "control_mapping",
+      "to": "in_game",
+      "steps": [
+        {
+          "activate": "Raves of Qud"
+        },
+        {
+          "key": "Escape",
+          "window": "Raves of Qud"
+        },
+        {
+          "bridge": "uiback",
+          "note": "QUD's half. Opening Raves' control mapping drives Qud to its Keybinds screen, and Escape on the Raves window closes only Raves' copy -- Qud stays there with its turn thread parked in the UI, so every later CmdQuit goes nowhere. A `bridge` step always talks to Qud whatever app the edge is for, which is exactly what a paired screen needs."
+        }
+      ],
+      "verify": {
+        "node": "in_game"
+      },
+      "timeout": 20,
+      "note": "THERE WAS NO EXIT AT ALL until 2026-08-08, and the missing half was Qud's. Measured in the whole-tree raves tour: control_mapping arrived, Raves left it happily, and the next EIGHT targets failed with `dismiss ran but in_game is still up` because Qud was still sitting on Keybinds. One missing edge, eight reported failures."
     },
     {
       "app": "qud",
